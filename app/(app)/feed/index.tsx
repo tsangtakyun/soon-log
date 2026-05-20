@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { LogCard } from '@/components/LogCard';
 import { EmptyState, Screen } from '@/components/ui';
@@ -26,7 +25,7 @@ export default function FeedScreen() {
         <FlatList
           data={logs}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <LogCard log={item} onPress={() => router.push(`/(app)/log/${item.id}`)} />}
+          renderItem={({ item }) => <LogCard log={item} />}
           refreshing={refreshing}
           onRefresh={refresh}
           onEndReached={loadMore}

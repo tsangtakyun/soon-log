@@ -1,5 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { GestureResponderEvent, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 import { Log } from '@/types';
@@ -14,15 +18,64 @@ function timeAgo(value: string) {
   return `${days} 日前`;
 }
 
-export function LogCard({ log, onPress }: { log: Log; onPress: () => void }) {
+export function LogCard({ log, onPress }: { log: Log; onPress?: () => void }) {
+  const router = useRouter();
+  const { user } = useAuth();
+  const [isLiked, setIsLiked] = useState(Boolean(log.liked_by_me));
+  const [likeCount, setLikeCount] = useState(log.like_count ?? 0);
   const profile = log.profile;
   const username = profile?.username ?? 'soon';
   const displayName = profile?.display_name || username;
   const cover = log.media_urls?.[0];
   const hasCover = Boolean(cover);
 
+  useEffect(() => {
+    setIsLiked(Boolean(log.liked_by_me));
+    setLikeCount(log.like_count ?? 0);
+  }, [log.liked_by_me, log.like_count]);
+
+  const openDetail = () => {
+    if (onPress) {
+      onPress();
+      return;
+    }
+    router.push(`/(app)/log/${log.id}`);
+  };
+
+  const toggleLike = async (event?: GestureResponderEvent) => {
+    event?.stopPropagation();
+    if (!user) return;
+
+    if (isLiked) {
+      setIsLiked(false);
+      setLikeCount((count) => Math.max(0, count - 1));
+      const { error } = await supabase
+        .from('likes')
+        .delete()
+        .eq('log_id', log.id)
+        .eq('user_id', user.id);
+
+      if (error) {
+        setIsLiked(true);
+        setLikeCount((count) => count + 1);
+      }
+      return;
+    }
+
+    setIsLiked(true);
+    setLikeCount((count) => count + 1);
+    const { error } = await supabase
+      .from('likes')
+      .insert({ log_id: log.id, user_id: user.id });
+
+    if (error) {
+      setIsLiked(false);
+      setLikeCount((count) => Math.max(0, count - 1));
+    }
+  };
+
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+    <Pressable onPress={openDetail} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       {hasCover ? (
         <View style={styles.coverWrap}>
           <Image source={{ uri: cover }} style={styles.cover} />
@@ -56,7 +109,9 @@ export function LogCard({ log, onPress }: { log: Log; onPress: () => void }) {
             ))}
           </View>
           <View style={styles.metrics}>
-            <Text style={[styles.metric, log.liked_by_me && styles.liked]}>{log.liked_by_me ? '♥' : '♡'} {log.like_count ?? 0}</Text>
+            <Pressable onPress={toggleLike} hitSlop={8} style={styles.metricButton}>
+              <Text style={[styles.metric, isLiked && styles.liked]}>{isLiked ? '♥' : '♡'} {likeCount}</Text>
+            </Pressable>
             <Text style={styles.metric}>◌ {log.comment_count ?? 0}</Text>
           </View>
         </View>
@@ -178,6 +233,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9
+  },
+  metricButton: {
+    minHeight: 24,
+    justifyContent: 'center'
   },
   metric: {
     color: colors.textMuted,

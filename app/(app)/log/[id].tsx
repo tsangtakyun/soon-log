@@ -1,160 +1,341 @@
-import * as WebBrowser from 'expo-web-browser';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from 'react-native';
 import { Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
-import { Comment, Log } from '@/types';
+import { Comment, Log, Profile } from '@/types';
+
+type LogWithAuthor = Log & {
+  profiles?: Profile | null;
+};
+
+type CommentWithAuthor = Comment & {
+  profiles?: Pick<Profile, 'username' | 'display_name' | 'avatar_url'> | null;
+};
+
+function timeAgo(value: string) {
+  const diff = Date.now() - new Date(value).getTime();
+  const minutes = Math.max(1, Math.floor(diff / 60000));
+  if (minutes < 60) return `${minutes} 分鐘前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小時前`;
+  const days = Math.floor(hours / 24);
+  return `${days} 日前`;
+}
+
+function avatarLabel(profile?: Pick<Profile, 'username' | 'display_name'> | null) {
+  return (profile?.display_name ?? profile?.username ?? 'S').slice(0, 1).toUpperCase();
+}
+
+function Avatar({ profile, size }: { profile?: Pick<Profile, 'username' | 'display_name' | 'avatar_url'> | null; size: number }) {
+  if (profile?.avatar_url) {
+    return <Image source={{ uri: profile.avatar_url }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  }
+
+  return (
+    <View style={[styles.avatarFallback, { width: size, height: size, borderRadius: size / 2 }]}>
+      <Text style={styles.avatarText}>{avatarLabel(profile)}</Text>
+    </View>
+  );
+}
 
 export default function LogDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const logId = Array.isArray(id) ? id[0] : id;
   const { user } = useAuth();
-  const [log, setLog] = useState<Log | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [commentBody, setCommentBody] = useState('');
-  const [notesOpen, setNotesOpen] = useState(true);
+  const [log, setLog] = useState<LogWithAuthor | null>(null);
+  const [comments, setComments] = useState<CommentWithAuthor[]>([]);
+  const [commentText, setCommentText] = useState('');
+  const [notesOpen, setNotesOpen] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
-  const [liked, setLiked] = useState(false);
+  const [commentCount, setCommentCount] = useState(0);
+  const [isLiked, setIsLiked] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const author = log?.profiles ?? log?.profile;
+
+  const fetchLikeCount = useCallback(async () => {
+    if (!logId) return;
+    const { count } = await supabase
+      .from('likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('log_id', logId);
+    setLikeCount(count ?? 0);
+  }, [logId]);
+
+  const fetchComments = useCallback(async () => {
+    if (!logId) return;
+    const { data, error } = await supabase
+      .from('comments')
+      .select('*, profiles(username, display_name, avatar_url)')
+      .eq('log_id', logId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    setComments((data ?? []) as CommentWithAuthor[]);
+    setCommentCount(data?.length ?? 0);
+  }, [logId]);
 
   const load = useCallback(async () => {
-    const { data: logData, error } = await supabase
-      .from('logs')
-      .select('*, profile:profiles!logs_user_id_fkey(*)')
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-    setLog(logData as Log);
+    if (!logId) return;
+    setLoading(true);
 
-    const [{ data: likeRows }, { data: myLike }, { data: commentRows }] = await Promise.all([
-      supabase.from('likes').select('user_id').eq('log_id', id),
-      user ? supabase.from('likes').select('log_id').eq('log_id', id).eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
-      supabase.from('comments').select('*, profile:profiles!comments_user_id_fkey(*)').eq('log_id', id).order('created_at', { ascending: true })
+    const { data, error } = await supabase
+      .from('logs')
+      .select('*, profiles(*)')
+      .eq('id', logId)
+      .single();
+
+    if (error) throw error;
+    setLog(data as LogWithAuthor);
+
+    const [{ data: existingLike }, { count }] = await Promise.all([
+      user
+        ? supabase
+          .from('likes')
+          .select('*')
+          .eq('log_id', logId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from('likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('log_id', logId)
     ]);
 
-    setLikeCount(likeRows?.length ?? 0);
-    setLiked(Boolean(myLike));
-    setComments((commentRows ?? []) as Comment[]);
-  }, [id, user]);
+    setIsLiked(!!existingLike);
+    setLikeCount(count ?? 0);
+    await fetchComments();
+    setLoading(false);
+  }, [fetchComments, logId, user]);
 
   useEffect(() => {
-    load().catch((error) => Alert.alert('載入失敗', error.message));
+    load().catch((error) => {
+      setLoading(false);
+      Alert.alert('載入失敗', error instanceof Error ? error.message : '請稍後再試。');
+    });
   }, [load]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`log-detail-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'likes', filter: `log_id=eq.${id}` }, () => {
-        supabase.from('likes').select('user_id').eq('log_id', id).then(({ data }) => setLikeCount(data?.length ?? 0));
-        if (user) {
-          supabase.from('likes').select('log_id').eq('log_id', id).eq('user_id', user.id).maybeSingle().then(({ data }) => setLiked(Boolean(data)));
-        }
+    if (!logId) return;
+
+    const likesChannel = supabase
+      .channel(`likes-${logId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'likes',
+        filter: `log_id=eq.${logId}`
+      }, () => {
+        fetchLikeCount();
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments', filter: `log_id=eq.${id}` }, async (payload) => {
-        const next = payload.new as Comment;
-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', next.user_id).maybeSingle();
-        setComments((current) => current.some((item) => item.id === next.id) ? current : [...current, { ...next, profile }]);
+      .subscribe();
+
+    const commentsChannel = supabase
+      .channel(`comments-${logId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'comments',
+        filter: `log_id=eq.${logId}`
+      }, () => {
+        fetchComments().catch(() => undefined);
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(likesChannel);
+      supabase.removeChannel(commentsChannel);
     };
-  }, [id, user]);
+  }, [fetchComments, fetchLikeCount, logId]);
 
-  const toggleLike = async () => {
-    if (!user || !log) return;
-    if (liked) {
-      await supabase.from('likes').delete().eq('log_id', log.id).eq('user_id', user.id);
-    } else {
-      await supabase.from('likes').insert({ log_id: log.id, user_id: user.id });
-    }
-  };
+  async function toggleLike() {
+    if (!user || !logId) return;
 
-  const submitComment = async () => {
-    if (!user || !commentBody.trim()) return;
-    const { error } = await supabase.from('comments').insert({ log_id: id, user_id: user.id, body: commentBody.trim() });
-    if (error) {
-      Alert.alert('留言失敗', error.message);
+    if (isLiked) {
+      setLikeCount((count) => Math.max(0, count - 1));
+      setIsLiked(false);
+      const { error } = await supabase
+        .from('likes')
+        .delete()
+        .eq('log_id', logId)
+        .eq('user_id', user.id);
+      if (error) {
+        setLikeCount((count) => count + 1);
+        setIsLiked(true);
+        Alert.alert('取消喜歡失敗', error.message);
+      }
       return;
     }
-    setCommentBody('');
-  };
 
-  if (!log) return <Screen><View /></Screen>;
+    setLikeCount((count) => count + 1);
+    setIsLiked(true);
+    const { error } = await supabase
+      .from('likes')
+      .insert({ log_id: logId, user_id: user.id });
 
-  const profile = log.profile;
-  const coreUrl = `https://soon-core.vercel.app/logs/${log.id}`;
+    if (error) {
+      setLikeCount((count) => Math.max(0, count - 1));
+      setIsLiked(false);
+      Alert.alert('喜歡失敗', error.message);
+    }
+  }
+
+  async function submitComment() {
+    if (!commentText.trim() || !user || !logId) return;
+
+    const body = commentText.trim();
+    setCommentText('');
+    const { error } = await supabase.from('comments').insert({
+      log_id: logId,
+      user_id: user.id,
+      body
+    });
+
+    if (error) {
+      setCommentText(body);
+      Alert.alert('留言失敗', error.message);
+    }
+  }
+
+  const tagItems = useMemo(() => log?.tags?.filter(Boolean) ?? [], [log?.tags]);
+
+  if (loading) {
+    return (
+      <Screen>
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.accent} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (!log) {
+    return (
+      <Screen>
+        <View style={styles.loading}>
+          <Text style={styles.emptyText}>找不到這篇紀錄。</Text>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.wrap}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
+        <ScrollView contentContainerStyle={styles.wrap} showsVerticalScrollIndicator={false}>
           <View style={styles.topbar}>
-            <Pressable onPress={() => router.back()}><Text style={styles.link}>返回</Text></Pressable>
+            <Pressable onPress={() => router.back()} hitSlop={10}>
+              <Text style={styles.back}>返回</Text>
+            </Pressable>
             <Text style={styles.topTitle}>紀錄</Text>
-            <View style={{ width: 38 }} />
+            <View style={styles.topbarSpacer} />
           </View>
 
-          <Pressable onPress={() => profile?.username && router.push(`/(app)/profile/${profile.username}`)} style={styles.author}>
-            {profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={styles.avatar} /> : <View style={styles.avatarFallback}><Text style={styles.avatarText}>{(profile?.username ?? 'S').slice(0, 1).toUpperCase()}</Text></View>}
-            <View>
-              <Text style={styles.name}>{profile?.display_name || profile?.username || '創作者'}</Text>
-              <Text style={styles.meta}>@{profile?.username ?? 'soon'}</Text>
+          <View style={styles.header}>
+            <Avatar profile={author} size={40} />
+            <View style={styles.authorText}>
+              <Text style={styles.displayName}>{author?.display_name || author?.username || '創作者'}</Text>
+              <Text style={styles.username}>@{author?.username ?? 'soon'} · {timeAgo(log.created_at)}</Text>
             </View>
-          </Pressable>
+          </View>
 
-          {!!log.title && <Text style={styles.title}>{log.title}</Text>}
+          {!!log.title && <Text style={styles.title}>✦ {log.title}</Text>}
           <Text style={styles.body}>{log.body}</Text>
 
-          {log.media_urls?.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaRow}>
-              {log.media_urls.map((uri) => <Image key={uri} source={{ uri }} style={styles.image} />)}
-            </ScrollView>
-          )}
-
           {!!log.production_notes && (
-            <View style={styles.notes}>
-              <Pressable onPress={() => setNotesOpen((value) => !value)} style={styles.notesHeader}>
-                <Text style={styles.sectionTitle}>製作筆記</Text>
-                <Text style={styles.link}>{notesOpen ? '收起' : '展開'}</Text>
+            <View style={styles.notesSection}>
+              <Pressable onPress={() => setNotesOpen((open) => !open)} style={styles.notesHeader}>
+                <Text style={styles.notesLabel}>📝 製作筆記</Text>
+                <Text style={styles.chevron}>{notesOpen ? '▲' : '▼'}</Text>
               </Pressable>
-              {notesOpen && <Text style={styles.noteBody}>{log.production_notes}</Text>}
+              {notesOpen ? <Text style={styles.notesBody}>{log.production_notes}</Text> : null}
             </View>
           )}
 
-          <View style={styles.actions}>
-            <Pressable onPress={toggleLike} style={[styles.likeButton, liked && styles.likeActive]}>
-              <Text style={styles.likeText}>{liked ? '已喜歡' : '喜歡'} · {likeCount}</Text>
+          {!!log.video_url && (
+            <Pressable onPress={() => log.video_url && Linking.openURL(log.video_url)} style={styles.videoPill}>
+              <Text style={styles.videoText}>▶ 睇片</Text>
             </Pressable>
-            <Pressable onPress={() => WebBrowser.openBrowserAsync(coreUrl)} style={styles.coreButton}>
-              <Text style={styles.coreButtonText}>在 SOON-CORE 查看</Text>
-            </Pressable>
-            {!!log.video_url && <Text style={styles.video}>{log.platform ?? 'video'} · {log.video_url}</Text>}
+          )}
+
+          <Pressable onPress={() => Linking.openURL(`https://soon-core.vercel.app/logs/${log.id}`)} style={styles.coreLink}>
+            <Text style={styles.coreLinkText}>在 SOON-CORE 查看</Text>
+          </Pressable>
+
+          {log.media_urls?.length ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageRow}>
+              {log.media_urls.map((uri) => (
+                <Image key={uri} source={{ uri }} style={styles.image} />
+              ))}
+            </ScrollView>
+          ) : null}
+
+          {tagItems.length ? (
+            <View style={styles.tags}>
+              {tagItems.map((tag) => (
+                <Text key={tag} style={styles.tag}>✦ {tag}</Text>
+              ))}
+            </View>
+          ) : null}
+
+          <View style={styles.countRow}>
+            <Text style={[styles.countText, isLiked && styles.likedText]}>{isLiked ? '♥' : '♡'} {likeCount}</Text>
+            <Text style={styles.countText}>◌ {commentCount}</Text>
           </View>
 
-          <View style={styles.comments}>
-            <Text style={styles.sectionTitle}>留言</Text>
-            {comments.map((comment) => (
-              <View key={comment.id} style={styles.comment}>
-                <Text style={styles.commentName}>@{comment.profile?.username ?? 'soon'}</Text>
-                <Text style={styles.commentBody}>{comment.body}</Text>
-              </View>
-            ))}
+          <View style={styles.commentsSection}>
+            <Text style={styles.commentsTitle}>留言</Text>
+            {comments.map((comment) => {
+              const profile = comment.profiles ?? comment.profile;
+              return (
+                <View key={comment.id} style={styles.commentRow}>
+                  <Avatar profile={profile} size={28} />
+                  <View style={styles.commentContent}>
+                    <View style={styles.commentMeta}>
+                      <Text style={styles.commentName}>{profile?.display_name || profile?.username || 'SOON'}</Text>
+                      <Text style={styles.commentTime}>{timeAgo(comment.created_at)}</Text>
+                    </View>
+                    <Text style={styles.commentBody}>{comment.body}</Text>
+                  </View>
+                </View>
+              );
+            })}
           </View>
         </ScrollView>
 
-        <View style={styles.inputBar}>
+        <View style={styles.bottomBar}>
+          <Pressable onPress={toggleLike} style={styles.heartButton} hitSlop={8}>
+            <Text style={[styles.heartText, isLiked && styles.heartLiked]}>{isLiked ? '♥' : '♡'}</Text>
+          </Pressable>
+          <Text style={styles.bottomCount}>{commentCount}</Text>
           <TextInput
-            value={commentBody}
-            onChangeText={setCommentBody}
-            placeholder="寫低你的回應"
+            value={commentText}
+            onChangeText={setCommentText}
+            placeholder="留言..."
             placeholderTextColor={colors.textMuted}
             style={styles.commentInput}
           />
-          <Pressable onPress={submitComment} style={styles.send}><Text style={styles.sendText}>送出</Text></Pressable>
+          <Pressable onPress={submitComment} disabled={!commentText.trim()} style={[styles.sendButton, !commentText.trim() && styles.sendDisabled]}>
+            <Text style={styles.sendText}>送出</Text>
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </Screen>
@@ -162,203 +343,296 @@ export default function LogDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1
+  },
+  loading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  emptyText: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 15
+  },
   wrap: {
-    paddingTop: 58,
-    paddingBottom: 110,
-    gap: 16
+    paddingTop: 56,
+    paddingBottom: 128,
+    gap: 18
   },
   topbar: {
     paddingHorizontal: 16,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    justifyContent: 'space-between'
   },
-  topTitle: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 16
-  },
-  link: {
+  back: {
     color: colors.gold,
     fontFamily: fonts.bodyMedium,
     fontSize: 14
   },
-  author: {
+  topTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15
+  },
+  topbarSpacer: {
+    width: 34
+  },
+  header: {
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10
   },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22
-  },
   avatarFallback: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.accent
   },
   avatarText: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold
+    color: colors.bgCard,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14
   },
-  name: {
+  authorText: {
+    flex: 1
+  },
+  displayName: {
     color: colors.text,
     fontFamily: fonts.bodyBold,
     fontSize: 15
   },
-  meta: {
+  username: {
     color: colors.textMuted,
     fontFamily: fonts.body,
-    fontSize: 12
+    fontSize: 12,
+    marginTop: 2
   },
   title: {
     paddingHorizontal: 16,
     color: colors.text,
     fontFamily: fonts.heading,
-    fontSize: 34,
-    lineHeight: 38
+    fontSize: 28,
+    lineHeight: 34
   },
   body: {
     paddingHorizontal: 16,
-    color: colors.text,
+    color: '#3A3A3A',
     fontFamily: fonts.body,
     fontSize: 16,
-    lineHeight: 24
+    lineHeight: 26
   },
-  mediaRow: {
-    paddingHorizontal: 16,
-    gap: 12
-  },
-  image: {
-    width: 290,
-    height: 220,
-    borderRadius: 8,
-    backgroundColor: colors.bgCard
-  },
-  notes: {
+  notesSection: {
     marginHorizontal: 16,
-    padding: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bgCard
+    gap: 10
   },
   notesHeader: {
+    minHeight: 42,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: colors.bgMuted,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between'
   },
-  sectionTitle: {
+  notesLabel: {
     color: colors.text,
     fontFamily: fonts.bodyBold,
-    fontSize: 16
+    fontSize: 15
   },
-  noteBody: {
-    marginTop: 10,
+  chevron: {
     color: colors.textMuted,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13
+  },
+  notesBody: {
+    color: colors.textMuted,
+    backgroundColor: colors.bgMuted,
+    borderRadius: 12,
+    padding: 16,
     fontFamily: fonts.body,
     fontSize: 15,
-    lineHeight: 22
+    fontStyle: 'italic',
+    lineHeight: 24
   },
-  actions: {
-    paddingHorizontal: 16,
-    gap: 10,
-    alignItems: 'flex-start'
-  },
-  likeButton: {
+  videoPill: {
     alignSelf: 'flex-start',
-    borderRadius: 8,
+    marginHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: colors.text,
+    paddingHorizontal: 16,
+    paddingVertical: 9
+  },
+  videoText: {
+    color: colors.bgCard,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14
+  },
+  coreLink: {
+    alignSelf: 'flex-start',
+    marginHorizontal: 16,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: colors.bgCard
-  },
-  likeActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.bgMuted
-  },
-  likeText: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold
-  },
-  coreButton: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.gold,
+    backgroundColor: colors.bgCard,
     paddingHorizontal: 14,
-    paddingVertical: 9,
+    paddingVertical: 8
+  },
+  coreLinkText: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
+  },
+  imageRow: {
+    paddingHorizontal: 16
+  },
+  image: {
+    width: 280,
+    height: 350,
+    borderRadius: 12,
+    marginRight: 12,
     backgroundColor: colors.bgMuted
   },
-  coreButtonText: {
-    color: colors.gold,
+  tags: {
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  tag: {
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: colors.bgMuted,
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6
+  },
+  countRow: {
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16
+  },
+  countText: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14
+  },
+  likedText: {
+    color: colors.accent
+  },
+  commentsSection: {
+    paddingHorizontal: 16,
+    gap: 2
+  },
+  commentsTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    marginBottom: 8
+  },
+  commentRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.bgMuted
+  },
+  commentContent: {
+    flex: 1,
+    gap: 4
+  },
+  commentMeta: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8
+  },
+  commentName: {
+    color: colors.text,
     fontFamily: fonts.bodyBold,
     fontSize: 13
   },
-  video: {
-    color: colors.gold,
+  commentTime: {
+    color: colors.textMuted,
     fontFamily: fonts.body,
-    fontSize: 13
-  },
-  comments: {
-    paddingHorizontal: 16,
-    gap: 12
-  },
-  comment: {
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border
-  },
-  commentName: {
-    color: colors.gold,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 13
+    fontSize: 11
   },
   commentBody: {
-    color: colors.text,
+    color: '#3A3A3A',
     fontFamily: fonts.body,
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: 4
+    fontSize: 14,
+    lineHeight: 21
   },
-  inputBar: {
+  bottomBar: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
     paddingHorizontal: 12,
     paddingTop: 10,
-    paddingBottom: 28,
-    flexDirection: 'row',
-    gap: 8,
+    paddingBottom: 26,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    backgroundColor: colors.bg
+    backgroundColor: colors.bg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  heartButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgCard,
+    borderWidth: 1,
+    borderColor: colors.border
+  },
+  heartText: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyBold,
+    fontSize: 22
+  },
+  heartLiked: {
+    color: colors.accent
+  },
+  bottomCount: {
+    minWidth: 18,
+    color: colors.textMuted,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    textAlign: 'center'
   },
   commentInput: {
     flex: 1,
-    minHeight: 44,
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    minHeight: 42,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    backgroundColor: colors.bgCard,
+    borderWidth: 1,
+    borderColor: colors.border,
     color: colors.text,
     fontFamily: fonts.body,
-    backgroundColor: colors.bgCard
+    fontSize: 14
   },
-  send: {
-    height: 44,
-    borderRadius: 8,
-    paddingHorizontal: 16,
+  sendButton: {
+    minHeight: 42,
+    borderRadius: 999,
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.accent
   },
+  sendDisabled: {
+    opacity: 0.42
+  },
   sendText: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold
+    color: colors.bgCard,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13
   }
 });
