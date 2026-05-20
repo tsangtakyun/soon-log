@@ -72,7 +72,7 @@ export default function CreateLogScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsMultipleSelection: true,
       selectionLimit: Math.max(1, 4 - selectedImages.length),
       quality: 0.8
