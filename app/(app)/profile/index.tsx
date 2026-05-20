@@ -18,18 +18,9 @@ import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 import { Log, Profile, Region } from '@/types';
+import { normalizeImageForUpload } from '@/lib/images';
 
 const regions: Region[] = ['HK', 'TW', 'SG', 'OTHER'];
-
-function cleanImageExtension(uri: string) {
-  const ext = uri.split('.').pop()?.split('?')[0]?.toLowerCase();
-  if (!ext || ext === 'jpeg') return 'jpg';
-  return ext;
-}
-
-function imageContentType(ext: string) {
-  return ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
-}
 
 export default function OwnProfileScreen() {
   const { user, signOut, refreshProfile } = useAuth();
@@ -153,16 +144,15 @@ export default function OwnProfileScreen() {
 
     try {
       setUploadingAvatar(true);
-      const uri = result.assets[0].uri;
-      const ext = cleanImageExtension(uri);
-      const fileName = `avatars/${user.id}.${ext}`;
-      const response = await fetch(uri);
+      const image = await normalizeImageForUpload(result.assets[0].uri, 1024);
+      const fileName = `avatars/${user.id}.jpg`;
+      const response = await fetch(image.uri);
       const blob = await response.blob();
 
       const { error } = await supabase.storage
         .from('log-media')
         .upload(fileName, blob, {
-          contentType: blob.type || imageContentType(ext),
+          contentType: image.contentType,
           upsert: true
         });
 
@@ -171,14 +161,15 @@ export default function OwnProfileScreen() {
       const { data: { publicUrl } } = supabase.storage
         .from('log-media')
         .getPublicUrl(fileName);
+      const versionedPublicUrl = `${publicUrl}?v=${Date.now()}`;
 
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ avatar_url: publicUrl })
+        .update({ avatar_url: versionedPublicUrl })
         .eq('id', user.id);
 
       if (updateError) throw updateError;
-      setProfile((current) => current ? { ...current, avatar_url: publicUrl } : current);
+      setProfile((current) => current ? { ...current, avatar_url: versionedPublicUrl } : current);
       await refreshProfile();
     } catch (error) {
       Alert.alert('上載失敗', error instanceof Error ? error.message : '請稍後再試。');

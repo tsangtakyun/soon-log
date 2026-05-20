@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
+import { normalizeImageForUpload } from '@/lib/images';
 
 function detectPlatform(url: string) {
   const lower = url.toLowerCase();
@@ -17,28 +18,19 @@ function detectPlatform(url: string) {
   return null;
 }
 
-function cleanImageExtension(uri: string) {
-  const ext = uri.split('.').pop()?.toLowerCase()?.split('?')[0] || 'jpg';
-  return ext === 'jpeg' ? 'jpg' : ext;
-}
-
-function imageContentType(ext: string) {
-  return ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
-}
-
 async function uploadImages(logId: string, selectedImages: string[]): Promise<string[]> {
   const urls: string[] = [];
 
   for (const uri of selectedImages) {
-    const ext = cleanImageExtension(uri);
-    const fileName = `logs/${logId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const response = await fetch(uri);
+    const image = await normalizeImageForUpload(uri);
+    const fileName = `logs/${logId}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+    const response = await fetch(image.uri);
     const blob = await response.blob();
 
     const { error } = await supabase.storage
       .from('log-media')
       .upload(fileName, blob, {
-        contentType: blob.type || imageContentType(ext)
+        contentType: image.contentType
       });
 
     if (error) throw error;
@@ -79,7 +71,10 @@ export default function CreateLogScreen() {
     });
 
     if (!result.canceled) {
-      setSelectedImages((current) => [...current, ...result.assets.map((asset) => asset.uri)].slice(0, 4));
+      const normalized = await Promise.all(
+        result.assets.map((asset) => normalizeImageForUpload(asset.uri))
+      );
+      setSelectedImages((current) => [...current, ...normalized.map((image) => image.uri)].slice(0, 4));
     }
   };
 
