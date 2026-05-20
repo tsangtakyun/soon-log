@@ -8,7 +8,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
-import { normalizeImageForUpload } from '@/lib/images';
 
 function detectPlatform(url: string) {
   const lower = url.toLowerCase();
@@ -22,15 +21,14 @@ async function uploadImages(logId: string, selectedImages: string[]): Promise<st
   const urls: string[] = [];
 
   for (const uri of selectedImages) {
-    const image = await normalizeImageForUpload(uri);
     const fileName = `logs/${logId}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-    const response = await fetch(image.uri);
+    const response = await fetch(uri);
     const blob = await response.blob();
 
     const { error } = await supabase.storage
       .from('log-media')
       .upload(fileName, blob, {
-        contentType: image.contentType
+        contentType: 'image/jpeg'
       });
 
     if (error) throw error;
@@ -67,14 +65,12 @@ export default function CreateLogScreen() {
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
       selectionLimit: Math.max(1, 4 - selectedImages.length),
-      quality: 0.8
+      quality: 0.8,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible
     });
 
     if (!result.canceled) {
-      const normalized = await Promise.all(
-        result.assets.map((asset) => normalizeImageForUpload(asset.uri))
-      );
-      setSelectedImages((current) => [...current, ...normalized.map((image) => image.uri)].slice(0, 4));
+      setSelectedImages((current) => [...current, ...result.assets.map((asset) => asset.uri)].slice(0, 4));
     }
   };
 

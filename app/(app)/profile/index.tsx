@@ -18,9 +18,13 @@ import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 import { Log, Profile, Region } from '@/types';
-import { normalizeImageForUpload } from '@/lib/images';
 
 const regions: Region[] = ['HK', 'TW', 'SG', 'OTHER'];
+
+async function jpegBlobFromImageUri(uri: string) {
+  const response = await fetch(uri);
+  return response.blob();
+}
 
 export default function OwnProfileScreen() {
   const { user, signOut, refreshProfile } = useAuth();
@@ -137,22 +141,21 @@ export default function OwnProfileScreen() {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8
+      quality: 0.8,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible
     });
 
     if (result.canceled) return;
 
     try {
       setUploadingAvatar(true);
-      const image = await normalizeImageForUpload(result.assets[0].uri, 1024);
       const fileName = `avatars/${user.id}.jpg`;
-      const response = await fetch(image.uri);
-      const blob = await response.blob();
+      const blob = await jpegBlobFromImageUri(result.assets[0].uri);
 
       const { error } = await supabase.storage
         .from('log-media')
         .upload(fileName, blob, {
-          contentType: image.contentType,
+          contentType: 'image/jpeg',
           upsert: true
         });
 
