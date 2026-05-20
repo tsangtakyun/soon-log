@@ -12,6 +12,7 @@ import {
   TextInput,
   View
 } from 'react-native';
+import Markdown from 'react-native-markdown-display';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
@@ -24,7 +25,9 @@ const SYSTEM_PROMPT = `你係 Mayan，SOON Creator Network 嘅 AI 創作助手�
 你專門幫助亞洲創作者（香港、台灣、新加坡）規劃內容、
 分析題材、撰寫腳本同優化創作策略。
 你用廣東話回覆，語氣友善、專業、有創意。
-你了解 KOL 生態、短片製作、社交媒體算法同亞洲流行文化。`;
+你了解 KOL 生態、短片製作、社交媒體算法同亞洲流行文化。
+回覆格式：用自然廣東話，適量用 emoji，
+避免過多 markdown header，保持對話感。`;
 
 const quickActions = [
   '💡 幫我諗題材',
@@ -192,9 +195,11 @@ export default function MayanScreen() {
           </View>
         )}
         <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
-          <Text style={[styles.messageText, isUser ? styles.userText : styles.assistantText]}>
-            {item.content}
-          </Text>
+          {isUser ? (
+            <Text style={[styles.messageText, styles.userText]}>{item.content}</Text>
+          ) : (
+            <Markdown style={markdownStyles}>{item.content}</Markdown>
+          )}
           {item.isWelcome && showQuickActions && (
             <View style={styles.quickActions}>
               {quickActions.map((action) => (
@@ -448,5 +453,33 @@ const styles = StyleSheet.create({
     fontSize: 24,
     lineHeight: 26,
     color: colors.bgCard
+  }
+});
+
+const markdownStyles = StyleSheet.create({
+  body: {
+    fontFamily: fonts.body,
+    fontSize: 15,
+    color: colors.text,
+    lineHeight: 22
+  },
+  heading2: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 15,
+    color: colors.text,
+    marginBottom: 4,
+    marginTop: 8
+  },
+  strong: {
+    fontFamily: fonts.bodyBold
+  },
+  bullet_list: {
+    marginLeft: 4
+  },
+  list_item: {
+    marginBottom: 4
+  },
+  paragraph: {
+    marginBottom: 8
   }
 });
