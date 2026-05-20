@@ -58,3 +58,20 @@ export type WorkItem = {
   updated_at: string;
   assignee?: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_url'> | null;
 };
+
+export type ScheduleType = 'shoot' | 'meeting' | 'deadline' | 'publish' | 'other';
+
+export type Schedule = {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  start_at: string;
+  end_at: string | null;
+  type: ScheduleType;
+  collaborators: string[];
+  related_log_id: string | null;
+  created_at: string;
+  related_log?: Pick<Log, 'id' | 'title' | 'body'> | null;
+};

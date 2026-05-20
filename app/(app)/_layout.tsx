@@ -62,10 +62,18 @@ export default function AppTabs() {
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>◫</Text>
         }}
       />
+      <Tabs.Screen
+        name="schedule/index"
+        options={{
+          title: '日程',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>◷</Text>
+        }}
+      />
       <Tabs.Screen name="profile/[username]" options={{ href: null }} />
       <Tabs.Screen name="log/[id]" options={{ href: null }} />
       <Tabs.Screen name="work/create" options={{ href: null }} />
       <Tabs.Screen name="work/[id]" options={{ href: null }} />
+      <Tabs.Screen name="schedule/create" options={{ href: null }} />
     </Tabs>
   );
 }
