@@ -81,15 +81,19 @@ export default function LogDetailScreen() {
 
   const fetchComments = useCallback(async () => {
     if (!logId) return;
-    const { data, error } = await supabase
+    const { data: commentsData, error: commentsError } = await supabase
       .from('comments')
       .select('*, profiles(username, display_name, avatar_url)')
       .eq('log_id', logId)
       .order('created_at', { ascending: true });
 
-    if (error) throw error;
-    setComments((data ?? []) as CommentWithAuthor[]);
-    setCommentCount(data?.length ?? 0);
+    if (commentsError) {
+      console.error('Comments fetch error:', JSON.stringify(commentsError));
+      return;
+    }
+
+    setComments((commentsData ?? []) as CommentWithAuthor[]);
+    setCommentCount(commentsData?.length ?? 0);
   }, [logId]);
 
   const load = useCallback(async () => {
@@ -102,7 +106,13 @@ export default function LogDetailScreen() {
       .eq('id', logId)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Log fetch error:', JSON.stringify(error));
+      Alert.alert('載入失敗', error.message);
+      setLoading(false);
+      return;
+    }
+
     setLog(data as LogWithAuthor);
 
     const [{ data: existingLike }, { count }] = await Promise.all([
@@ -128,6 +138,7 @@ export default function LogDetailScreen() {
 
   useEffect(() => {
     load().catch((error) => {
+      console.error('Log detail load error:', JSON.stringify(error));
       setLoading(false);
       Alert.alert('載入失敗', error instanceof Error ? error.message : '請稍後再試。');
     });
