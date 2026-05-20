@@ -127,7 +127,7 @@ export default function LoginScreen() {
           ) : null}
         </View>
 
-        <Link href="/(auth)/register" style={styles.link}>未有帳戶？建立創作者帳戶</Link>
+        <Link href="/register" style={styles.link}>未有帳戶？建立創作者帳戶</Link>
       </KeyboardAvoidingView>
     </Screen>
   );

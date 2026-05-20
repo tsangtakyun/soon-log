@@ -54,14 +54,14 @@ export default function AuthCallback() {
             refresh_token: refreshToken
           });
           if (error) throw error;
-          router.replace('/(app)/feed');
+          router.replace('/feed');
           return;
         }
 
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
-          router.replace('/(app)/feed');
+          router.replace('/feed');
           return;
         }
 
@@ -80,7 +80,7 @@ export default function AuthCallback() {
         <View style={styles.card}>
           <Text style={styles.title}>Google 登入未完成</Text>
           <Text style={styles.message}>{errorMessage}</Text>
-          <Pressable onPress={() => router.replace('/(auth)/login')} style={styles.button}>
+          <Pressable onPress={() => router.replace('/login')} style={styles.button}>
             <Text style={styles.buttonText}>返回登入</Text>
           </Pressable>
         </View>

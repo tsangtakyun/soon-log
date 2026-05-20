@@ -40,3 +40,21 @@ export type Comment = {
   created_at: string;
   profile?: Profile | null;
 };
+
+export type WorkStatus = 'todo' | 'in_progress' | 'done' | 'blocked';
+export type WorkPriority = 'low' | 'medium' | 'high';
+
+export type WorkItem = {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  status: WorkStatus;
+  priority: WorkPriority;
+  due_date: string | null;
+  assignee_id: string | null;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+  assignee?: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_url'> | null;
+};

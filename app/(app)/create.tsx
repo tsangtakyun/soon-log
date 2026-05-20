@@ -111,7 +111,7 @@ export default function CreateLogScreen() {
         }
       }
 
-      router.replace('/(app)/feed');
+      router.replace('/feed');
     } catch (err: any) {
       Alert.alert('發布失敗', err?.message ?? '請稍後再試。');
     } finally {

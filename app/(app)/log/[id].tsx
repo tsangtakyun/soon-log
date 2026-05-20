@@ -22,11 +22,11 @@ import { colors } from '@/theme/colors';
 import { Comment, Log, Profile } from '@/types';
 
 type LogWithAuthor = Log & {
-  profiles?: Profile | null;
+  profile?: Profile | null;
 };
 
 type CommentWithAuthor = Comment & {
-  profiles?: Pick<Profile, 'username' | 'display_name' | 'avatar_url'> | null;
+  profile?: Pick<Profile, 'username' | 'display_name' | 'avatar_url'> | null;
 };
 
 function timeAgo(value: string) {
@@ -68,7 +68,7 @@ export default function LogDetailScreen() {
   const [isLiked, setIsLiked] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const author = log?.profiles ?? log?.profile;
+  const author = log?.profile;
 
   const fetchLikeCount = useCallback(async () => {
     if (!logId) return;
@@ -83,7 +83,7 @@ export default function LogDetailScreen() {
     if (!logId) return;
     const { data: commentsData, error: commentsError } = await supabase
       .from('comments')
-      .select('*, profiles(username, display_name, avatar_url)')
+      .select('*, profile:profiles!comments_user_id_fkey(username, display_name, avatar_url)')
       .eq('log_id', logId)
       .order('created_at', { ascending: true });
 
@@ -102,7 +102,7 @@ export default function LogDetailScreen() {
 
     const { data, error } = await supabase
       .from('logs')
-      .select('*, profiles(*)')
+      .select('*, profile:profiles!logs_user_id_fkey(*)')
       .eq('id', logId)
       .single();
 
@@ -315,7 +315,7 @@ export default function LogDetailScreen() {
           <View style={styles.commentsSection}>
             <Text style={styles.commentsTitle}>留言</Text>
             {comments.map((comment) => {
-              const profile = comment.profiles ?? comment.profile;
+              const profile = comment.profile;
               return (
                 <View key={comment.id} style={styles.commentRow}>
                   <Avatar profile={profile} size={28} />

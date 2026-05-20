@@ -79,12 +79,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const inAuthCallback = segments[0] === 'auth';
 
     if (!session && !inAuthGroup && !inAuthCallback) {
-      router.replace('/(auth)/login');
+      router.replace('/login');
       return;
     }
 
     if (session && inAuthGroup) {
-      router.replace('/(app)/feed');
+      router.replace('/feed');
     }
   }, [loading, session, segments]);
 

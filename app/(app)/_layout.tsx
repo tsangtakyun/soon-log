@@ -55,8 +55,17 @@ export default function AppTabs() {
           )
         }}
       />
+      <Tabs.Screen
+        name="work/index"
+        options={{
+          title: '工作',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>◫</Text>
+        }}
+      />
       <Tabs.Screen name="profile/[username]" options={{ href: null }} />
       <Tabs.Screen name="log/[id]" options={{ href: null }} />
+      <Tabs.Screen name="work/create" options={{ href: null }} />
+      <Tabs.Screen name="work/[id]" options={{ href: null }} />
     </Tabs>
   );
 }

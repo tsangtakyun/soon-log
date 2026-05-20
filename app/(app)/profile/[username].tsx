@@ -79,7 +79,7 @@ export default function PublicProfileScreen() {
           </View>
         )}
         renderItem={({ item }) => (
-          <Pressable onPress={() => router.push(`/(app)/log/${item.id}`)} style={styles.tile}>
+          <Pressable onPress={() => router.push(`/log/${item.id}`)} style={styles.tile}>
             {item.media_urls?.[0] ? <Image source={{ uri: item.media_urls[0] }} style={styles.tileImage} /> : <View style={styles.tileFallback}><Text numberOfLines={3} style={styles.tileText}>{item.title || item.body}</Text></View>}
           </Pressable>
         )}

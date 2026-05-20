@@ -55,7 +55,7 @@ export default function RegisterScreen() {
             </View>
           </View>
           <Button title="註冊" onPress={onSubmit} loading={loading} disabled={!email || !password || !username} />
-          <Link href="/(auth)/login" style={styles.link}>已有帳戶？返回登入</Link>
+          <Link href="/login" style={styles.link}>已有帳戶？返回登入</Link>
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>

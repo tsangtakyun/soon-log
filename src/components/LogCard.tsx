@@ -39,7 +39,7 @@ export function LogCard({ log, onPress }: { log: Log; onPress?: () => void }) {
       onPress();
       return;
     }
-    router.push(`/(app)/log/${log.id}`);
+    router.push(`/log/${log.id}`);
   };
 
   const toggleLike = async (event?: GestureResponderEvent) => {
