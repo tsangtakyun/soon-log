@@ -75,3 +75,13 @@ export type Schedule = {
   created_at: string;
   related_log?: Pick<Log, 'id' | 'title' | 'body'> | null;
 };
+
+export type MayanMessageRole = 'user' | 'assistant';
+
+export type MayanMessage = {
+  id: string;
+  user_id: string;
+  role: MayanMessageRole;
+  content: string;
+  created_at: string;
+};
