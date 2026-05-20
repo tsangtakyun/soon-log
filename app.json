@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "SOON LOG",
+    "slug": "soon-log",
+    "scheme": "soonlog",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F5F2ED"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "network.sooncreator.log",
+      "icon": "./assets/icon.png",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "googlechrome",
+          "comgooglemaps"
+        ]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F5F2ED"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SOON-LOG 需要存取相片，用作上載創作紀錄圖片。"
+        }
+      ]
+    ]
+  }
+}
