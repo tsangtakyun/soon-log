@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import * as Crypto from 'expo-crypto';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
@@ -16,20 +17,40 @@ function detectPlatform(url: string) {
   return null;
 }
 
-async function uploadImage(uri: string, userId: string) {
-  const response = await fetch(uri);
-  const blob = await response.blob();
+function cleanImageExtension(uri: string) {
   const ext = uri.split('.').pop()?.toLowerCase()?.split('?')[0] || 'jpg';
-  const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  return ext === 'jpeg' ? 'jpg' : ext;
+}
 
-  const { error } = await supabase.storage.from('log-media').upload(path, blob, {
-    contentType: blob.type || `image/${ext}`,
-    upsert: false
-  });
+function imageContentType(ext: string) {
+  return ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+}
 
-  if (error) throw error;
-  const { data } = supabase.storage.from('log-media').getPublicUrl(path);
-  return data.publicUrl;
+async function uploadImages(logId: string, selectedImages: string[]): Promise<string[]> {
+  const urls: string[] = [];
+
+  for (const uri of selectedImages) {
+    const ext = cleanImageExtension(uri);
+    const fileName = `logs/${logId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const response = await fetch(uri);
+    const blob = await response.blob();
+
+    const { error } = await supabase.storage
+      .from('log-media')
+      .upload(fileName, blob, {
+        contentType: blob.type || imageContentType(ext)
+      });
+
+    if (error) throw error;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('log-media')
+      .getPublicUrl(fileName);
+
+    urls.push(publicUrl);
+  }
+
+  return urls;
 }
 
 export default function CreateLogScreen() {
@@ -40,7 +61,7 @@ export default function CreateLogScreen() {
   const [videoUrl, setVideoUrl] = useState('');
   const [tags, setTags] = useState('');
   const [isPublished, setIsPublished] = useState(true);
-  const [images, setImages] = useState<string[]>([]);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const pickImages = async () => {
@@ -53,13 +74,17 @@ export default function CreateLogScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
-      selectionLimit: Math.max(1, 4 - images.length),
-      quality: 0.82
+      selectionLimit: Math.max(1, 4 - selectedImages.length),
+      quality: 0.8
     });
 
     if (!result.canceled) {
-      setImages((current) => [...current, ...result.assets.map((asset) => asset.uri)].slice(0, 4));
+      setSelectedImages((current) => [...current, ...result.assets.map((asset) => asset.uri)].slice(0, 4));
     }
+  };
+
+  const removeImage = (uri: string) => {
+    setSelectedImages((current) => current.filter((item) => item !== uri));
   };
 
   const submit = async () => {
@@ -82,10 +107,14 @@ export default function CreateLogScreen() {
 
       if (profileError) throw profileError;
 
-      const mediaUrls = await Promise.all(images.map((uri) => uploadImage(uri, authUser.id)));
+      const logId = Crypto.randomUUID();
+      const mediaUrls = selectedImages.length > 0
+        ? await uploadImages(logId, selectedImages)
+        : [];
       const normalizedTags = tags.split(',').map((tag) => tag.trim()).filter(Boolean);
 
       const { data: createdLog, error } = await supabase.from('logs').insert({
+        id: logId,
         user_id: authUser.id,
         title: title.trim() || null,
         body: body.trim(),
@@ -136,15 +165,24 @@ export default function CreateLogScreen() {
 
           <View style={styles.mediaHeader}>
             <Text style={styles.sectionTitle}>圖片</Text>
-            <Pressable onPress={pickImages} disabled={images.length >= 4}><Text style={styles.addImage}>加入圖片</Text></Pressable>
+            <Text style={styles.imageCount}>{selectedImages.length}/4</Text>
           </View>
-          <View style={styles.imageRow}>
-            {images.map((uri) => (
-              <Pressable key={uri} onPress={() => setImages((current) => current.filter((item) => item !== uri))}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageRow}>
+            {selectedImages.map((uri) => (
+              <View key={uri} style={styles.previewWrap}>
                 <Image source={{ uri }} style={styles.preview} />
-              </Pressable>
+                <Pressable onPress={() => removeImage(uri)} style={styles.removeImageButton}>
+                  <Text style={styles.removeImageText}>✕</Text>
+                </Pressable>
+              </View>
             ))}
-          </View>
+            {selectedImages.length < 4 && (
+              <Pressable onPress={pickImages} style={styles.addPhotoBox}>
+                <Text style={styles.addPhotoIcon}>＋</Text>
+                <Text style={styles.addPhotoText}>相片</Text>
+              </Pressable>
+            )}
+          </ScrollView>
 
           <View style={styles.publishRow}>
             <View>
@@ -189,20 +227,65 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 15
   },
-  addImage: {
-    color: colors.gold,
-    fontFamily: fonts.bodyMedium
+  imageCount: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13
   },
   imageRow: {
     flexDirection: 'row',
     gap: 10,
-    minHeight: 78
+    minHeight: 80,
+    paddingRight: 16
+  },
+  previewWrap: {
+    width: 80,
+    height: 80
   },
   preview: {
-    width: 78,
-    height: 78,
+    width: 80,
+    height: 80,
     borderRadius: 8,
     backgroundColor: colors.bgCard
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -7,
+    right: -7,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.text
+  },
+  removeImageText: {
+    color: colors.bgCard,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
+  },
+  addPhotoBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgCard
+  },
+  addPhotoIcon: {
+    color: colors.gold,
+    fontFamily: fonts.bodyBold,
+    fontSize: 22,
+    lineHeight: 24
+  },
+  addPhotoText: {
+    marginTop: 2,
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12
   },
   publishRow: {
     padding: 14,

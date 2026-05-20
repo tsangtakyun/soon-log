@@ -42,6 +42,13 @@ export function LogCard({ log, onPress }: { log: Log; onPress?: () => void }) {
     router.push(`/log/${log.id}`);
   };
 
+  const openProfile = (event?: GestureResponderEvent) => {
+    event?.stopPropagation();
+    if (profile?.username) {
+      router.push(`/profile/${profile.username}`);
+    }
+  };
+
   const toggleLike = async (event?: GestureResponderEvent) => {
     event?.stopPropagation();
     if (!user) return;
@@ -83,12 +90,16 @@ export function LogCard({ log, onPress }: { log: Log; onPress?: () => void }) {
             colors={['transparent', 'rgba(0,0,0,0.56)']}
             style={styles.coverGradient}
           >
-            <Text style={styles.overlayName}>@{username}</Text>
+            <Pressable onPress={openProfile} hitSlop={8}>
+              <Text style={styles.overlayName}>@{username}</Text>
+            </Pressable>
           </LinearGradient>
         </View>
       ) : (
         <View style={styles.textOnlyHeader}>
-          <Text style={styles.username}>@{username}</Text>
+          <Pressable onPress={openProfile} hitSlop={8}>
+            <Text style={styles.username}>@{username}</Text>
+          </Pressable>
         </View>
       )}
 
@@ -100,7 +111,9 @@ export function LogCard({ log, onPress }: { log: Log; onPress?: () => void }) {
           </View>
         )}
         <Text numberOfLines={hasCover ? 2 : 4} style={styles.body}>{log.body}</Text>
-        <Text style={styles.displayName}>{displayName}</Text>
+        <Pressable onPress={openProfile} hitSlop={8}>
+          <Text style={styles.displayName}>{displayName}</Text>
+        </Pressable>
 
         <View style={styles.footer}>
           <View style={styles.tags}>
