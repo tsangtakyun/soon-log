@@ -14,6 +14,14 @@ const potentialConfig: Record<ViralPotential, { label: string; color: string }> 
   low: { label: '低潛力', color: colors.textMuted }
 };
 
+function getPotential(value: unknown) {
+  if (value === 'high' || value === 'medium' || value === 'low') {
+    return potentialConfig[value];
+  }
+
+  return potentialConfig.medium;
+}
+
 function formatTime(value: string) {
   return new Intl.DateTimeFormat('zh-HK', {
     month: 'short',
@@ -24,7 +32,8 @@ function formatTime(value: string) {
 }
 
 function IdeaCard({ item }: { item: Idea }) {
-  const potential = potentialConfig[item.viral_potential];
+  const potential = getPotential(item.viral_potential) ?? { label: '中潛力', color: colors.gold };
+  const tags = Array.isArray(item.tags) ? item.tags : [];
 
   async function openSource() {
     if (!item.source_url) return;
@@ -35,16 +44,16 @@ function IdeaCard({ item }: { item: Idea }) {
     <Pressable onPress={openSource} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       <View style={styles.metaRow}>
         <View style={styles.potentialRow}>
-          <View style={[styles.dot, { backgroundColor: potential.color }]} />
-          <Text style={styles.potentialText}>{potential.label}</Text>
+          <View style={[styles.dot, { backgroundColor: potential.color || colors.gold }]} />
+          <Text style={styles.potentialText}>{potential.label || '中潛力'}</Text>
         </View>
-        <Text style={styles.platformBadge}>{item.platform}</Text>
+        <Text style={styles.platformBadge}>{item.platform || 'Instagram'}</Text>
       </View>
       <Text numberOfLines={2} style={styles.cardTitle}>{item.title || '未命名題材'}</Text>
       {item.description ? <Text numberOfLines={2} style={styles.description}>{item.description}</Text> : null}
       <View style={styles.detailRow}>
-        <Text style={styles.region}>{item.region}</Text>
-        {item.tags.slice(0, 4).map((tag) => <Text key={tag} style={styles.tag}>#{tag}</Text>)}
+        <Text style={styles.region}>{item.region || '全球'}</Text>
+        {tags.slice(0, 4).map((tag) => <Text key={tag} style={styles.tag}>#{tag}</Text>)}
       </View>
       <Text style={styles.timestamp}>{formatTime(item.created_at)}</Text>
     </Pressable>

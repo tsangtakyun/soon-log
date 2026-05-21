@@ -1,7 +1,6 @@
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import {
@@ -35,25 +34,18 @@ function RootNavigator() {
     <>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="auth/callback" />
         <Stack.Screen name="(app)" />
+        <Stack.Screen name="(auth)/login" />
+        <Stack.Screen name="(auth)/register" />
+        <Stack.Screen name="auth/callback" />
       </Stack>
     </>
   );
 }
 
 export default function RootLayout() {
-  const [serifLoaded] = useSerifFonts({ DMSerifDisplay_400Regular });
-  const [sansLoaded] = useSansFonts({ DMSans_400Regular, DMSans_500Medium, DMSans_700Bold });
-
-  if (!serifLoaded || !sansLoaded) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
-    );
-  }
+  useSerifFonts({ DMSerifDisplay_400Regular });
+  useSansFonts({ DMSans_400Regular, DMSans_500Medium, DMSans_700Bold });
 
   return (
     <SafeAreaProvider>

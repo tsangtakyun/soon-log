@@ -57,13 +57,13 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
 
   override func sourceURL(for bridge: RCTBridge) -> URL? {
     // needed to return the correct URL for expo-dev-client.
-    bridge.bundleURL ?? bundleURL()
+    bundleURL() ?? bridge.bundleURL
   }
 
   override func bundleURL() -> URL? {
 #if DEBUG
-    return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
-      ?? debugMetroURL()
+    return debugMetroURL()
+      ?? RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
 #else
     return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
@@ -74,7 +74,7 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
 #if targetEnvironment(simulator)
     let host = "localhost"
 #else
-    let host = "192.168.1.114"
+    let host = "Tommys-MacBook-Pro.local"
 #endif
     return URL(string: "http://\(host):8081/.expo/.virtual-metro-entry.bundle?platform=ios&dev=true&minify=false")
   }
