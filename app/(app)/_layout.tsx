@@ -88,6 +88,7 @@ export default function AppTabs() {
       <Tabs.Screen name="work/create" options={{ href: null }} />
       <Tabs.Screen name="work/[id]" options={{ href: null }} />
       <Tabs.Screen name="schedule/create" options={{ href: null }} />
+      <Tabs.Screen name="idea/[id]" options={{ href: null }} />
       <Tabs.Screen name="idea/library" options={{ href: null }} />
       <Tabs.Screen name="idea/share" options={{ href: null }} />
     </Tabs>

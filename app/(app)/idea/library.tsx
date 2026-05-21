@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import * as Location from 'expo-location';
+import MapView, { Callout, Marker } from 'react-native-maps';
 import { EmptyState, Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -42,6 +44,21 @@ function formatTime(value?: string | null) {
     hour: '2-digit',
     minute: '2-digit'
   }).format(new Date(value));
+}
+
+function hasCoordinates(idea: Idea) {
+  return typeof idea.lat === 'number' && typeof idea.lng === 'number';
+}
+
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const radiusKm = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return radiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function IdeaCard({ item }: { item: Idea }) {
@@ -100,6 +117,8 @@ export default function IdeasLibraryScreen() {
   const router = useRouter();
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const loadIdeas = useCallback(async () => {
     if (!user) return;
@@ -130,6 +149,29 @@ export default function IdeasLibraryScreen() {
     };
   }, [loadIdeas]);
 
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+
+      const location = await Location.getCurrentPositionAsync({});
+      setUserLocation({
+        lat: location.coords.latitude,
+        lng: location.coords.longitude
+      });
+    })().catch((error) => {
+      console.warn('Location error:', error instanceof Error ? error.message : error);
+    });
+  }, []);
+
+  const mappableIdeas = useMemo(() => ideas.filter(hasCoordinates), [ideas]);
+  const nearbyCount = useMemo(() => {
+    if (!userLocation) return 0;
+    return mappableIdeas.filter((idea) =>
+      haversineDistance(userLocation.lat, userLocation.lng, idea.lat!, idea.lng!) <= 50
+    ).length;
+  }, [mappableIdeas, userLocation]);
+
   async function refresh() {
     setRefreshing(true);
     await loadIdeas();
@@ -144,19 +186,67 @@ export default function IdeasLibraryScreen() {
           <Text style={styles.title}>◈ 題材庫</Text>
           <Text style={styles.subtitle}>已儲存嘅創作靈感</Text>
         </View>
-        <Pressable onPress={() => router.push('/idea/share')} style={styles.addButton}>
-          <Text style={styles.addText}>＋</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable onPress={() => setViewMode((current) => current === 'list' ? 'map' : 'list')} style={styles.iconButton}>
+            <Text style={styles.viewToggle}>{viewMode === 'list' ? '🗺️' : '≡'}</Text>
+          </Pressable>
+          <Pressable onPress={() => router.push('/idea/share')} style={styles.addButton}>
+            <Text style={styles.addText}>＋</Text>
+          </Pressable>
+        </View>
       </View>
 
-      <FlatList
-        data={ideas}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <IdeaCard item={item} />}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} />}
-        contentContainerStyle={ideas.length ? styles.list : styles.emptyList}
-        ListEmptyComponent={<EmptyState title="題材庫係空嘅" body={'喺 IG 睇到好 Reel，Share 入嚟即可'} />}
-      />
+      {viewMode === 'list' ? (
+        <FlatList
+          data={ideas}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <IdeaCard item={item} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} />}
+          contentContainerStyle={ideas.length ? styles.list : styles.emptyList}
+          ListEmptyComponent={<EmptyState title="題材庫係空嘅" body={'喺 IG 睇到好 Reel，Share 入嚟即可'} />}
+        />
+      ) : (
+        <View style={styles.mapWrap}>
+          {userLocation ? (
+            <View style={styles.nearbyBadge}>
+              <Text style={styles.nearbyText}>📍 附近 {nearbyCount} 個題材</Text>
+            </View>
+          ) : null}
+          <MapView
+            style={styles.map}
+            initialRegion={{
+              latitude: userLocation?.lat ?? 22.3193,
+              longitude: userLocation?.lng ?? 114.1694,
+              latitudeDelta: 0.5,
+              longitudeDelta: 0.5
+            }}
+            showsUserLocation
+            showsMyLocationButton
+          >
+            {mappableIdeas.map((idea) => (
+              <Marker
+                key={idea.id}
+                coordinate={{ latitude: idea.lat!, longitude: idea.lng! }}
+                pinColor={colors.accent}
+              >
+                <Callout onPress={() => router.push(`/idea/${idea.id}`)}>
+                  <View style={styles.callout}>
+                    <Text style={styles.calloutTitle}>{idea.title || '未命名題材'}</Text>
+                    <Text style={styles.calloutSummary} numberOfLines={2}>{idea.summary || idea.description || ''}</Text>
+                    <Text style={styles.calloutLink}>點擊睇詳情 →</Text>
+                  </View>
+                </Callout>
+              </Marker>
+            ))}
+          </MapView>
+          {mappableIdeas.length === 0 ? (
+            <View style={styles.mapEmpty}>
+              <Text style={styles.mapEmptyTitle}>未有可定位題材</Text>
+              <Text style={styles.mapEmptyBody}>有地點資料嘅 idea 會喺呢度變成 pin。</Text>
+            </View>
+          ) : null}
+        </View>
+      )}
     </Screen>
   );
 }
@@ -194,6 +284,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.gold
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgMuted
+  },
+  viewToggle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 20
   },
   addText: {
     color: colors.text,
@@ -342,5 +450,81 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.74
+  },
+  mapWrap: {
+    flex: 1,
+    marginHorizontal: 18,
+    marginBottom: 24,
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bgMuted
+  },
+  map: {
+    flex: 1,
+    minHeight: 520
+  },
+  nearbyBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    zIndex: 2,
+    borderRadius: 999,
+    backgroundColor: colors.bgCard,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2
+  },
+  nearbyText: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
+  },
+  callout: {
+    width: 200,
+    padding: 8,
+    gap: 4
+  },
+  calloutTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13
+  },
+  calloutSummary: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 11,
+    lineHeight: 15
+  },
+  calloutLink: {
+    color: colors.accent,
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    marginTop: 2
+  },
+  mapEmpty: {
+    position: 'absolute',
+    left: 18,
+    right: 18,
+    bottom: 18,
+    borderRadius: 14,
+    backgroundColor: colors.bgCard,
+    padding: 14,
+    gap: 4
+  },
+  mapEmptyTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14
+  },
+  mapEmptyBody: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 12
   }
 });

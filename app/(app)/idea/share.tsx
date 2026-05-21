@@ -50,6 +50,25 @@ function asStringArray(value: unknown) {
   return value.map((item) => String(item).trim()).filter(Boolean);
 }
 
+async function geocodePlace(placeName: string, country: string) {
+  const key = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!key || !placeName.trim()) return null;
+
+  const query = encodeURIComponent(`${placeName}, ${country}`);
+  const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${key}`);
+  const data = await response.json();
+  const location = data.results?.[0]?.geometry?.location;
+
+  if (typeof location?.lat === 'number' && typeof location?.lng === 'number') {
+    return {
+      lat: location.lat,
+      lng: location.lng
+    };
+  }
+
+  return null;
+}
+
 export default function IdeaShareScreen() {
   const { shareIntent, hasShareIntent, resetShareIntent } = useShareIntentContext();
   const { user } = useAuth();
@@ -129,6 +148,8 @@ export default function IdeaShareScreen() {
     const finalNotes = editNotes.trim();
 
     setStatus('saving');
+    const placeQuery = result.placeName || result.placeAddress || '';
+    const coords = placeQuery ? await geocodePlace(placeQuery, result.country || 'HK') : null;
 
     const { error } = await supabase.from('ideas').insert({
       user_id: user.id,
@@ -148,6 +169,8 @@ export default function IdeaShareScreen() {
       ai_viral_base: 0,
       date: new Date().toISOString(),
       notes: finalNotes,
+      lat: coords?.lat ?? null,
+      lng: coords?.lng ?? null,
       description: result.desc ?? result.description ?? '',
       hook: result.hook ?? '',
       region: result.country ?? 'HK',
