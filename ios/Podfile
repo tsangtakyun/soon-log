@@ -20,8 +20,8 @@ target 'SOONLOG' do
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
   else
     config_command = [
-      'npx',
-      'expo-modules-autolinking',
+      'node',
+      File.join(__dir__, '..', 'node_modules', 'expo-modules-autolinking', 'bin', 'expo-modules-autolinking'),
       'react-native-config',
       '--json',
       '--platform',

@@ -8,24 +8,60 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		159ACD4BA83041598DB2249C /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9368215E7DCB4F3CB230FC91 /* ShareViewController.swift */; };
 		16A95AEE95A7FDA9F5133B64 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D15C1BCAD0D26539683E064 /* ExpoModulesProvider.swift */; };
+		35200BE1470340D8A0BBA6C4 /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9CFA6689E2F0461E971333C2 /* MainInterface.storyboard */; };
 		3CF0742E7C625D694FA5F1CD /* libPods-SOONLOG.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 2121A829CFAAE211A1BAE1F5 /* libPods-SOONLOG.a */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+		69BC317624CD4288993A49CF /* ShareExtensionPreprocessor.js in Resources */ = {isa = PBXBuildFile; fileRef = C573C587C3234B9C917C11C6 /* ShareExtensionPreprocessor.js */; };
+		89AB96B74A2A45059281432D /* ShareExtension.appex in Copy Files */ = {isa = PBXBuildFile; fileRef = BF958D2F627A4893800C990F /* ShareExtension.appex */; };
+		A30974C7A221442E91F2D855 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1ADE128DA29C4BEEB746A237 /* PrivacyInfo.xcprivacy */; };
 		A46156BCDF7CBAEB2CCFCBF3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F9B1EF415E64E2B0EEFFA284 /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		6090A49B15514A64B2B4AB4E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EF03C87909E74B56B40ECE7B;
+			remoteInfo = ShareExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		10BD55DD8C344EE091FE6C92 /* Copy Files */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				89AB96B74A2A45059281432D /* ShareExtension.appex in Copy Files */,
+			);
+			name = "Copy Files";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* SOONLOG.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SOONLOG.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = SOONLOG/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = SOONLOG/Info.plist; sourceTree = "<group>"; };
+		1ADE128DA29C4BEEB746A237 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = PrivacyInfo.xcprivacy; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		1D15C1BCAD0D26539683E064 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SOONLOG/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		2121A829CFAAE211A1BAE1F5 /* libPods-SOONLOG.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SOONLOG.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		30884717A4B2832DFB3EDC2B /* Pods-SOONLOG.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SOONLOG.debug.xcconfig"; path = "Target Support Files/Pods-SOONLOG/Pods-SOONLOG.debug.xcconfig"; sourceTree = "<group>"; };
+		70962DC09E724CF7ADBEE9DF /* ShareExtension-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "ShareExtension-Info.plist"; path = "ShareExtension-Info.plist"; sourceTree = "<group>"; };
 		75EA61810649C0B424A42918 /* Pods-SOONLOG.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SOONLOG.release.xcconfig"; path = "Target Support Files/Pods-SOONLOG/Pods-SOONLOG.release.xcconfig"; sourceTree = "<group>"; };
+		7B27B07DDDD7442DBA9E59C1 /* ShareExtension.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ShareExtension.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
+		9368215E7DCB4F3CB230FC91 /* ShareViewController.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = ShareViewController.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		9CFA6689E2F0461E971333C2 /* MainInterface.storyboard */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = MainInterface.storyboard; path = MainInterface.storyboard; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = SOONLOG/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
+		BF958D2F627A4893800C990F /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = ShareExtension.appex; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		C573C587C3234B9C917C11C6 /* ShareExtensionPreprocessor.js */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ShareExtensionPreprocessor.js; path = ShareExtensionPreprocessor.js; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = SOONLOG/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* SOONLOG-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "SOONLOG-Bridging-Header.h"; path = "SOONLOG/SOONLOG-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -38,6 +74,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				3CF0742E7C625D694FA5F1CD /* libPods-SOONLOG.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6CB9ABC046864C4988751421 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +108,20 @@
 				2121A829CFAAE211A1BAE1F5 /* libPods-SOONLOG.a */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		32D4A0A3737344D8B3FC30A6 /* ShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				9368215E7DCB4F3CB230FC91 /* ShareViewController.swift */,
+				9CFA6689E2F0461E971333C2 /* MainInterface.storyboard */,
+				C573C587C3234B9C917C11C6 /* ShareExtensionPreprocessor.js */,
+				1ADE128DA29C4BEEB746A237 /* PrivacyInfo.xcprivacy */,
+				70962DC09E724CF7ADBEE9DF /* ShareExtension-Info.plist */,
+				7B27B07DDDD7442DBA9E59C1 /* ShareExtension.entitlements */,
+			);
+			name = ShareExtension;
+			path = ShareExtension;
 			sourceTree = "<group>";
 		};
 		65D8E40C3F804727B0B2E191 /* SOONLOG */ = {
@@ -99,6 +156,7 @@
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BF586C6FB213307D06E8307C /* Pods */,
 				8220ABBEA37FD8C77AF4A535 /* ExpoModulesProviders */,
+				32D4A0A3737344D8B3FC30A6 /* ShareExtension */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -109,6 +167,7 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* SOONLOG.app */,
+				BF958D2F627A4893800C990F /* ShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -141,15 +200,34 @@
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
+				10BD55DD8C344EE091FE6C92 /* Copy Files */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				4ED1810554004468ADAE0F74 /* PBXTargetDependency */,
 			);
 			name = SOONLOG;
 			productName = SOONLOG;
 			productReference = 13B07F961A680F5B00A75B9A /* SOONLOG.app */;
 			productType = "com.apple.product-type.application";
+		};
+		EF03C87909E74B56B40ECE7B /* ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D6388DA10F944A6CB649AF9B /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildPhases = (
+				E81E99719D464C33B9E8F721 /* Sources */,
+				661E1B661717467DBCF15016 /* Resources */,
+				6CB9ABC046864C4988751421 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ShareExtension;
+			productName = ShareExtension;
+			productReference = BF958D2F627A4893800C990F /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -179,6 +257,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* SOONLOG */,
+				EF03C87909E74B56B40ECE7B /* ShareExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -195,6 +274,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		661E1B661717467DBCF15016 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				35200BE1470340D8A0BBA6C4 /* MainInterface.storyboard in Resources */,
+				69BC317624CD4288993A49CF /* ShareExtensionPreprocessor.js in Resources */,
+				A30974C7A221442E91F2D855 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -207,7 +296,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E81E99719D464C33B9E8F721 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				159ACD4BA83041598DB2249C /* ShareViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4ED1810554004468ADAE0F74 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EF03C87909E74B56B40ECE7B /* ShareExtension */;
+			targetProxy = 6090A49B15514A64B2B4AB4E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
@@ -277,6 +382,64 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		1BB3109AFBC74BC3B7B12C84 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "ShareExtension/ShareExtension-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
+				PRODUCT_BUNDLE_IDENTIFIER = network.sooncreator.log.ShareExtension;
+				PRODUCT_NAME = ShareExtension;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		386F99DB16874F509D4790AA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "ShareExtension/ShareExtension-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
+				PRODUCT_BUNDLE_IDENTIFIER = network.sooncreator.log.ShareExtension;
+				PRODUCT_NAME = ShareExtension;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -430,6 +593,15 @@
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,
 				83CBBA211A601CBA00E9B192 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D6388DA10F944A6CB649AF9B /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1BB3109AFBC74BC3B7B12C84 /* Debug */,
+				386F99DB16874F509D4790AA /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

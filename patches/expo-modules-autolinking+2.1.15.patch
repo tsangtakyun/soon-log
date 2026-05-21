@@ -1,0 +1,29 @@
+diff --git a/node_modules/expo-modules-autolinking/build/reactNativeConfig/reactNativeConfig.js b/node_modules/expo-modules-autolinking/build/reactNativeConfig/reactNativeConfig.js
+--- a/node_modules/expo-modules-autolinking/build/reactNativeConfig/reactNativeConfig.js
++++ b/node_modules/expo-modules-autolinking/build/reactNativeConfig/reactNativeConfig.js
+@@ -108,6 +108,13 @@ function findProjectLocalDependencyRoots(projectConfig) {
+     return results;
+ }
+ async function resolveDependencyConfigAsync(platform, name, packageRoot, projectConfig) {
++    if (name === 'react-native' || name === 'react-native-macos') {
++        // Starting from version 0.76, the `react-native` package only defines platforms
++        // when @react-native-community/cli-platform-android/ios is installed.
++        // Therefore, we need to manually filter it out before loading its config.
++        return null;
++    }
+     const libraryConfig = await (0, config_1.loadConfigAsync)(packageRoot);
+     const reactNativeConfig = {
+         ...libraryConfig?.dependency,
+@@ -118,12 +125,6 @@ async function resolveDependencyConfigAsync(platform, name, packageRoot, projectC
+         // The rnc-cli will skip this package.
+         return null;
+     }
+-    if (name === 'react-native' || name === 'react-native-macos') {
+-        // Starting from version 0.76, the `react-native` package only defines platforms
+-        // when @react-native-community/cli-platform-android/ios is installed.
+-        // Therefore, we need to manually filter it out.
+-        return null;
+-    }
+     let platformData = null;
+     if (platform === 'android') {
+         platformData = await (0, androidResolver_1.resolveDependencyConfigImplAndroidAsync)(packageRoot, reactNativeConfig.platforms?.android);
