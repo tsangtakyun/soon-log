@@ -4,9 +4,11 @@ import { Profile } from '@/types';
 
 export function useUnreadComments(profile: Profile | null) {
   const [count, setCount] = useState(0);
+  const profileId = profile?.id ?? null;
+  const lastSeenAt = profile?.last_seen_at ?? null;
 
   const refresh = useCallback(async () => {
-    if (!profile) {
+    if (!profileId) {
       setCount(0);
       return;
     }
@@ -14,7 +16,7 @@ export function useUnreadComments(profile: Profile | null) {
     const { data: logs, error: logsError } = await supabase
       .from('logs')
       .select('id')
-      .eq('user_id', profile.id);
+      .eq('user_id', profileId);
 
     if (logsError) throw logsError;
 
@@ -28,26 +30,26 @@ export function useUnreadComments(profile: Profile | null) {
       .from('comments')
       .select('id', { count: 'exact', head: true })
       .in('log_id', logIds)
-      .neq('user_id', profile.id);
+      .neq('user_id', profileId);
 
-    if (profile.last_seen_at) {
-      query = query.gt('created_at', profile.last_seen_at);
+    if (lastSeenAt) {
+      query = query.gt('created_at', lastSeenAt);
     }
 
     const { count: unreadCount, error } = await query;
     if (error) throw error;
     setCount(unreadCount ?? 0);
-  }, [profile]);
+  }, [lastSeenAt, profileId]);
 
   useEffect(() => {
     refresh().catch(() => setCount(0));
   }, [refresh]);
 
   useEffect(() => {
-    if (!profile) return;
+    if (!profileId) return;
 
     const channel = supabase
-      .channel(`profile-unread-comments-${profile.id}`)
+      .channel(`profile-unread-comments-${profileId}-${Date.now()}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -60,7 +62,7 @@ export function useUnreadComments(profile: Profile | null) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [profile, refresh]);
+  }, [profileId, refresh]);
 
   return { count, refresh };
 }
