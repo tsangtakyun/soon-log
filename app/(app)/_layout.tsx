@@ -1,14 +1,9 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
-import { useAuth } from '@/hooks/useAuth';
-import { useUnreadComments } from '@/hooks/useUnreadComments';
+import { Text } from 'react-native';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 
 export default function AppTabs() {
-  const { profile } = useAuth();
-  const { count } = useUnreadComments(profile);
-
   return (
     <Tabs
       screenOptions={{
@@ -17,42 +12,37 @@ export default function AppTabs() {
           height: 82,
           paddingTop: 10,
           paddingBottom: 22,
-          borderTopColor: colors.border,
-          backgroundColor: colors.bg
+          borderTopWidth: 1,
+          borderTopColor: colors.bodyBorder,
+          backgroundColor: colors.bgBody
         },
-        tabBarActiveTintColor: colors.accent,
+        tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
           fontFamily: fonts.bodyMedium,
-          fontSize: 12
+          fontSize: 11
         }
       }}
     >
       <Tabs.Screen
-        name="feed/index"
+        name="home/index"
         options={{
-          title: '動態',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 22 }}>◈</Text>
+          title: 'Home',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🏠</Text>
         }}
       />
       <Tabs.Screen
-        name="create"
+        name="log/index"
         options={{
-          title: '記錄',
-          tabBarActiveTintColor: colors.gold,
-          tabBarIcon: () => <Text style={{ color: colors.gold, fontSize: 26 }}>⊕</Text>
+          title: 'Log',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>⌛</Text>
         }}
       />
       <Tabs.Screen
-        name="profile/index"
+        name="idea/library"
         options={{
-          title: '個人',
-          tabBarIcon: ({ color }) => (
-            <View>
-              <Text style={{ color, fontSize: 22 }}>◉</Text>
-              {count > 0 && <View style={styles.badge} />}
-            </View>
-          )
+          title: 'Idea',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>◈</Text>
         }}
       />
       <Tabs.Screen
@@ -63,46 +53,26 @@ export default function AppTabs() {
         }}
       />
       <Tabs.Screen
-        name="schedule/index"
-        options={{
-          title: '日程',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>◷</Text>
-        }}
-      />
-      <Tabs.Screen
-        name="idea/index"
-        options={{
-          title: '題材',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>◈</Text>
-        }}
-      />
-      <Tabs.Screen
         name="mayan/index"
         options={{
           title: 'Mayan',
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>◎</Text>
         }}
       />
+      <Tabs.Screen name="feed/index" options={{ href: null }} />
+      <Tabs.Screen name="create" options={{ href: null }} />
+      <Tabs.Screen name="profile/index" options={{ href: null }} />
       <Tabs.Screen name="profile/[username]" options={{ href: null }} />
       <Tabs.Screen name="log/[id]" options={{ href: null }} />
+      <Tabs.Screen name="log/room/[id]" options={{ href: null }} />
       <Tabs.Screen name="work/create" options={{ href: null }} />
       <Tabs.Screen name="work/[id]" options={{ href: null }} />
+      <Tabs.Screen name="schedule/index" options={{ href: null }} />
       <Tabs.Screen name="schedule/create" options={{ href: null }} />
+      <Tabs.Screen name="idea/index" options={{ href: null }} />
       <Tabs.Screen name="idea/[id]" options={{ href: null }} />
-      <Tabs.Screen name="idea/library" options={{ href: null }} />
       <Tabs.Screen name="idea/share" options={{ href: null }} />
+      <Tabs.Screen name="home/trend/[id]" options={{ href: null }} />
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  badge: {
-    position: 'absolute',
-    top: -2,
-    right: -7,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: colors.accent
-  }
-});

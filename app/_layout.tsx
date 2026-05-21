@@ -33,7 +33,7 @@ function RootNavigator() {
   return (
     <>
       <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bgBody } }}>
         <Stack.Screen name="(app)" />
         <Stack.Screen name="(auth)/login" />
         <Stack.Screen name="(auth)/register" />

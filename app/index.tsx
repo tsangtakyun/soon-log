@@ -14,5 +14,5 @@ export default function IndexRoute() {
     );
   }
 
-  return <Redirect href={session ? '/feed' : '/login'} />;
+  return <Redirect href={session ? '/home' : '/login'} />;
 }

@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (session && inAuthGroup) {
-      router.replace('/feed');
+      router.replace('/home');
     }
   }, [loading, session, segments]);
 

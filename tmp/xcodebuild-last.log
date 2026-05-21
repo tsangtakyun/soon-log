@@ -1,0 +1,6 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -workspace ios/SOONLOG.xcworkspace -scheme SOONLOG -configuration Debug -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 17 Pro Max" -derivedDataPath /tmp/soonlog-ios-build build
+
+Build settings from command line:
+    SDKROOT = iphonesimulator26.4
+
