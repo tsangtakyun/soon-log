@@ -70,6 +70,13 @@ export default function AppTabs() {
         }}
       />
       <Tabs.Screen
+        name="idea/index"
+        options={{
+          title: '題材',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>◈</Text>
+        }}
+      />
+      <Tabs.Screen
         name="mayan/index"
         options={{
           title: 'Mayan',
@@ -81,6 +88,8 @@ export default function AppTabs() {
       <Tabs.Screen name="work/create" options={{ href: null }} />
       <Tabs.Screen name="work/[id]" options={{ href: null }} />
       <Tabs.Screen name="schedule/create" options={{ href: null }} />
+      <Tabs.Screen name="idea/library" options={{ href: null }} />
+      <Tabs.Screen name="idea/share" options={{ href: null }} />
     </Tabs>
   );
 }

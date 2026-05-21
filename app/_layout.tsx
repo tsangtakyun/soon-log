@@ -1,8 +1,9 @@
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
+import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import {
   DMSerifDisplay_400Regular,
   useFonts as useSerifFonts
@@ -13,26 +14,33 @@ import {
   DMSans_700Bold,
   useFonts as useSansFonts
 } from '@expo-google-fonts/dm-sans';
-import { AuthProvider } from '@/hooks/useAuth';
+import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { colors } from '@/theme/colors';
 
-type ShareIntentValue = {
-  sharedText: string | null;
-  setSharedText: (value: string | null) => void;
-};
+function RootNavigator() {
+  const { hasShareIntent } = useShareIntentContext();
+  const { session, loading } = useAuth();
 
-const ShareIntentContext = createContext<ShareIntentValue | undefined>(undefined);
+  useEffect(() => {
+    if (!hasShareIntent || loading) return;
 
-function ShareIntentProvider({ children }: { children: ReactNode }) {
-  const [sharedText, setSharedText] = useState<string | null>(null);
-  const value = useMemo(() => ({ sharedText, setSharedText }), [sharedText]);
-  return <ShareIntentContext.Provider value={value}>{children}</ShareIntentContext.Provider>;
-}
+    if (session) {
+      router.push('/idea/share');
+    } else {
+      router.replace('/login');
+    }
+  }, [hasShareIntent, loading, session]);
 
-export function useShareIntent() {
-  const context = useContext(ShareIntentContext);
-  if (!context) throw new Error('useShareIntent 必須在 ShareIntentProvider 之內使用。');
-  return context;
+  return (
+    <>
+      <StatusBar style="dark" />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="auth/callback" />
+        <Stack.Screen name="(app)" />
+      </Stack>
+    </>
+  );
 }
 
 export default function RootLayout() {
@@ -49,14 +57,9 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ShareIntentProvider>
+      <ShareIntentProvider options={{ scheme: 'soonlog' }}>
         <AuthProvider>
-          <StatusBar style="light" />
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="auth/callback" />
-            <Stack.Screen name="(app)" />
-          </Stack>
+          <RootNavigator />
         </AuthProvider>
       </ShareIntentProvider>
     </SafeAreaProvider>

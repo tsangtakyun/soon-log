@@ -36,6 +36,16 @@
         {
           "photosPermission": "SOON-LOG 需要存取相片，用作上載創作紀錄圖片。"
         }
+      ],
+      [
+        "expo-share-intent",
+        {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsWebPageWithMaxCount": 1
+          },
+          "iosShareExtensionBundleIdentifier": "network.sooncreator.log.ShareExtension"
+        }
       ]
     ]
   }

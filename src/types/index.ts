@@ -85,3 +85,19 @@ export type MayanMessage = {
   content: string;
   created_at: string;
 };
+
+export type ViralPotential = 'high' | 'medium' | 'low';
+
+export type Idea = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  description: string | null;
+  hook: string | null;
+  region: string;
+  viral_potential: ViralPotential;
+  source_url: string | null;
+  platform: string;
+  tags: string[];
+  created_at: string;
+};
