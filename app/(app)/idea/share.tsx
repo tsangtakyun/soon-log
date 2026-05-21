@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useShareIntentContext } from 'expo-share-intent';
 import { Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
@@ -58,6 +58,8 @@ export default function IdeaShareScreen() {
   const [url, setUrl] = useState('');
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [editTitle, setEditTitle] = useState('');
+  const [editNotes, setEditNotes] = useState('');
 
   const analyzeUrl = useCallback(async (targetUrl: string) => {
     setStatus('analyzing');
@@ -110,18 +112,30 @@ export default function IdeaShareScreen() {
     analyzeUrl(sharedUrl);
   }, [analyzeUrl, hasShareIntent, shareIntent, status]);
 
+  useEffect(() => {
+    if (!result) return;
+
+    const blockedTitle = result.title === 'Instagram' || result.title === 'TikTok' || !result.title;
+    setEditTitle(blockedTitle ? '' : result.title);
+    setEditNotes('');
+  }, [result]);
+
   const potential = useMemo(() => potentialConfig[result?.viral_potential ?? 'medium'], [result?.viral_potential]);
 
   async function saveIdea() {
     if (!result || !user) return;
+
+    const finalTitle = editTitle.trim() || result.title || 'Untitled';
+    const finalNotes = editNotes.trim();
+
     setStatus('saving');
 
     const { error } = await supabase.from('ideas').insert({
       user_id: user.id,
       url,
       thumb: result.image || null,
-      title: result.title,
-      topic: result.topic ?? result.title,
+      title: finalTitle,
+      topic: finalTitle,
       summary: result.description ?? result.desc ?? '',
       script_hook: result.script_hook ?? result.hook ?? '',
       country: result.country ?? 'HK',
@@ -133,7 +147,7 @@ export default function IdeaShareScreen() {
       viral_score: 0,
       ai_viral_base: 0,
       date: new Date().toISOString(),
-      notes: '',
+      notes: finalNotes,
       description: result.desc ?? result.description ?? '',
       hook: result.hook ?? '',
       region: result.country ?? 'HK',
@@ -213,6 +227,31 @@ export default function IdeaShareScreen() {
             ) : null}
 
             {result.description ? <Text style={styles.description}>{result.description}</Text> : null}
+
+            <View style={styles.editSection}>
+              <Text style={styles.editLabel}>題材名稱</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editTitle}
+                onChangeText={setEditTitle}
+                placeholder="幫呢個靈感起個名..."
+                placeholderTextColor={colors.textMuted}
+                multiline={false}
+              />
+            </View>
+
+            <View style={styles.editSection}>
+              <Text style={styles.editLabel}>筆記（選填）</Text>
+              <TextInput
+                style={[styles.editInput, styles.editInputMultiline]}
+                value={editNotes}
+                onChangeText={setEditNotes}
+                placeholder="點解覺得呢個有潛力？記低諗法..."
+                placeholderTextColor={colors.textMuted}
+                multiline
+                numberOfLines={3}
+              />
+            </View>
 
             <View style={styles.detailRow}>
               <Text style={styles.region}>{result.region || result.country || 'HK'}</Text>
@@ -379,6 +418,31 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 15,
     lineHeight: 23
+  },
+  editSection: {
+    gap: 6
+  },
+  editLabel: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 11,
+    color: colors.textMuted,
+    letterSpacing: 1,
+    textTransform: 'uppercase'
+  },
+  editInput: {
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    color: colors.text
+  },
+  editInputMultiline: {
+    height: 80,
+    textAlignVertical: 'top'
   },
   detailRow: {
     flexDirection: 'row',
