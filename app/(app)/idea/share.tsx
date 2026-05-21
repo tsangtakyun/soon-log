@@ -13,12 +13,20 @@ const AUTOFILL_API = 'https://idea-brainstorm.vercel.app/api/autofill-link';
 
 type AnalysisResult = {
   title: string;
-  description: string;
-  hook: string;
-  region: string;
+  topic?: string;
+  description?: string;
+  desc?: string;
+  hook?: string;
+  script_hook?: string;
+  region?: string;
+  country?: string;
   viral_potential: ViralPotential;
   tags: string[];
   platform: string;
+  image?: string;
+  placeName?: string;
+  placeAddress?: string;
+  categories?: string[];
 };
 
 type Status = 'idle' | 'analyzing' | 'ready' | 'saving' | 'saved' | 'error';
@@ -66,13 +74,20 @@ export default function IdeaShareScreen() {
 
       const data = await response.json();
       setResult({
-        title: data.title || '未知題材',
-        description: data.description || '',
-        hook: data.hook || '',
-        region: data.region || '全球',
-        viral_potential: normalizePotential(data.viral_potential),
+        title: data.title || 'Untitled',
+        topic: data.title || '',
+        description: data.desc || data.metadataDescription || '',
+        desc: data.desc || '',
+        hook: '',
+        country: data.country || 'HK',
+        region: data.country || 'HK',
+        viral_potential: 'medium',
         tags: asStringArray(data.tags),
-        platform: data.platform || 'Instagram'
+        platform: data.platform || 'instagram',
+        image: data.image || '',
+        placeName: data.placeName || '',
+        placeAddress: data.placeAddress || '',
+        categories: []
       });
       setStatus('ready');
     } catch (error) {
@@ -103,14 +118,27 @@ export default function IdeaShareScreen() {
 
     const { error } = await supabase.from('ideas').insert({
       user_id: user.id,
+      url,
+      thumb: result.image || null,
       title: result.title,
-      description: result.description,
-      hook: result.hook,
-      region: result.region,
-      viral_potential: result.viral_potential,
-      source_url: url,
-      platform: result.platform,
-      tags: result.tags
+      topic: result.topic ?? result.title,
+      summary: result.description ?? result.desc ?? '',
+      script_hook: result.script_hook ?? result.hook ?? '',
+      country: result.country ?? 'HK',
+      platform: result.platform ?? 'instagram',
+      tags: result.tags ?? [],
+      categories: result.categories ?? [],
+      place_name: result.placeName ?? '',
+      place_address: result.placeAddress ?? '',
+      viral_score: 0,
+      ai_viral_base: 0,
+      date: new Date().toISOString(),
+      notes: '',
+      description: result.desc ?? result.description ?? '',
+      hook: result.hook ?? '',
+      region: result.country ?? 'HK',
+      viral_potential: result.viral_potential ?? 'medium',
+      source_url: url
     });
 
     if (error) {
@@ -187,7 +215,7 @@ export default function IdeaShareScreen() {
             {result.description ? <Text style={styles.description}>{result.description}</Text> : null}
 
             <View style={styles.detailRow}>
-              <Text style={styles.region}>{result.region}</Text>
+              <Text style={styles.region}>{result.region || result.country || 'HK'}</Text>
               {result.tags.slice(0, 5).map((tag) => <Text key={tag} style={styles.tag}>#{tag}</Text>)}
             </View>
 

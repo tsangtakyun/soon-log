@@ -14,6 +14,13 @@ const potentialConfig: Record<ViralPotential, { label: string; color: string }> 
   low: { label: '低潛力', color: colors.textMuted }
 };
 
+const platformConfig: Record<string, { label: string; bg: string; color: string }> = {
+  instagram: { label: 'IG REEL', bg: '#E94B8A', color: '#FFFFFF' },
+  tiktok: { label: 'TIKTOK', bg: '#111111', color: '#FFFFFF' },
+  xiaohongshu: { label: '小紅書', bg: '#E53935', color: '#FFFFFF' },
+  web: { label: 'WEB', bg: '#E8E2D9', color: colors.textMuted }
+};
+
 function getPotential(value: unknown) {
   if (value === 'high' || value === 'medium' || value === 'low') {
     return potentialConfig[value];
@@ -22,7 +29,13 @@ function getPotential(value: unknown) {
   return potentialConfig.medium;
 }
 
-function formatTime(value: string) {
+function getPlatform(value: unknown) {
+  const key = typeof value === 'string' ? value.toLowerCase() : 'web';
+  return platformConfig[key] ?? platformConfig.web;
+}
+
+function formatTime(value?: string | null) {
+  if (!value) return '';
   return new Intl.DateTimeFormat('zh-HK', {
     month: 'short',
     day: 'numeric',
@@ -33,29 +46,51 @@ function formatTime(value: string) {
 
 function IdeaCard({ item }: { item: Idea }) {
   const potential = getPotential(item.viral_potential) ?? { label: '中潛力', color: colors.gold };
+  const platform = getPlatform(item.platform);
   const tags = Array.isArray(item.tags) ? item.tags : [];
+  const viralScore = Number(item.viral_score ?? 0);
+  const sourceUrl = item.url || item.source_url;
+  const summary = item.summary || item.description || '';
+  const hook = item.script_hook || item.hook || '';
+  const country = item.country || item.region || 'HK';
+  const timestamp = formatTime(item.date || item.created_at);
+  const placeName = item.place_name || item.shop_name || '';
 
   async function openSource() {
-    if (!item.source_url) return;
-    await Linking.openURL(item.source_url);
+    if (!sourceUrl) return;
+    await Linking.openURL(sourceUrl);
   }
 
   return (
     <Pressable onPress={openSource} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       <View style={styles.metaRow}>
-        <View style={styles.potentialRow}>
-          <View style={[styles.dot, { backgroundColor: potential.color || colors.gold }]} />
-          <Text style={styles.potentialText}>{potential.label || '中潛力'}</Text>
+        {viralScore > 0 ? (
+          <View style={styles.scoreBadge}>
+            <Text style={styles.scoreText}>{Math.round(viralScore)}</Text>
+          </View>
+        ) : (
+          <View style={styles.potentialRow}>
+            <View style={[styles.dot, { backgroundColor: potential.color || colors.gold }]} />
+            <Text style={styles.potentialText}>{potential.label || '中潛力'}</Text>
+          </View>
+        )}
+        <View style={styles.badgeCluster}>
+          <Text style={[styles.platformBadge, { backgroundColor: platform.bg, color: platform.color }]}>{platform.label}</Text>
+          <Text style={styles.countryBadge}>{country}</Text>
         </View>
-        <Text style={styles.platformBadge}>{item.platform || 'Instagram'}</Text>
       </View>
       <Text numberOfLines={2} style={styles.cardTitle}>{item.title || '未命名題材'}</Text>
-      {item.description ? <Text numberOfLines={2} style={styles.description}>{item.description}</Text> : null}
+      {summary ? <Text numberOfLines={2} style={styles.description}>{summary}</Text> : null}
+      {hook ? (
+        <View style={styles.hookPreview}>
+          <Text numberOfLines={1} style={styles.hookText}>{hook}</Text>
+        </View>
+      ) : null}
+      {placeName ? <Text numberOfLines={1} style={styles.place}>📍 {placeName}</Text> : null}
       <View style={styles.detailRow}>
-        <Text style={styles.region}>{item.region || '全球'}</Text>
-        {tags.slice(0, 4).map((tag) => <Text key={tag} style={styles.tag}>#{tag}</Text>)}
+        {tags.slice(0, 3).map((tag) => <Text key={tag} style={styles.tag}>#{tag}</Text>)}
       </View>
-      <Text style={styles.timestamp}>{formatTime(item.created_at)}</Text>
+      {timestamp ? <Text style={styles.timestamp}>{timestamp}</Text> : null}
     </Pressable>
   );
 }
@@ -209,12 +244,38 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 12
   },
+  scoreBadge: {
+    minWidth: 42,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF0EE'
+  },
+  scoreText: {
+    color: colors.accent,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14
+  },
+  badgeCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
   platformBadge: {
-    color: colors.purple,
-    backgroundColor: '#F0EAFE',
     borderRadius: 999,
     overflow: 'hidden',
     paddingHorizontal: 10,
+    paddingVertical: 5,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
+  },
+  countryBadge: {
+    color: colors.textMuted,
+    backgroundColor: colors.bgMuted,
+    borderRadius: 999,
+    overflow: 'hidden',
+    paddingHorizontal: 9,
     paddingVertical: 5,
     fontFamily: fonts.bodyBold,
     fontSize: 12
@@ -230,6 +291,24 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     lineHeight: 21
+  },
+  hookPreview: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.gold,
+    paddingLeft: 10,
+    paddingVertical: 2
+  },
+  hookText: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    fontStyle: 'italic',
+    lineHeight: 18
+  },
+  place: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12
   },
   detailRow: {
     flexDirection: 'row',
