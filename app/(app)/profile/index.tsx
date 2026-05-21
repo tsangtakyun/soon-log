@@ -21,9 +21,26 @@ import { Log, Profile, Region } from '@/types';
 
 const regions: Region[] = ['HK', 'TW', 'SG', 'OTHER'];
 
-async function jpegBlobFromImageUri(uri: string) {
-  const response = await fetch(uri);
-  return response.blob();
+function base64ToArrayBuffer(base64: string) {
+  const cleanBase64 = base64.replace(/[^A-Za-z0-9+/=]/g, '');
+  const lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const byteLength = Math.floor((cleanBase64.length * 3) / 4) - (cleanBase64.endsWith('==') ? 2 : cleanBase64.endsWith('=') ? 1 : 0);
+  const bytes = new Uint8Array(byteLength);
+  let byteIndex = 0;
+
+  for (let index = 0; index < cleanBase64.length; index += 4) {
+    const chunk =
+      (lookup.indexOf(cleanBase64[index]) << 18) |
+      (lookup.indexOf(cleanBase64[index + 1]) << 12) |
+      ((cleanBase64[index + 2] === '=' ? 0 : lookup.indexOf(cleanBase64[index + 2])) << 6) |
+      (cleanBase64[index + 3] === '=' ? 0 : lookup.indexOf(cleanBase64[index + 3]));
+
+    if (byteIndex < byteLength) bytes[byteIndex++] = (chunk >> 16) & 255;
+    if (byteIndex < byteLength) bytes[byteIndex++] = (chunk >> 8) & 255;
+    if (byteIndex < byteLength) bytes[byteIndex++] = chunk & 255;
+  }
+
+  return bytes.buffer;
 }
 
 export default function OwnProfileScreen() {
@@ -142,6 +159,7 @@ export default function OwnProfileScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
+      base64: true,
       preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible
     });
 
@@ -149,12 +167,15 @@ export default function OwnProfileScreen() {
 
     try {
       setUploadingAvatar(true);
+      const base64 = result.assets[0].base64;
+      if (!base64) throw new Error('未能讀取相片資料，請再試一次。');
+
       const fileName = `avatars/${user.id}.jpg`;
-      const blob = await jpegBlobFromImageUri(result.assets[0].uri);
+      const imageBody = base64ToArrayBuffer(base64);
 
       const { error } = await supabase.storage
         .from('log-media')
-        .upload(fileName, blob, {
+        .upload(fileName, imageBody, {
           contentType: 'image/jpeg',
           upsert: true
         });
