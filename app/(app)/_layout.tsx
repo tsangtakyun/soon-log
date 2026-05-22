@@ -34,8 +34,8 @@ export default function AppTabs() {
       <Tabs.Screen
         name="log/index"
         options={{
-          title: 'Log',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>⌛</Text>
+          title: 'Their.Studio',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🎬</Text>
         }}
       />
       <Tabs.Screen

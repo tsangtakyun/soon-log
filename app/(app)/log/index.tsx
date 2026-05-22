@@ -223,8 +223,8 @@ export default function StudioLogScreen() {
   return (
     <View style={styles.screen}>
       <View style={[styles.hero, { paddingTop: insets.top + 22 }]}>
-        <Text style={styles.heroTitle}>⌛ Studio</Text>
-        <Text style={styles.heroSubtitle}>你嘅創作空間</Text>
+        <Text style={styles.heroTitle}>Their. Studio</Text>
+        <Text style={styles.heroSubtitle}>創作者嘅工作間</Text>
       </View>
 
       {loading ? (
