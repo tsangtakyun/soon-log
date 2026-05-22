@@ -17,6 +17,7 @@ export default function DiscoverCreatorsScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [creators, setCreators] = useState<Creator[]>([]);
+  const [followedIds, setFollowedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   const loadCreators = useCallback(async () => {
@@ -91,14 +92,18 @@ export default function DiscoverCreatorsScreen() {
 
   const followCreator = async (creatorId: string) => {
     if (!user) return;
-    setCreators((current) => current.filter((creator) => creator.id !== creatorId));
+    setFollowedIds((current) => new Set([...current, creatorId]));
     const { error } = await supabase
       .from('follows')
       .insert({ follower_id: user.id, following_id: creatorId });
 
     if (error) {
+      setFollowedIds((current) => {
+        const next = new Set(current);
+        next.delete(creatorId);
+        return next;
+      });
       Alert.alert('追蹤失敗', error.message);
-      loadCreators();
     }
   };
 
@@ -129,6 +134,7 @@ export default function DiscoverCreatorsScreen() {
           )}
           renderItem={({ item }) => {
             const displayName = item.display_name || item.username || '創作者';
+            const isFollowed = followedIds.has(item.id);
             return (
               <View style={styles.creatorRow}>
                 {item.avatar_url ? (
@@ -143,8 +149,16 @@ export default function DiscoverCreatorsScreen() {
                   <Text numberOfLines={1} style={styles.creatorUsername}>@{item.username}</Text>
                   <Text style={styles.creatorMeta}>{item.log_count} 個作品 · {item.follower_count} 位追蹤者</Text>
                 </View>
-                <Pressable onPress={() => followCreator(item.id)} style={({ pressed }) => [styles.followButton, pressed && styles.pressed]}>
-                  <Text style={styles.followText}>追蹤</Text>
+                <Pressable
+                  onPress={() => followCreator(item.id)}
+                  disabled={isFollowed}
+                  style={({ pressed }) => [
+                    styles.followButton,
+                    isFollowed && styles.followingButton,
+                    pressed && !isFollowed && styles.pressed
+                  ]}
+                >
+                  <Text style={[styles.followText, isFollowed && styles.followingText]}>{isFollowed ? '已追蹤' : '追蹤'}</Text>
                 </Pressable>
               </View>
             );
@@ -242,15 +256,24 @@ const styles = StyleSheet.create({
     fontSize: 12
   },
   followButton: {
+    borderWidth: 1,
+    borderColor: colors.primary,
     borderRadius: 999,
     backgroundColor: colors.primary,
     paddingHorizontal: 14,
     paddingVertical: 8
   },
+  followingButton: {
+    borderColor: colors.bodyBorder,
+    backgroundColor: colors.bgBodyMuted
+  },
   followText: {
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 13
+  },
+  followingText: {
+    color: colors.textMuted
   },
   empty: {
     paddingTop: 120,

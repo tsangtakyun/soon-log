@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -372,10 +372,20 @@ export default function HomeScreen() {
   useEffect(() => {
     loadNudge();
     loadTrends();
-    loadOpenStudios();
-    loadFollowingFeed();
     loadAllFeed();
-  }, [loadAllFeed, loadFollowingFeed, loadNudge, loadOpenStudios, loadTrends]);
+  }, [loadAllFeed, loadNudge, loadTrends]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadFollowingFeed();
+    }, [loadFollowingFeed])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      loadOpenStudios();
+    }, [loadOpenStudios])
+  );
 
   const nudgeMessage = task
     ? `今日要完成：${task.title}${task.due_date ? `，截止 ${formatDueDate(task.due_date)}` : ''}`
