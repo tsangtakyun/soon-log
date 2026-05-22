@@ -312,6 +312,11 @@ export default function HomeScreen() {
   const [credits, setCredits] = useState(30);
   const screenWidth = Dimensions.get('window').width;
   const heroHeight = Math.round(Dimensions.get('window').height * 0.36);
+  const eggRotation = useRef(new Animated.Value(0)).current;
+  const eggRotate = eggRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
   const displayUsername = homeProfile?.username || authProfile?.username ? `@${homeProfile?.username || authProfile?.username}` : '@soon';
   const avatar = homeProfile?.avatar_url;
   const initial = (homeProfile?.username || authProfile?.username || user?.email || 'S').slice(0, 1).toUpperCase();
@@ -441,6 +446,17 @@ export default function HomeScreen() {
     loadTrends();
   }, [loadNudge, loadTrends]);
 
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(eggRotation, {
+        toValue: 1,
+        duration: 8000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [eggRotation]);
+
   useFocusEffect(
     useCallback(() => {
       loadOpenStudios();
@@ -482,7 +498,10 @@ export default function HomeScreen() {
           </Pressable>
           <Pressable onPress={() => router.push('/(app)/log')} style={({ pressed }) => pressed && styles.pressed}>
             <View style={styles.eggImageButton}>
-              <Image source={require('../../../assets/soon-egg.png')} style={styles.eggImage} />
+              <Animated.Image
+                source={require('../../../assets/soon-egg.png')}
+                style={[styles.eggImage, { transform: [{ rotate: eggRotate }] }]}
+              />
               <Text style={styles.eggSvgLabel}>EGGS</Text>
             </View>
           </Pressable>
@@ -592,7 +611,7 @@ const styles = StyleSheet.create({
     marginTop: 9,
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
-    fontSize: 22,
+    fontSize: 11,
     textAlign: 'center'
   },
   eggImageButton: {
