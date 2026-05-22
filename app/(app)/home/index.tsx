@@ -15,7 +15,6 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Path } from 'react-native-svg';
 import ClipPlayer from '@/components/ClipPlayer';
 import { MenuDrawer } from '@/components/MenuDrawer';
 import { SavedSheet } from '@/components/SavedSheet';
@@ -482,27 +481,8 @@ export default function HomeScreen() {
             <Text style={styles.username}>{displayUsername}</Text>
           </Pressable>
           <Pressable onPress={() => router.push('/(app)/log')} style={({ pressed }) => pressed && styles.pressed}>
-            <View style={styles.eggSvgButton}>
-              <Svg width={100} height={100} viewBox="0 0 100 100">
-                <Path
-                  d="M50 8 C65 8, 85 20, 90 38 C95 55, 88 75, 72 85 C58 94, 38 94, 25 85 C10 75, 5 55, 10 38 C15 20, 35 8, 50 8 Z"
-                  fill="white"
-                  stroke="#1A1A1A"
-                  strokeWidth="2.5"
-                  strokeLinejoin="round"
-                />
-                <Circle cx="50" cy="52" r="18" fill="#F5A623" />
-                <Circle cx="44" cy="46" r="5" fill="white" opacity={0.4} />
-                <Circle cx="45" cy="50" r="2" fill="#1A1A1A" />
-                <Circle cx="55" cy="50" r="2" fill="#1A1A1A" />
-                <Path
-                  d="M44 56 Q50 62 56 56"
-                  stroke="#1A1A1A"
-                  strokeWidth="2"
-                  fill="none"
-                  strokeLinecap="round"
-                />
-              </Svg>
+            <View style={styles.eggImageButton}>
+              <Image source={require('../../../assets/soon-egg.png')} style={styles.eggImage} />
               <Text style={styles.eggSvgLabel}>EGGS</Text>
             </View>
           </Pressable>
@@ -615,10 +595,15 @@ const styles = StyleSheet.create({
     fontSize: 22,
     textAlign: 'center'
   },
-  eggSvgButton: {
+  eggImageButton: {
     marginTop: 16,
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  eggImage: {
+    width: 100,
+    height: 100,
+    resizeMode: 'contain'
   },
   eggSvgLabel: {
     color: colors.textOnDarkMuted,
