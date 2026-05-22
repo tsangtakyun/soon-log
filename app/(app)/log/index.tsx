@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,10 +21,13 @@ import { Log } from '@/types';
 type TopicRoom = {
   id: string;
   name: string;
-  is_private?: boolean | null;
+  topic: string;
+  privacy: 'private' | 'open';
+  created_at: string;
+  updated_at?: string | null;
+  invite_code?: string | null;
   member_count?: number | null;
-  last_activity_at?: string | null;
-  members?: { avatar_url?: string | null; username?: string | null }[] | null;
+  last_clip_at?: string | null;
 };
 
 function formatActivity(value?: string | null) {
@@ -46,26 +49,17 @@ function EmptyTodayLog() {
 }
 
 function RoomCard({ room }: { room: TopicRoom }) {
-  const members = room.members ?? [];
   return (
     <Pressable onPress={() => router.push(`/log/room/${room.id}`)} style={({ pressed }) => [styles.roomCard, pressed && styles.pressed]}>
       <View style={styles.roomHeader}>
-        <Text numberOfLines={1} style={styles.roomName}>{room.name}</Text>
-        <Text style={styles.privacyBadge}>{room.is_private ? '🔒 私密' : '🌐 Open Studio'}</Text>
+        <Text style={styles.privacyBadge}>{room.privacy === 'open' ? '🌐 Open Studio' : '🔒 私密'}</Text>
       </View>
-      <View style={styles.memberLine}>
-        <View style={styles.memberAvatars}>
-          {members.slice(0, 4).map((member, index) => member.avatar_url ? (
-            <Image key={`${member.avatar_url}-${index}`} source={{ uri: member.avatar_url }} style={[styles.memberAvatar, { marginLeft: index === 0 ? 0 : -10 }]} />
-          ) : (
-            <View key={`${member.username}-${index}`} style={[styles.memberAvatarFallback, { marginLeft: index === 0 ? 0 : -10 }]}>
-              <Text style={styles.memberInitial}>{(member.username || 'S').slice(0, 1).toUpperCase()}</Text>
-            </View>
-          ))}
-        </View>
-        <Text style={styles.memberCount}>{room.member_count ?? members.length} members</Text>
+      <Text numberOfLines={1} style={styles.roomName}>{room.name}</Text>
+      <Text numberOfLines={2} style={styles.roomTopic}>{room.topic}</Text>
+      <View style={styles.roomMeta}>
+        <Text style={styles.memberCount}>{room.member_count ?? 0} 位成員</Text>
+        <Text style={styles.lastActivity}>{formatActivity(room.last_clip_at ?? room.updated_at ?? room.created_at)}</Text>
       </View>
-      <Text style={styles.lastActivity}>{formatActivity(room.last_activity_at)}</Text>
     </Pressable>
   );
 }
@@ -77,22 +71,84 @@ export default function StudioLogScreen() {
   const [rooms, setRooms] = useState<TopicRoom[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadData = useCallback(async () => {
+  const loadRooms = useCallback(async () => {
     if (!user) return;
-    const now = new Date();
-    const [{ data: logs, error: logsError }, { data: roomData, error: roomsError }] = await Promise.all([
-      supabase
-        .from('logs')
-        .select('*, profile:profiles!logs_user_id_fkey(*)')
-        .eq('user_id', user.id)
-        .gte('created_at', startOfDay(now).toISOString())
-        .lte('created_at', endOfDay(now).toISOString())
-        .order('created_at', { ascending: false }),
+    const { data: memberships, error: membershipError } = await supabase
+      .from('topic_room_members')
+      .select('room_id')
+      .eq('user_id', user.id);
+
+    if (membershipError) {
+      console.error('Room membership fetch error:', JSON.stringify(membershipError));
+      setRooms([]);
+      return;
+    }
+
+    const roomIds = [...new Set((memberships ?? []).map((row) => row.room_id).filter(Boolean))];
+    if (roomIds.length === 0) {
+      setRooms([]);
+      return;
+    }
+
+    const [{ data: roomData, error: roomsError }, { data: members }, { data: clips }] = await Promise.all([
       supabase
         .from('topic_rooms')
         .select('*')
-        .order('last_activity_at', { ascending: false })
+        .in('id', roomIds),
+      supabase
+        .from('topic_room_members')
+        .select('room_id')
+        .in('room_id', roomIds),
+      supabase
+        .from('topic_clips')
+        .select('room_id, created_at')
+        .in('room_id', roomIds)
     ]);
+
+    if (roomsError) {
+      console.error('Topic rooms fetch error:', JSON.stringify(roomsError));
+      setRooms([]);
+      return;
+    }
+
+    const roomRows = (roomData ?? []) as TopicRoom[];
+    const memberCounts = new Map<string, number>();
+    (members ?? []).forEach((member) => {
+      memberCounts.set(member.room_id, (memberCounts.get(member.room_id) ?? 0) + 1);
+    });
+    const lastClips = new Map<string, string>();
+    (clips ?? []).forEach((clip) => {
+      const current = lastClips.get(clip.room_id);
+      if (!current || new Date(clip.created_at).getTime() > new Date(current).getTime()) {
+        lastClips.set(clip.room_id, clip.created_at);
+      }
+    });
+
+    const enriched = roomRows
+      .map((room) => ({
+        ...room,
+        member_count: memberCounts.get(room.id) ?? 0,
+        last_clip_at: lastClips.get(room.id) ?? null
+      }))
+      .sort((a, b) => {
+        const aTime = new Date(a.last_clip_at ?? a.created_at).getTime();
+        const bTime = new Date(b.last_clip_at ?? b.created_at).getTime();
+        return bTime - aTime;
+      });
+
+    setRooms(enriched);
+  }, [user]);
+
+  const loadData = useCallback(async () => {
+    if (!user) return;
+    const now = new Date();
+    const { data: logs, error: logsError } = await supabase
+      .from('logs')
+      .select('*, profile:profiles!logs_user_id_fkey(*)')
+      .eq('user_id', user.id)
+      .gte('created_at', startOfDay(now).toISOString())
+      .lte('created_at', endOfDay(now).toISOString())
+      .order('created_at', { ascending: false });
 
     if (logsError) {
       console.error('Today logs fetch error:', JSON.stringify(logsError));
@@ -101,17 +157,56 @@ export default function StudioLogScreen() {
       setTodayLogs((logs ?? []) as Log[]);
     }
 
-    if (roomsError) {
-      setRooms([]);
-    } else {
-      setRooms((roomData ?? []) as TopicRoom[]);
-    }
+    await loadRooms();
     setLoading(false);
-  }, [user]);
+  }, [loadRooms, user]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    const roomsChannel = supabase
+      .channel('studio-topic-rooms')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_rooms' }, () => loadRooms())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_room_members' }, () => loadRooms())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_clips' }, () => loadRooms())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(roomsChannel);
+    };
+  }, [loadData, loadRooms]);
+
+  const joinByInviteCode = () => {
+    if (!user) return;
+    Alert.prompt(
+      '輸入邀請碼',
+      '貼上隊友分享俾你嘅 Topic Room 邀請碼',
+      async (value) => {
+        const inviteCode = value.trim();
+        if (!inviteCode) return;
+        const { data: room, error: roomError } = await supabase
+          .from('topic_rooms')
+          .select('id')
+          .eq('invite_code', inviteCode)
+          .maybeSingle();
+
+        if (roomError || !room) {
+          Alert.alert('找不到房間', '請確認邀請碼是否正確');
+          return;
+        }
+
+        const { error: joinError } = await supabase
+          .from('topic_room_members')
+          .upsert({ room_id: room.id, user_id: user.id, role: 'member' }, { onConflict: 'room_id,user_id' });
+
+        if (joinError) {
+          Alert.alert('加入失敗', joinError.message);
+          return;
+        }
+        router.push(`/log/room/${room.id}`);
+      },
+      'plain-text'
+    );
+  };
 
   return (
     <View style={styles.screen}>
@@ -145,16 +240,19 @@ export default function StudioLogScreen() {
 
           <View style={[styles.sectionHeader, styles.roomsHeader]}>
             <Text style={styles.sectionTitle}>Topic Rooms</Text>
-            <Pressable onPress={() => undefined} hitSlop={8}>
+            <Pressable onPress={() => router.push('/log/create-room')} hitSlop={8}>
               <Text style={styles.addButton}>+ 新建</Text>
             </Pressable>
           </View>
+          <Pressable onPress={joinByInviteCode} hitSlop={8} style={styles.inviteButton}>
+            <Text style={styles.inviteButtonText}>輸入邀請碼</Text>
+          </Pressable>
 
           {rooms.length === 0 ? (
             <View style={styles.emptyRooms}>
               <Text style={styles.emptyRoomsTitle}>你仲未有 Topic Room</Text>
               <Text style={styles.emptyRoomsBody}>建立一個同隊友一齊記錄創作過程</Text>
-              <Pressable onPress={() => undefined} style={({ pressed }) => [styles.createRoomButton, pressed && styles.pressed]}>
+              <Pressable onPress={() => router.push('/log/create-room')} style={({ pressed }) => [styles.createRoomButton, pressed && styles.pressed]}>
                 <Text style={styles.createRoomText}>+ 建立 Topic Room</Text>
               </Pressable>
             </View>
@@ -248,6 +346,18 @@ const styles = StyleSheet.create({
   roomsHeader: {
     marginTop: 26
   },
+  inviteButton: {
+    alignSelf: 'flex-end',
+    marginRight: 16,
+    marginTop: 8,
+    minHeight: 28,
+    justifyContent: 'center'
+  },
+  inviteButtonText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14
+  },
   emptyRooms: {
     marginHorizontal: 16,
     marginTop: 12,
@@ -288,57 +398,40 @@ const styles = StyleSheet.create({
   roomCard: {
     borderRadius: 16,
     backgroundColor: colors.bgBodyMuted,
-    padding: 16
+    padding: 16,
+    gap: 8
   },
   roomHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     gap: 10
   },
   roomName: {
-    flex: 1,
     color: colors.text,
     fontFamily: fonts.bodyBold,
     fontSize: 18
   },
   privacyBadge: {
-    color: colors.textMuted,
-    fontFamily: fonts.bodyMedium,
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: colors.bgBodyCard,
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
     fontSize: 12
   },
-  memberLine: {
-    marginTop: 14,
+  roomTopic: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20
+  },
+  roomMeta: {
+    marginTop: 4,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 10
-  },
-  memberAvatars: {
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  memberAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: colors.bgBodyMuted,
-    backgroundColor: colors.bodyBorder
-  },
-  memberAvatarFallback: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: colors.bgBodyMuted,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  memberInitial: {
-    color: colors.textOnDark,
-    fontFamily: fonts.bodyBold,
-    fontSize: 11
   },
   memberCount: {
     color: colors.textMuted,
