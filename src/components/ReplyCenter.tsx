@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -65,6 +66,26 @@ const statusMeta: Record<string, { label: string; color: string }> = {
   important: { label: '重要', color: colors.error },
   done: { label: '已完成', color: colors.textMuted }
 };
+
+function useKeyboardInset(safeBottom: number) {
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardInset(Math.max(0, event.endCoordinates.height - safeBottom));
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardInset(0));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [safeBottom]);
+
+  return keyboardInset;
+}
 
 function relativeTime(value: string) {
   const diff = Date.now() - new Date(value).getTime();
@@ -303,6 +324,7 @@ function NewThreadSheet({
   onCreate: (draft: { inbox_type: InboxType; sender_name: string; original_message: string }) => Promise<void>;
 }) {
   const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset(insets.bottom);
   const [inboxType, setInboxType] = useState<InboxType>('fans');
   const [senderName, setSenderName] = useState('');
   const [originalMessage, setOriginalMessage] = useState('');
@@ -328,7 +350,7 @@ function NewThreadSheet({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoiding}
       >
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + 18 }]}>
+        <View style={[styles.sheet, { bottom: keyboardInset, paddingBottom: insets.bottom + 18 }]}>
           <ScrollView
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: 40 }}
@@ -391,6 +413,7 @@ function ThreadDetailSheet({
 }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const keyboardInset = useKeyboardInset(insets.bottom);
   const [replyText, setReplyText] = useState('');
   const [notes, setNotes] = useState('');
   const [generating, setGenerating] = useState(false);
@@ -506,7 +529,7 @@ function ThreadDetailSheet({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoiding}
       >
-        <View style={[styles.detailSheet, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={[styles.detailSheet, { bottom: keyboardInset, paddingBottom: insets.bottom + 16 }]}>
           <ScrollView
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: 40 }}
