@@ -82,7 +82,7 @@ export default function StudioLogScreen() {
       .eq('user_id', user.id);
 
     if (membershipError) {
-      console.error('Room membership fetch error:', JSON.stringify(membershipError));
+      console.warn('Room membership fetch error:', JSON.stringify(membershipError));
       setRooms([]);
       return;
     }
