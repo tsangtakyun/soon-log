@@ -12,6 +12,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View
@@ -123,6 +124,7 @@ export default function TopicRoomScreen() {
   const [membershipRole, setMembershipRole] = useState<'owner' | 'member' | null>(null);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const memberAngles = useMemo(() => new Map(members.map((member) => [member.user_id, member.angle])), [members]);
   const isMember = Boolean(membershipRole);
   const isOwner = membershipRole === 'owner';
@@ -242,7 +244,14 @@ export default function TopicRoomScreen() {
             <Pressable onPress={() => router.back()} hitSlop={10}>
               <Text style={styles.heroBack}>← 返回</Text>
             </Pressable>
-            <Text style={styles.heroBadge}>{room.privacy === 'open' ? '🌐 Open Studio' : '🔒 私密'}</Text>
+            <View style={styles.heroActions}>
+              <Text style={styles.heroBadge}>{room.privacy === 'open' ? '🌐 Open Studio' : '🔒 私密'}</Text>
+              {isOwner ? (
+                <Pressable onPress={() => setSettingsOpen(true)} hitSlop={10}>
+                  <Text style={styles.settingsGear}>⚙️</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
           <Text style={styles.roomTitle}>{room.name}</Text>
           <Text style={styles.topicText}>{room.topic}</Text>
@@ -312,6 +321,17 @@ export default function TopicRoomScreen() {
             }}
           />
         </>
+      ) : null}
+      {isOwner ? (
+        <RoomSettingsSheet
+          room={room}
+          visible={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={() => {
+            setSettingsOpen(false);
+            loadRoom();
+          }}
+        />
       ) : null}
     </View>
   );
@@ -468,6 +488,119 @@ function AddClipSheet({
   );
 }
 
+function RoomSettingsSheet({
+  room,
+  visible,
+  onClose,
+  onSaved
+}: {
+  room: Room;
+  visible: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const [name, setName] = useState(room.name);
+  const [isOpen, setIsOpen] = useState(room.privacy === 'open');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    setName(room.name);
+    setIsOpen(room.privacy === 'open');
+  }, [room.name, room.privacy, visible]);
+
+  const saveSettings = async () => {
+    const nextName = name.trim();
+    if (!nextName || saving) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from('topic_rooms')
+      .update({ name: nextName, privacy: isOpen ? 'open' : 'private' })
+      .eq('id', room.id);
+
+    setSaving(false);
+    if (error) {
+      Alert.alert('儲存失敗', error.message);
+      return;
+    }
+    onSaved();
+  };
+
+  const confirmDelete = () => {
+    Alert.alert(
+      '刪除 Topic Room',
+      '刪除後所有成員、clips 同邀請碼都會一併移除。確定要刪除？',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '刪除',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await supabase.from('topic_rooms').delete().eq('id', room.id);
+            if (error) {
+              Alert.alert('刪除失敗', error.message);
+              return;
+            }
+            onClose();
+            router.replace('/log');
+          }
+        }
+      ]
+    );
+  };
+
+  return (
+    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetOverlay}>
+        <Pressable style={styles.sheetBackdrop} onPress={onClose} />
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + 18 }]}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>房間設定</Text>
+
+          <View style={styles.settingsField}>
+            <Text style={styles.settingsLabel}>題材名稱</Text>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="題材名稱"
+              placeholderTextColor={colors.textMuted}
+              style={styles.sheetInput}
+            />
+          </View>
+
+          <View style={styles.privacySetting}>
+            <View style={styles.privacySettingText}>
+              <Text style={styles.settingsLabel}>開放模式</Text>
+              <Text style={styles.privacyDescription}>
+                {isOpen ? '🌐 Open Studio — 任何人可以睇製作過程' : '🔒 私密 — 只有成員可以睇'}
+              </Text>
+            </View>
+            <Switch
+              value={isOpen}
+              onValueChange={setIsOpen}
+              trackColor={{ false: colors.bodyBorder, true: colors.primaryLight }}
+              thumbColor={isOpen ? colors.primary : colors.textMuted}
+            />
+          </View>
+
+          <Pressable
+            onPress={saveSettings}
+            disabled={saving || !name.trim()}
+            style={({ pressed }) => [styles.sheetSubmit, (pressed || saving || !name.trim()) && styles.pressed]}
+          >
+            {saving ? <ActivityIndicator color={colors.textOnDark} /> : <Text style={styles.sheetSubmitText}>儲存設定</Text>}
+          </Pressable>
+
+          <Pressable onPress={confirmDelete} style={styles.deleteRoomButton}>
+            <Text style={styles.deleteRoomText}>刪除 Topic Room</Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -489,6 +622,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between'
   },
+  heroActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
   heroBack: {
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
@@ -503,6 +641,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     paddingHorizontal: 10,
     paddingVertical: 6
+  },
+  settingsGear: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 20
   },
   roomTitle: {
     marginTop: 28,
@@ -822,6 +964,44 @@ const styles = StyleSheet.create({
   },
   sheetSubmitText: {
     color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15
+  },
+  settingsField: {
+    gap: 8
+  },
+  settingsLabel: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14
+  },
+  privacySetting: {
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    borderRadius: 16,
+    backgroundColor: colors.bgBodyCard,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  privacySettingText: {
+    flex: 1,
+    gap: 6
+  },
+  privacyDescription: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 18
+  },
+  deleteRoomButton: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  deleteRoomText: {
+    color: colors.error,
     fontFamily: fonts.bodyBold,
     fontSize: 15
   },
