@@ -76,7 +76,7 @@ function EmptySocialState({ buttonLabel }: { buttonLabel: string }) {
 function TrendCard({ trend }: { trend: Trend }) {
   const angles = trend.angles ?? [];
   return (
-    <Pressable onPress={() => router.push(`/home/trend/${trend.id}`)} style={({ pressed }) => [styles.trendCard, pressed && styles.pressed]}>
+    <Pressable onPress={() => router.push('/(app)/home/trend/' + trend.id)} style={({ pressed }) => [styles.trendCard, pressed && styles.pressed]}>
       <View style={styles.trendHeader}>
         <View style={styles.trendTopic}>
           <Text style={styles.trendIcon}>{trend.icon || '🔥'}</Text>
