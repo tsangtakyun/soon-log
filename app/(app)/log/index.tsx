@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 import { Log } from '@/types';
+import CreateTopicRoomScreen from './create-room';
 
 type TopicRoom = {
   id: string;
@@ -69,6 +71,7 @@ export default function StudioLogScreen() {
   const { user } = useAuth();
   const [todayLogs, setTodayLogs] = useState<Log[]>([]);
   const [rooms, setRooms] = useState<TopicRoom[]>([]);
+  const [createRoomOpen, setCreateRoomOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const loadRooms = useCallback(async () => {
@@ -240,7 +243,7 @@ export default function StudioLogScreen() {
 
           <View style={[styles.sectionHeader, styles.roomsHeader]}>
             <Text style={styles.sectionTitle}>Topic Rooms</Text>
-            <Pressable onPress={() => router.push('/topic-room/create')} hitSlop={8}>
+            <Pressable onPress={() => setCreateRoomOpen(true)} hitSlop={8}>
               <Text style={styles.addButton}>+ 新建</Text>
             </Pressable>
           </View>
@@ -252,7 +255,7 @@ export default function StudioLogScreen() {
             <View style={styles.emptyRooms}>
               <Text style={styles.emptyRoomsTitle}>你仲未有 Topic Room</Text>
               <Text style={styles.emptyRoomsBody}>建立一個同隊友一齊記錄創作過程</Text>
-              <Pressable onPress={() => router.push('/topic-room/create')} style={({ pressed }) => [styles.createRoomButton, pressed && styles.pressed]}>
+              <Pressable onPress={() => setCreateRoomOpen(true)} style={({ pressed }) => [styles.createRoomButton, pressed && styles.pressed]}>
                 <Text style={styles.createRoomText}>+ 建立 Topic Room</Text>
               </Pressable>
             </View>
@@ -267,6 +270,10 @@ export default function StudioLogScreen() {
       <Pressable onPress={() => router.push('/create')} style={({ pressed }) => [styles.fab, { bottom: insets.bottom + 94 }, pressed && styles.pressed]}>
         <Text style={styles.fabText}>🎬</Text>
       </Pressable>
+
+      <Modal animationType="slide" presentationStyle="fullScreen" visible={createRoomOpen} onRequestClose={() => setCreateRoomOpen(false)}>
+        <CreateTopicRoomScreen onClose={() => setCreateRoomOpen(false)} />
+      </Modal>
     </View>
   );
 }

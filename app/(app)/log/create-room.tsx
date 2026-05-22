@@ -20,7 +20,11 @@ import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 
-export default function CreateTopicRoomScreen() {
+type CreateTopicRoomScreenProps = {
+  onClose?: () => void;
+};
+
+export default function CreateTopicRoomScreen({ onClose }: CreateTopicRoomScreenProps = {}) {
   const insets = useSafeAreaInsets();
   const { loading: authLoading, user } = useAuth();
   const [topic, setTopic] = useState('');
@@ -73,7 +77,8 @@ export default function CreateTopicRoomScreen() {
         return;
       }
 
-      router.replace(`/log/room/${room.id}`);
+      onClose?.();
+      router.push(`/log/room/${room.id}`);
     } catch (error) {
       Alert.alert('建立失敗', error instanceof Error ? error.message : '請稍後再試');
     } finally {
@@ -84,7 +89,7 @@ export default function CreateTopicRoomScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
+        <Pressable onPress={onClose ?? (() => router.back())} hitSlop={10}>
           <Text style={styles.cancel}>← 取消</Text>
         </Pressable>
         <Text style={styles.title}>建立 Topic Room</Text>
