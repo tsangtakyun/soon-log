@@ -183,10 +183,6 @@ function BlackBoxSection({ studios }: { studios: OpenStudio[] }) {
     <View style={styles.openStudiosSection}>
       <View style={styles.sectionBannerCard}>
         <Image source={require('../../../assets/home-black-box-banner.png')} style={styles.sectionBannerImage} />
-        <View style={styles.sectionBannerOverlay}>
-          <Text style={styles.sectionBannerTitle}>Black Box 黑盒</Text>
-          <Text style={styles.sectionBannerSubtitle}>紀錄製作的電子黑盒</Text>
-        </View>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.openStudiosStrip}>
         {studios.map((studio) => (
@@ -533,10 +529,6 @@ export default function HomeScreen() {
         <View style={styles.prediktSection}>
           <View style={styles.sectionBannerCard}>
             <Image source={require('../../../assets/home-predikt-banner.png')} style={styles.sectionBannerImage} />
-            <View style={styles.sectionBannerOverlay}>
-              <Text style={styles.sectionBannerTitle}>預言書</Text>
-              <Text style={styles.sectionBannerSubtitle}>Predikt · 創作者社群熱話</Text>
-            </View>
           </View>
           <View style={styles.trendsWrap}>
             {loadingTrends ? <ActivityIndicator color={colors.primary} /> : null}
@@ -757,29 +749,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: colors.bgHero
+    backgroundColor: 'transparent'
   },
   sectionBannerImage: {
     width: '100%',
-    height: 88,
+    height: 62,
     resizeMode: 'cover'
-  },
-  sectionBannerOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-    backgroundColor: 'rgba(0,0,0,0.15)'
-  },
-  sectionBannerTitle: {
-    color: colors.textOnDark,
-    fontFamily: fonts.bodyBold,
-    fontSize: 22
-  },
-  sectionBannerSubtitle: {
-    marginTop: 4,
-    color: colors.textOnDarkMuted,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 13
   },
   openStudiosStrip: {
     paddingLeft: 16,
