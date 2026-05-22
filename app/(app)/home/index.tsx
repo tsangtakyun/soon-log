@@ -278,7 +278,7 @@ export default function HomeScreen() {
               <Text style={styles.squareButtonText}>🪙</Text>
               <Text style={styles.creditTiny}>{credits}</Text>
             </Pressable>
-            <Pressable onPress={() => router.push('/home/referrals')} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
+            <Pressable onPress={() => router.push('/(app)/home/referrals')} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
               <Text style={styles.squareButtonText}>🎁</Text>
             </Pressable>
             <Pressable onPress={() => setSavedOpen(true)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>

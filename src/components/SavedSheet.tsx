@@ -106,7 +106,7 @@ export function SavedSheet({ visible, onClose }: { visible: boolean; onClose: ()
 
   const openTrend = (id: string) => {
     onClose();
-    router.push(`/home/trend/${id}`);
+    router.push(`/(app)/home/trend/${id}`);
   };
 
   const renderItem = ({ item }: { item: SavedItem }) => {
