@@ -1,0 +1,239 @@
+require File.join(File.dirname(`node --print "require.resolve('expo/package.json')"`), "scripts/autolinking")
+require File.join(File.dirname(`node --print "require.resolve('react-native/package.json')"`), "scripts/react_native_pods")
+
+require 'json'
+podfile_properties = JSON.parse(File.read(File.join(__dir__, 'Podfile.properties.json'))) rescue {}
+
+ENV['RCT_NEW_ARCH_ENABLED'] = '0' if podfile_properties['newArchEnabled'] == 'false'
+ENV['EX_DEV_CLIENT_NETWORK_INSPECTOR'] = podfile_properties['EX_DEV_CLIENT_NETWORK_INSPECTOR']
+
+platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
+install! 'cocoapods',
+  :deterministic_uuids => false
+
+prepare_react_native_project!
+
+target 'SOONLOG' do
+  use_expo_modules!
+
+  if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
+    config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
+  else
+    config_command = [
+      'node',
+      File.join(__dir__, '..', 'node_modules', 'expo-modules-autolinking', 'bin', 'expo-modules-autolinking'),
+      'react-native-config',
+      '--json',
+      '--platform',
+      'ios'
+    ]
+  end
+
+  config = use_native_modules!(config_command)
+
+  use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
+  use_frameworks! :linkage => ENV['USE_FRAMEWORKS'].to_sym if ENV['USE_FRAMEWORKS']
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    :hermes_enabled => podfile_properties['expo.jsEngine'] == nil || podfile_properties['expo.jsEngine'] == 'hermes',
+    # An absolute path to your application root.
+    :app_path => "#{Pod::Config.instance.installation_root}/..",
+    :privacy_file_aggregation_enabled => podfile_properties['apple.privacyManifestAggregationEnabled'] != 'false',
+  )
+
+  post_install do |installer|
+    react_native_post_install(
+      installer,
+      config[:reactNativePath],
+      :mac_catalyst_enabled => false,
+      :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
+    )
+
+    append_build_setting = lambda do |settings, key, value|
+      current = settings[key]
+      current = ['$(inherited)'] if current.nil?
+      current = current.split(' ') if current.is_a?(String)
+      current << value unless current.include?(value)
+      settings[key] = current
+    end
+
+    installer.pods_project.targets.each do |target|
+      target.shell_script_build_phases.each do |phase|
+        phase.shell_path = '/bin/bash'
+      end
+
+      target.shell_script_build_phases.each do |phase|
+        next unless phase.name == 'Copy generated compatibility header'
+
+        phase.remove_from_project
+      end
+
+      target.build_configurations.each do |config|
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
+        config.build_settings['CLANG_CXX_LIBRARY'] = 'libc++'
+        config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+        config.build_settings['SWIFT_ENABLE_EXPLICIT_MODULES'] = 'NO'
+        if target.name == 'Expo'
+          append_build_setting.call(config.build_settings, 'HEADER_SEARCH_PATHS', '$(DERIVED_FILE_DIR)/../../ExpoModulesCore.build/DerivedSources')
+          append_build_setting.call(config.build_settings, 'HEADER_SEARCH_PATHS', '$(DERIVED_FILE_DIR)/../../ExpoModulesCore.build/Objects-normal/$(CURRENT_ARCH)')
+        end
+        append_build_setting.call(config.build_settings, 'GCC_PREPROCESSOR_DEFINITIONS', 'FMT_HEADER_ONLY=1')
+        append_build_setting.call(config.build_settings, 'GCC_PREPROCESSOR_DEFINITIONS', 'FMT_USE_CONSTEVAL=0')
+        append_build_setting.call(config.build_settings, 'OTHER_CPLUSPLUSFLAGS', '-DFMT_USE_CONSTEVAL=0')
+      end
+    end
+
+    # Fix for fmt consteval issue
+    installer.pods_project.targets.each do |target|
+      if target.name == 'fmt'
+        target.build_configurations.each do |config|
+          config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
+        end
+      end
+
+      if target.name == 'hermes-engine'
+        target.shell_script_build_phases.each do |phase|
+          next unless phase.name&.include?('Replace Hermes')
+
+          phase.remove_from_project
+        end
+      end
+
+      if ['React-Fabric', 'React-RCTFBReactNativeSpec', 'React-FabricComponents'].include?(target.name)
+        target.shell_script_build_phases.each do |phase|
+          next unless phase.shell_script&.include?('Checking whether Codegen has run')
+
+          phase.remove_from_project
+        end
+      end
+
+      if target.name == 'ReactCodegen'
+        target.shell_script_build_phases.each do |phase|
+          next unless phase.shell_script&.include?('withCodegenDiscovery')
+
+          phase.remove_from_project
+        end
+      end
+
+      if target.name == 'EXConstants'
+        target.shell_script_build_phases.each do |phase|
+          next unless phase.name&.include?('Generate app.config')
+
+          phase.remove_from_project
+        end
+      end
+    end
+
+    fmt_base_header = File.join(__dir__, 'Pods/fmt/include/fmt/base.h')
+    if File.exist?(fmt_base_header)
+      fmt_base = File.read(fmt_base_header)
+      fmt_base = fmt_base.sub(
+        "// Detect consteval, C++20 constexpr extensions and std::is_constant_evaluated.\n#if !defined(__cpp_lib_is_constant_evaluated)",
+        "// Detect consteval, C++20 constexpr extensions and std::is_constant_evaluated.\n#if defined(FMT_USE_CONSTEVAL)\n// Use the provided definition.\n#elif !defined(__cpp_lib_is_constant_evaluated)"
+      )
+      File.chmod(0644, fmt_base_header)
+      File.write(fmt_base_header, fmt_base)
+    end
+
+    installer.aggregate_targets.each do |aggregate_target|
+      aggregate_target.user_project.targets.each do |target|
+        target.shell_script_build_phases.each do |phase|
+          phase.shell_path = '/bin/bash'
+        end
+
+        target.shell_script_build_phases.each do |phase|
+          next unless ['[Expo] Configure project', 'Bundle React Native code and images'].include?(phase.name)
+
+          phase.remove_from_project
+        end
+
+        target.build_configurations.each do |config|
+          config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+          config.build_settings['SWIFT_ENABLE_EXPLICIT_MODULES'] = 'NO'
+        end
+      end
+      aggregate_target.user_project.save
+    end
+
+    # This is necessary for Xcode 14, because it signs resource bundles by default
+    # when building for devices.
+    installer.target_installation_results.pod_target_installation_results
+      .each do |pod_name, target_installation_result|
+      target_installation_result.resource_bundle_targets.each do |resource_bundle_target|
+        resource_bundle_target.build_configurations.each do |config|
+          config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+        end
+      end
+    end
+
+    Dir.glob(File.join(__dir__, 'Pods/Target Support Files/**/*.xcconfig')).each do |xcconfig_path|
+      xcconfig = File.read(xcconfig_path)
+      updated = xcconfig.gsub(%r{\$\{PODS_CONFIGURATION_BUILD_DIR\}/([^/]+)/([^"\s]+\.modulemap)}) do
+        pod_name = Regexp.last_match(1)
+        modulemap = Regexp.last_match(2)
+        "${PODS_ROOT}/Headers/Public/#{pod_name}/#{modulemap}"
+      end
+      File.write(xcconfig_path, updated) if updated != xcconfig
+    end
+
+    ex_constants_service = File.join(__dir__, '../node_modules/expo-constants/ios/EXConstantsService.m')
+    if File.exist?(ex_constants_service)
+      service = File.read(ex_constants_service)
+      fallback = <<~'OBJC'
+          NSString *expoPlistPath = [[NSBundle mainBundle] pathForResource:@"Expo" ofType:@"plist"];
+          if (expoPlistPath) {
+            NSDictionary *expoPlist = [NSDictionary dictionaryWithContentsOfFile:expoPlistPath];
+            NSDictionary *expoConfig = expoPlist[@"EXExpoConfig"];
+            if (expoConfig && [expoConfig isKindOfClass:[NSDictionary class]]) {
+              return expoConfig;
+            }
+          }
+      OBJC
+      unless service.include?('EXExpoConfig')
+        service = service.sub("  return nil;\n}\n\n@end\n", "#{fallback}  return nil;\n}\n\n@end\n")
+        File.write(ex_constants_service, service)
+      end
+    end
+
+    ex_image_loader_header = File.join(__dir__, '../node_modules/expo-image-loader/ios/EXImageLoader/EXImageLoader.h')
+    if File.exist?(ex_image_loader_header)
+      header = File.read(ex_image_loader_header)
+      unless header.include?('@import React;')
+        header = header.sub(
+          "#import <ExpoModulesCore/EXInternalModule.h>",
+          "@import React;\n#import <ExpoModulesCore/EXInternalModule.h>"
+        )
+        File.write(ex_image_loader_header, header)
+      end
+    end
+  end
+end
+
+post_integrate do |installer|
+  Dir.glob(File.join(__dir__, 'Pods/Target Support Files/**/*.xcconfig')).each do |xcconfig_path|
+    xcconfig = File.read(xcconfig_path)
+    updated = xcconfig.gsub(%r{\$\{PODS_CONFIGURATION_BUILD_DIR\}/([^/]+)/([^"\s]+\.modulemap)}) do
+      pod_name = Regexp.last_match(1)
+      modulemap = Regexp.last_match(2)
+      "${PODS_ROOT}/Headers/Public/#{pod_name}/#{modulemap}"
+    end
+    File.write(xcconfig_path, updated) if updated != xcconfig
+  end
+
+  installer.aggregate_targets.each do |aggregate_target|
+    aggregate_target.user_project.targets.each do |target|
+      target.shell_script_build_phases.each do |phase|
+        next unless [
+          '[CP] Check Pods Manifest.lock',
+          '[CP] Copy Pods Resources',
+          '[Expo] Configure project',
+          'Bundle React Native code and images'
+        ].include?(phase.name)
+
+        phase.remove_from_project
+      end
+    end
+    aggregate_target.user_project.save
+  end
+end
