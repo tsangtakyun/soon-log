@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -322,45 +324,56 @@ function NewThreadSheet({
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <Pressable style={styles.sheetOverlay} onPress={onClose} />
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + 18 }]}>
-        <View style={styles.sheetHeader}>
-          <Text style={styles.sheetTitle}>新增訊息</Text>
-          <TouchableOpacity onPress={onClose}><Text style={styles.closeText}>×</Text></TouchableOpacity>
-        </View>
-        <View style={styles.typeSelector}>
-          {(['email', 'message', 'fans'] as InboxType[]).map((type) => (
-            <TouchableOpacity
-              key={type}
-              style={[styles.typePill, inboxType === type && styles.typePillActive]}
-              onPress={() => setInboxType(type)}
-            >
-              <Text style={[styles.typePillText, inboxType === type && styles.typePillTextActive]}>
-                {inboxLabels[type]}
-              </Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoiding}
+      >
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + 18 }]}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>新增訊息</Text>
+              <TouchableOpacity onPress={onClose}><Text style={styles.closeText}>×</Text></TouchableOpacity>
+            </View>
+            <View style={styles.typeSelector}>
+              {(['email', 'message', 'fans'] as InboxType[]).map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[styles.typePill, inboxType === type && styles.typePillActive]}
+                  onPress={() => setInboxType(type)}
+                >
+                  <Text style={[styles.typePillText, inboxType === type && styles.typePillTextActive]}>
+                    {inboxLabels[type]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.inputLabel}>發送者名稱</Text>
+            <TextInput
+              value={senderName}
+              onChangeText={setSenderName}
+              placeholder="例如：@username 或 粉絲名字"
+              placeholderTextColor={colors.textMuted}
+              style={styles.sheetInput}
+            />
+            <Text style={styles.inputLabel}>原始訊息</Text>
+            <TextInput
+              value={originalMessage}
+              onChangeText={setOriginalMessage}
+              placeholder="貼上 fan 或客戶嘅訊息..."
+              placeholderTextColor={colors.textMuted}
+              multiline
+              style={[styles.sheetInput, styles.messageInput]}
+            />
+            <TouchableOpacity style={[styles.primaryButton, saving && styles.disabled]} disabled={saving} onPress={submit}>
+              <Text style={styles.primaryButtonText}>{saving ? '建立中...' : '建立'}</Text>
             </TouchableOpacity>
-          ))}
+          </ScrollView>
         </View>
-        <Text style={styles.inputLabel}>發送者名稱</Text>
-        <TextInput
-          value={senderName}
-          onChangeText={setSenderName}
-          placeholder="例如：@username 或 粉絲名字"
-          placeholderTextColor={colors.textMuted}
-          style={styles.sheetInput}
-        />
-        <Text style={styles.inputLabel}>原始訊息</Text>
-        <TextInput
-          value={originalMessage}
-          onChangeText={setOriginalMessage}
-          placeholder="貼上 fan 或客戶嘅訊息..."
-          placeholderTextColor={colors.textMuted}
-          multiline
-          style={[styles.sheetInput, styles.messageInput]}
-        />
-        <TouchableOpacity style={[styles.primaryButton, saving && styles.disabled]} disabled={saving} onPress={submit}>
-          <Text style={styles.primaryButtonText}>{saving ? '建立中...' : '建立'}</Text>
-        </TouchableOpacity>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -489,64 +502,73 @@ function ThreadDetailSheet({
   return (
     <Modal animationType="slide" transparent visible={Boolean(thread)} onRequestClose={onClose}>
       <Pressable style={styles.sheetOverlay} onPress={onClose} />
-      <View style={[styles.detailSheet, { paddingBottom: insets.bottom + 16 }]}>
-        <View style={styles.sheetHeader}>
-          <View style={styles.detailTitleWrap}>
-            <Text numberOfLines={1} style={styles.sheetTitle}>{thread.sender_name || '未命名'}</Text>
-            <View style={[styles.inboxBadge, { backgroundColor: inboxColors[thread.inbox_type] }]}>
-              <Text style={styles.inboxBadgeText}>{inboxLabels[thread.inbox_type]}</Text>
-            </View>
-          </View>
-          <TouchableOpacity onPress={onClose}><Text style={styles.closeText}>×</Text></TouchableOpacity>
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <Text style={styles.sectionTitle}>原始訊息</Text>
-          <Text style={styles.originalBox}>{thread.original_message}</Text>
-
-          <Text style={styles.sectionTitle}>AI 回覆</Text>
-          {!replyText ? (
-            <TouchableOpacity style={[styles.primaryButton, generating && styles.disabled]} disabled={generating} onPress={generateReply}>
-              <Text style={styles.primaryButtonText}>{generating ? '生成中...' : '🤖 生成 AI 回覆'}</Text>
-            </TouchableOpacity>
-          ) : (
-            <>
-              <TextInput
-                value={replyText}
-                onChangeText={setReplyText}
-                multiline
-                style={styles.replyInput}
-              />
-              <View style={styles.actionRow}>
-                <TouchableOpacity style={styles.actionButton} disabled={generating} onPress={generateReply}>
-                  <Text style={styles.actionText}>🔄 重新生成</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton} onPress={copyReply}>
-                  <Text style={styles.actionText}>📋 複製</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton} onPress={markReplied}>
-                  <Text style={styles.actionText}>✓ 標記已回覆</Text>
-                </TouchableOpacity>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoiding}
+      >
+        <View style={[styles.detailSheet, { paddingBottom: insets.bottom + 16 }]}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.sheetHeader}>
+              <View style={styles.detailTitleWrap}>
+                <Text numberOfLines={1} style={styles.sheetTitle}>{thread.sender_name || '未命名'}</Text>
+                <View style={[styles.inboxBadge, { backgroundColor: inboxColors[thread.inbox_type] }]}>
+                  <Text style={styles.inboxBadgeText}>{inboxLabels[thread.inbox_type]}</Text>
+                </View>
               </View>
-            </>
-          )}
+              <TouchableOpacity onPress={onClose}><Text style={styles.closeText}>×</Text></TouchableOpacity>
+            </View>
 
-          <Text style={styles.sectionTitle}>標籤 + 備註</Text>
-          <View style={styles.tagRow}>
-            {(thread.tags ?? []).length > 0
-              ? thread.tags?.map((tag) => <Text key={tag} style={styles.tagPill}>{tag}</Text>)
-              : <Text style={styles.mutedText}>未有標籤</Text>}
-          </View>
-          <TextInput
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="備註"
-            placeholderTextColor={colors.textMuted}
-            multiline
-            style={[styles.sheetInput, styles.notesInput]}
-          />
-        </ScrollView>
-      </View>
+            <Text style={styles.sectionTitle}>原始訊息</Text>
+            <Text style={styles.originalBox}>{thread.original_message}</Text>
+
+            <Text style={styles.sectionTitle}>AI 回覆</Text>
+            {!replyText ? (
+              <TouchableOpacity style={[styles.primaryButton, generating && styles.disabled]} disabled={generating} onPress={generateReply}>
+                <Text style={styles.primaryButtonText}>{generating ? '生成中...' : '🤖 生成 AI 回覆'}</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <TextInput
+                  value={replyText}
+                  onChangeText={setReplyText}
+                  multiline
+                  style={styles.replyInput}
+                />
+                <View style={styles.actionRow}>
+                  <TouchableOpacity style={styles.actionButton} disabled={generating} onPress={generateReply}>
+                    <Text style={styles.actionText}>🔄 重新生成</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.actionButton} onPress={copyReply}>
+                    <Text style={styles.actionText}>📋 複製</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.actionButton} onPress={markReplied}>
+                    <Text style={styles.actionText}>✓ 標記已回覆</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            <Text style={styles.sectionTitle}>標籤 + 備註</Text>
+            <View style={styles.tagRow}>
+              {(thread.tags ?? []).length > 0
+                ? thread.tags?.map((tag) => <Text key={tag} style={styles.tagPill}>{tag}</Text>)
+                : <Text style={styles.mutedText}>未有標籤</Text>}
+            </View>
+            <TextInput
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="備註"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              style={[styles.sheetInput, styles.notesInput]}
+            />
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -678,6 +700,10 @@ const styles = StyleSheet.create({
   sheetOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)'
+  },
+  keyboardAvoiding: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end'
   },
   sheet: {
     position: 'absolute',
