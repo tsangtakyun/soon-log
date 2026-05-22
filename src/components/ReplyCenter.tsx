@@ -110,28 +110,19 @@ export function ReplyCenter() {
   const resolveWorkspace = useCallback(async () => {
     if (!user) return null;
 
-    const { data: workspace } = await supabase
-      .from('workspaces')
-      .select('id')
-      .eq('owner_id', user.id)
-      .order('created_at', { ascending: true })
+    const { data: membership } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
       .limit(1)
       .maybeSingle();
 
-    if (workspace?.id) return workspace.id as string;
+    if (membership?.workspace_id) return membership.workspace_id as string;
 
-    const { data: existingFallback } = await supabase
-      .from('workspaces')
-      .select('id')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (existingFallback?.id) return existingFallback.id as string;
-
-    const { data: created } = await supabase
+    const { data: created, error: workspaceError } = await supabase
       .from('workspaces')
       .insert({
-        id: user.id,
         name: 'SOON-LOG',
         type: 'mixed',
         owner: user.email ?? null,
@@ -140,7 +131,22 @@ export function ReplyCenter() {
       .select('id')
       .maybeSingle();
 
-    return (created?.id as string | undefined) ?? user.id;
+    if (workspaceError || !created?.id) return null;
+
+    const { error: memberError } = await supabase
+      .from('workspace_members')
+      .insert({
+        workspace_id: created.id,
+        user_id: user.id,
+        email: user.email ?? null,
+        display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'SOON',
+        role: 'owner',
+        status: 'active',
+        invited_by: user.id
+      });
+
+    if (memberError) return null;
+    return created.id as string;
   }, [user]);
 
   const loadThreads = useCallback(async () => {
@@ -148,14 +154,16 @@ export function ReplyCenter() {
     setLoading(true);
     try {
       const id = workspaceId ?? await resolveWorkspace();
-      if (!id) return;
       setWorkspaceId(id);
 
-      const { data, error } = await supabase
+      const query = supabase
         .from('reply_threads')
         .select('*')
-        .eq('workspace_id', id)
         .order('created_at', { ascending: false });
+
+      const { data, error } = id
+        ? await query.eq('workspace_id', id)
+        : await query.is('workspace_id', null);
 
       if (error) throw error;
       setThreads((data ?? []) as ReplyThread[]);
@@ -190,9 +198,9 @@ export function ReplyCenter() {
     sender_name: string;
     original_message: string;
   }) {
-    if (!user || !workspaceId) return;
+    if (!user) return;
     const { error } = await supabase.from('reply_threads').insert({
-      workspace_id: workspaceId,
+      workspace_id: workspaceId ?? null,
       inbox_type: draft.inbox_type,
       sender_name: draft.sender_name.trim() || '未命名',
       original_message: draft.original_message.trim(),
