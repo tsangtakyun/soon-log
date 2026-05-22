@@ -181,8 +181,13 @@ function BlackBoxSection({ studios }: { studios: OpenStudio[] }) {
 
   return (
     <View style={styles.openStudiosSection}>
-      <Text style={styles.openStudiosTitle}>⬛ Black Box 黑盒</Text>
-      <Text style={styles.openStudiosSubtitle}>紀錄製作的電子黑盒</Text>
+      <View style={styles.sectionBannerCard}>
+        <Image source={require('../../../assets/home-black-box-banner.jpg')} style={styles.sectionBannerImage} />
+        <View style={styles.sectionBannerOverlay}>
+          <Text style={styles.sectionBannerTitle}>Black Box 黑盒</Text>
+          <Text style={styles.sectionBannerSubtitle}>紀錄製作的電子黑盒</Text>
+        </View>
+      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.openStudiosStrip}>
         {studios.map((studio) => (
           <Pressable
@@ -447,14 +452,25 @@ export default function HomeScreen() {
   }, [loadNudge, loadTrends]);
 
   useEffect(() => {
-    Animated.loop(
-      Animated.timing(eggRotation, {
-        toValue: 1,
-        duration: 8000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    ).start();
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(eggRotation, {
+          toValue: 1,
+          duration: 8000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+        Animated.timing(eggRotation, {
+          toValue: 0,
+          duration: 0,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    animation.start();
+    return () => animation.stop();
   }, [eggRotation]);
 
   useFocusEffect(
@@ -502,7 +518,6 @@ export default function HomeScreen() {
                 source={require('../../../assets/soon-egg.png')}
                 style={[styles.eggImage, { transform: [{ rotate: eggRotate }] }]}
               />
-              <Text style={styles.eggSvgLabel}>EGGS</Text>
             </View>
           </Pressable>
         </View>
@@ -514,8 +529,13 @@ export default function HomeScreen() {
         <BlackBoxSection studios={openStudios} />
 
         <View style={styles.prediktSection}>
-          <Text style={styles.sectionTitle}>預言書</Text>
-          <Text style={styles.sectionSubtitle}>Predikt · 創作者社群熱話</Text>
+          <View style={styles.sectionBannerCard}>
+            <Image source={require('../../../assets/home-predikt-banner.jpg')} style={styles.sectionBannerImage} />
+            <View style={styles.sectionBannerOverlay}>
+              <Text style={styles.sectionBannerTitle}>預言書</Text>
+              <Text style={styles.sectionBannerSubtitle}>Predikt · 創作者社群熱話</Text>
+            </View>
+          </View>
           <View style={styles.trendsWrap}>
             {loadingTrends ? <ActivityIndicator color={colors.primary} /> : null}
             {!loadingTrends && trends.length === 0 ? (
@@ -624,13 +644,6 @@ const styles = StyleSheet.create({
     height: 100,
     resizeMode: 'contain'
   },
-  eggSvgLabel: {
-    color: colors.textOnDarkMuted,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 11,
-    letterSpacing: 2,
-    marginTop: 4
-  },
   body: {
     flex: 1,
     backgroundColor: colors.bgBody
@@ -738,17 +751,32 @@ const styles = StyleSheet.create({
   openStudiosSection: {
     marginTop: 22
   },
-  openStudiosTitle: {
+  sectionBannerCard: {
     marginHorizontal: 16,
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 20
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: colors.bgHero
   },
-  openStudiosSubtitle: {
+  sectionBannerImage: {
+    width: '100%',
+    height: 88,
+    resizeMode: 'cover'
+  },
+  sectionBannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    backgroundColor: 'rgba(0,0,0,0.15)'
+  },
+  sectionBannerTitle: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 22
+  },
+  sectionBannerSubtitle: {
     marginTop: 4,
-    marginHorizontal: 16,
-    color: colors.textMuted,
-    fontFamily: fonts.body,
+    color: colors.textOnDarkMuted,
+    fontFamily: fonts.bodyMedium,
     fontSize: 13
   },
   openStudiosStrip: {
@@ -819,20 +847,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.5)',
     fontFamily: fonts.body,
     fontSize: 12
-  },
-  sectionTitle: {
-    marginTop: 24,
-    marginHorizontal: 16,
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 28
-  },
-  sectionSubtitle: {
-    marginTop: 4,
-    marginHorizontal: 16,
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 13
   },
   prediktSection: {
     marginTop: 24
