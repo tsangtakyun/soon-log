@@ -71,7 +71,6 @@ export default function MayanScreen() {
       .limit(50);
 
     if (error) {
-      console.error('Mayan history error:', JSON.stringify(error));
       Alert.alert('載入失敗', error.message);
       setInitializing(false);
       return;
@@ -176,9 +175,9 @@ export default function MayanScreen() {
       };
 
       setMessages((prev) => [...prev.filter((message) => !message.isWelcome), assistantMessage]);
-    } catch (err: any) {
-      console.error('Mayan send error:', err);
-      Alert.alert('Mayan 回覆失敗', err?.message ?? '請稍後再試。');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '請稍後再試。';
+      Alert.alert('Mayan 回覆失敗', message);
     } finally {
       setLoading(false);
     }

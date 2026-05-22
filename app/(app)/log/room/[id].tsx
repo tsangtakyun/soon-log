@@ -142,52 +142,70 @@ export default function TopicRoomScreen() {
 
   const loadRoom = useCallback(async () => {
     if (!id) return;
-    const [{ data: roomData, error: roomError }, { data: memberData, error: memberError }, { data: clipData, error: clipError }] = await Promise.all([
-      supabase.from('topic_rooms').select('*').eq('id', id).maybeSingle(),
-      supabase
+    setLoading(true);
+
+    try {
+      const { data: roomData, error: roomError } = await supabase
+        .from('topic_rooms')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (roomError) throw roomError;
+      if (!roomData) throw new Error('找不到 Topic Room');
+
+      const { data: memberData, error: memberError } = await supabase
         .from('topic_room_members')
         .select('*, profile:profiles!topic_room_members_user_id_fkey(username, avatar_url, display_name)')
-        .eq('room_id', id),
-      supabase
+        .eq('room_id', id);
+
+      if (memberError) throw memberError;
+
+      const { data: clipData, error: clipError } = await supabase
         .from('topic_clips')
         .select('*, profile:profiles!topic_clips_user_id_fkey(username, avatar_url)')
         .eq('room_id', id)
-        .order('created_at', { ascending: false })
-    ]);
+        .order('created_at', { ascending: false });
 
-    if (roomError) console.error('Room fetch error:', JSON.stringify(roomError));
-    if (memberError) console.error('Members fetch error:', JSON.stringify(memberError));
-    if (clipError) console.error('Clips fetch error:', JSON.stringify(clipError));
+      if (clipError) throw clipError;
 
-    const memberRows = (memberData ?? []).map((member) => ({
-      ...member,
-      username: member.profile?.username ?? null,
-      display_name: member.profile?.display_name ?? null,
-      avatar_url: member.profile?.avatar_url ?? null
-    })) as Member[];
+      const memberRows = (memberData ?? []).map((member) => ({
+        ...member,
+        username: member.profile?.username ?? null,
+        display_name: member.profile?.display_name ?? null,
+        avatar_url: member.profile?.avatar_url ?? null
+      })) as Member[];
 
-    const clipRows = (clipData ?? []).map((clip) => ({
-      ...clip,
-      username: clip.profile?.username ?? null,
-      avatar_url: clip.profile?.avatar_url ?? null
-    })) as Clip[];
+      const clipRows = (clipData ?? []).map((clip) => ({
+        ...clip,
+        username: clip.profile?.username ?? null,
+        avatar_url: clip.profile?.avatar_url ?? null
+      })) as Clip[];
 
-    setRoom(roomData ? { ...(roomData as Room), member_count: memberRows.length } : null);
-    setMembers(memberRows);
-    setClips(clipRows);
+      setRoom({ ...(roomData as Room), member_count: memberRows.length });
+      setMembers(memberRows);
+      setClips(clipRows);
 
-    if (user) {
-      const { data: membership } = await supabase
-        .from('topic_room_members')
-        .select('id, role')
-        .eq('room_id', id)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      setMembershipRole((membership?.role as 'owner' | 'member' | undefined) ?? null);
-    } else {
-      setMembershipRole(null);
+      if (user) {
+        const { data: membership, error: membershipError } = await supabase
+          .from('topic_room_members')
+          .select('id, role')
+          .eq('room_id', id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (membershipError) throw membershipError;
+        setMembershipRole((membership?.role as 'owner' | 'member' | undefined) ?? null);
+      } else {
+        setMembershipRole(null);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '載入失敗';
+      Alert.alert('錯誤', message);
+      router.back();
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [id, user]);
 
   useEffect(() => {
@@ -441,30 +459,34 @@ function AddClipSheet({
       });
       if (error) throw error;
 
-      const { data: members } = await supabase
-        .from('topic_room_members')
-        .select('profile:profiles!topic_room_members_user_id_fkey(expo_push_token, username)')
-        .eq('room_id', room.id)
-        .neq('user_id', user.id);
-
-      const username = profile?.username || user.email?.split('@')[0] || 'soon';
-      await Promise.all(((members ?? []) as PushMember[]).map((member) => {
-        const memberProfile = Array.isArray(member.profile) ? member.profile[0] : member.profile;
-        const token = memberProfile?.expo_push_token;
-        if (!token) return Promise.resolve();
-        return sendPushNotification(
-          token,
-          room.name,
-          `@${username} 分享咗新製作進度`,
-          { type: 'new_clip', room_id: room.id }
-        );
-      }));
-
       setCaption('');
       setNotes('');
       setVideoUrl('');
       setImages([]);
       onSaved();
+
+      try {
+        const { data: members } = await supabase
+          .from('topic_room_members')
+          .select('profile:profiles!topic_room_members_user_id_fkey(expo_push_token, username)')
+          .eq('room_id', room.id)
+          .neq('user_id', user.id);
+
+        const username = profile?.username || user.email?.split('@')[0] || 'soon';
+        await Promise.all(((members ?? []) as PushMember[]).map((member) => {
+          const memberProfile = Array.isArray(member.profile) ? member.profile[0] : member.profile;
+          const token = memberProfile?.expo_push_token;
+          if (!token) return Promise.resolve();
+          return sendPushNotification(
+            token,
+            room.name,
+            `@${username} 分享咗新製作進度`,
+            { type: 'new_clip', room_id: room.id }
+          );
+        }));
+      } catch {
+        // Push notification failure should not affect clip creation.
+      }
     } catch (error) {
       Alert.alert('新增失敗', error instanceof Error ? error.message : '請稍後再試');
     } finally {

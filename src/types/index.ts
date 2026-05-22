@@ -9,6 +9,7 @@ export type Profile = {
   bio: string | null;
   region: Region | null;
   role: Role;
+  expo_push_token: string | null;
   created_at: string;
   last_seen_at: string | null;
 };

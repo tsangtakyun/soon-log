@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Keyboard,
@@ -169,7 +170,7 @@ export default function TrendDetailScreen() {
     if (!trendId) return;
     setLoading(true);
 
-    const [{ data: trendData }, { data: discussionData, error: discussionError }] = await Promise.all([
+    const [{ data: trendData, error: trendError }, { data: discussionData, error: discussionError }] = await Promise.all([
       supabase
         .from('trends')
         .select('*')
@@ -182,10 +183,16 @@ export default function TrendDetailScreen() {
         .order('created_at', { ascending: false })
     ]);
 
+    if (trendError || !trendData) {
+      Alert.alert('錯誤', '找不到此話題');
+      router.back();
+      setLoading(false);
+      return;
+    }
+
     setTrend((trendData ?? null) as Trend | null);
 
     if (discussionError) {
-      console.log('Trend discussions fetch error:', JSON.stringify(discussionError));
       setDiscussions([]);
       setLoading(false);
       return;

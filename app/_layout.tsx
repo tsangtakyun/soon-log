@@ -41,9 +41,7 @@ function RootNavigator() {
   }, [session]);
 
   useEffect(() => {
-    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
-      console.log('Notification received:', notification);
-    });
+    notificationListener.current = Notifications.addNotificationReceivedListener(() => undefined);
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data;

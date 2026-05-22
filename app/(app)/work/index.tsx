@@ -68,7 +68,6 @@ export default function WorkBoardScreen() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Work items fetch error:', JSON.stringify(error));
       setItems([]);
     } else {
       setItems((data ?? []) as WorkItem[]);

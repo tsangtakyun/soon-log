@@ -161,20 +161,17 @@ export default function CreateLogScreen() {
       if (error) throw error;
 
       if (createdLog?.id) {
-        const { error: activityError } = await supabase.from('activities').insert({
+        await supabase.from('activities').insert({
           type: 'log_published',
           reference_id: createdLog.id,
           user_id: authUser.id
         });
-
-        if (activityError) {
-          console.warn('SOON-CORE activity sync failed', activityError.message);
-        }
       }
 
       router.replace('/feed');
-    } catch (err: any) {
-      Alert.alert('發布失敗', err?.message ?? '請稍後再試。');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '請稍後再試。';
+      Alert.alert('發布失敗', message);
     } finally {
       setLoading(false);
     }

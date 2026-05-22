@@ -185,7 +185,6 @@ export default function HomeScreen() {
       .order('heat_score', { ascending: false });
 
     if (error) {
-      console.error('Trends fetch error:', JSON.stringify(error));
       setTrends([]);
     } else {
       setTrends((data ?? []) as Trend[]);
@@ -200,7 +199,6 @@ export default function HomeScreen() {
       .eq('privacy', 'open');
 
     if (roomsError) {
-      console.log('Open studios fetch error:', JSON.stringify(roomsError));
       setOpenStudios([]);
       return;
     }

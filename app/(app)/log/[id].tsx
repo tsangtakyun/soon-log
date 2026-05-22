@@ -98,7 +98,6 @@ function LogDetailContent({ logId }: { logId?: string }) {
       .order('created_at', { ascending: true });
 
     if (commentsError) {
-      console.error('Comments fetch error:', JSON.stringify(commentsError));
       return;
     }
 
@@ -117,7 +116,6 @@ function LogDetailContent({ logId }: { logId?: string }) {
       .single();
 
     if (error) {
-      console.error('Log fetch error:', JSON.stringify(error));
       Alert.alert('載入失敗', error.message);
       setLoading(false);
       return;
@@ -148,7 +146,6 @@ function LogDetailContent({ logId }: { logId?: string }) {
 
   useEffect(() => {
     load().catch((error) => {
-      console.error('Log detail load error:', JSON.stringify(error));
       setLoading(false);
       Alert.alert('載入失敗', error instanceof Error ? error.message : '請稍後再試。');
     });

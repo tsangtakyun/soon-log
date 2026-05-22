@@ -78,7 +78,6 @@ export default function ScheduleScreen() {
       .order('start_at', { ascending: true });
 
     if (error) {
-      console.error('Schedule fetch error:', JSON.stringify(error));
       setEvents([]);
       return;
     }

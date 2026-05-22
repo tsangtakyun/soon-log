@@ -51,7 +51,6 @@ export function SavedSheet({ visible, onClose }: { visible: boolean; onClose: ()
       .order('saved_at', { ascending: false });
 
     if (error) {
-      console.log('Saved items fetch error:', JSON.stringify(error));
       setItems([]);
       setLoading(false);
       return;

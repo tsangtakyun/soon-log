@@ -82,6 +82,7 @@ export default function IdeaShareScreen() {
 
   const analyzeUrl = useCallback(async (targetUrl: string) => {
     setStatus('analyzing');
+    setResult(null);
     setErrorMsg('');
 
     try {
@@ -111,9 +112,10 @@ export default function IdeaShareScreen() {
         categories: []
       });
       setStatus('ready');
-    } catch (error) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '分析失敗';
       setStatus('error');
-      setErrorMsg(error instanceof Error ? error.message : '分析失敗');
+      setErrorMsg(message);
     }
   }, []);
 
@@ -148,45 +150,47 @@ export default function IdeaShareScreen() {
     const finalNotes = editNotes.trim();
 
     setStatus('saving');
-    const placeQuery = result.placeName || result.placeAddress || '';
-    const coords = placeQuery ? await geocodePlace(placeQuery, result.country || 'HK') : null;
+    try {
+      const placeQuery = result.placeName || result.placeAddress || '';
+      const coords = placeQuery ? await geocodePlace(placeQuery, result.country || 'HK') : null;
 
-    const { error } = await supabase.from('ideas').insert({
-      user_id: user.id,
-      url,
-      thumb: result.image || null,
-      title: finalTitle,
-      topic: finalTitle,
-      summary: result.description ?? result.desc ?? '',
-      script_hook: result.script_hook ?? result.hook ?? '',
-      country: result.country ?? 'HK',
-      platform: result.platform ?? 'instagram',
-      tags: result.tags ?? [],
-      categories: result.categories ?? [],
-      place_name: result.placeName ?? '',
-      place_address: result.placeAddress ?? '',
-      viral_score: 0,
-      ai_viral_base: 0,
-      date: new Date().toISOString(),
-      notes: finalNotes,
-      lat: coords?.lat ?? null,
-      lng: coords?.lng ?? null,
-      description: result.desc ?? result.description ?? '',
-      hook: result.hook ?? '',
-      region: result.country ?? 'HK',
-      viral_potential: result.viral_potential ?? 'medium',
-      source_url: url
-    });
+      const { error } = await supabase.from('ideas').insert({
+        user_id: user.id,
+        url,
+        thumb: result.image || null,
+        title: finalTitle,
+        topic: finalTitle,
+        summary: result.description ?? result.desc ?? '',
+        script_hook: result.script_hook ?? result.hook ?? '',
+        country: result.country ?? 'HK',
+        platform: result.platform ?? 'instagram',
+        tags: result.tags ?? [],
+        categories: result.categories ?? [],
+        place_name: result.placeName ?? '',
+        place_address: result.placeAddress ?? '',
+        viral_score: 0,
+        ai_viral_base: 0,
+        date: new Date().toISOString(),
+        notes: finalNotes,
+        lat: coords?.lat ?? null,
+        lng: coords?.lng ?? null,
+        description: result.desc ?? result.description ?? '',
+        hook: result.hook ?? '',
+        region: result.country ?? 'HK',
+        viral_potential: result.viral_potential ?? 'medium',
+        source_url: url
+      });
 
-    if (error) {
-      Alert.alert('儲存失敗', error.message);
+      if (error) throw error;
+
+      setStatus('saved');
+      resetShareIntent();
+      setTimeout(() => router.replace('/(app)/idea/library'), 1200);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '請稍後再試';
+      Alert.alert('儲存失敗', message);
       setStatus('ready');
-      return;
     }
-
-    setStatus('saved');
-    resetShareIntent();
-    setTimeout(() => router.replace('/idea/library'), 1200);
   }
 
   function dismiss() {

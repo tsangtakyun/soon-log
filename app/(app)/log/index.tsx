@@ -94,7 +94,6 @@ export default function StudioLogScreen() {
       .eq('user_id', user.id);
 
     if (membershipError) {
-      console.warn('Room membership fetch error:', JSON.stringify(membershipError));
       setRooms([]);
       return;
     }
@@ -121,7 +120,6 @@ export default function StudioLogScreen() {
     ]);
 
     if (roomsError) {
-      console.error('Topic rooms fetch error:', JSON.stringify(roomsError));
       setRooms([]);
       return;
     }
@@ -166,7 +164,6 @@ export default function StudioLogScreen() {
       .order('created_at', { ascending: false });
 
     if (logsError) {
-      console.error('Today logs fetch error:', JSON.stringify(logsError));
       setTodayLogs([]);
     } else {
       setTodayLogs((logs ?? []) as Log[]);

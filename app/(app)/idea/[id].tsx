@@ -25,7 +25,6 @@ export default function IdeaDetailScreen() {
       .maybeSingle();
 
     if (error) {
-      console.error('Idea detail fetch error:', JSON.stringify(error));
       return;
     }
 

@@ -129,7 +129,6 @@ export default function IdeasLibraryScreen() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Ideas fetch error:', JSON.stringify(error));
       setIdeas([]);
       return;
     }
@@ -159,9 +158,7 @@ export default function IdeasLibraryScreen() {
         lat: location.coords.latitude,
         lng: location.coords.longitude
       });
-    })().catch((error) => {
-      console.warn('Location error:', error instanceof Error ? error.message : error);
-    });
+    })().catch(() => undefined);
   }, []);
 
   const mappableIdeas = useMemo(() => ideas.filter(hasCoordinates), [ideas]);

@@ -53,7 +53,6 @@ export default function FeedScreen() {
       .order('start_at', { ascending: true });
 
     if (error) {
-      console.error('Today schedules fetch error:', JSON.stringify(error));
       return;
     }
     setTodaySchedules((data ?? []) as Schedule[]);

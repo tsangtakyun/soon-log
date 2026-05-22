@@ -61,7 +61,6 @@ export default function CreateScheduleScreen() {
       .limit(30)
       .then(({ data, error }) => {
         if (error) {
-          console.error('Related logs fetch error:', JSON.stringify(error));
           return;
         }
         setLogs((data ?? []) as Log[]);
