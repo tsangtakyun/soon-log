@@ -6,7 +6,6 @@ import {
   Alert,
   Dimensions,
   Image,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MenuDrawer } from '@/components/MenuDrawer';
+import { SavedSheet } from '@/components/SavedSheet';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
@@ -278,7 +278,7 @@ export default function HomeScreen() {
               <Text style={styles.squareButtonText}>🪙</Text>
               <Text style={styles.creditTiny}>{credits}</Text>
             </Pressable>
-            <Pressable onPress={() => Alert.alert('Coming soon')} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
+            <Pressable onPress={() => router.push('/home/referrals')} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
               <Text style={styles.squareButtonText}>🎁</Text>
             </Pressable>
             <Pressable onPress={() => setSavedOpen(true)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
@@ -341,20 +341,6 @@ export default function HomeScreen() {
       <MenuDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
       <SavedSheet visible={savedOpen} onClose={() => setSavedOpen(false)} />
     </View>
-  );
-}
-
-function SavedSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  return (
-    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-      <Pressable style={styles.sheetOverlay} onPress={onClose}>
-        <Pressable style={styles.sheet}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>Saved</Text>
-          <Text style={styles.sheetBody}>你儲存嘅趨勢同靈感會喺呢度出現。</Text>
-        </Pressable>
-      </Pressable>
-    </Modal>
   );
 }
 
@@ -710,38 +696,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 15,
     textAlign: 'center'
-  },
-  sheetOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.35)'
-  },
-  sheet: {
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    backgroundColor: colors.bgBody,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 36
-  },
-  sheetHandle: {
-    alignSelf: 'center',
-    width: 42,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: colors.bodyBorder,
-    marginBottom: 18
-  },
-  sheetTitle: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 20
-  },
-  sheetBody: {
-    marginTop: 8,
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 14
   },
   pressed: {
     opacity: 0.72

@@ -138,6 +138,33 @@ export default function TrendDetailScreen() {
     setLikedIds(new Set((myLikes ?? []).map((like) => like.discussion_id)));
   }, [user]);
 
+  const loadSavedStatus = useCallback(async (ids: string[]) => {
+    if (!user || !trendId) {
+      setSavedTrend(false);
+      setSavedDiscussionIds(new Set());
+      return;
+    }
+
+    const savedTargets = [
+      { item_type: 'trend', item_id: trendId },
+      ...ids.map((discussionId) => ({ item_type: 'discussion', item_id: discussionId }))
+    ];
+
+    const { data } = await supabase
+      .from('saved_items')
+      .select('item_type, item_id')
+      .eq('user_id', user.id)
+      .or(savedTargets.map((target) => `and(item_type.eq.${target.item_type},item_id.eq.${target.item_id})`).join(','));
+
+    const savedRows = data ?? [];
+    setSavedTrend(savedRows.some((row) => row.item_type === 'trend' && row.item_id === trendId));
+    setSavedDiscussionIds(new Set(
+      savedRows
+        .filter((row) => row.item_type === 'discussion')
+        .map((row) => row.item_id)
+    ));
+  }, [trendId, user]);
+
   const loadData = useCallback(async () => {
     if (!trendId) return;
     setLoading(true);
@@ -167,8 +194,9 @@ export default function TrendDetailScreen() {
     const rows = (discussionData ?? []) as Discussion[];
     setDiscussions(rows);
     await loadLikedStatus(rows.map((discussion) => discussion.id));
+    await loadSavedStatus(rows.map((discussion) => discussion.id));
     setLoading(false);
-  }, [loadLikedStatus, trendId]);
+  }, [loadLikedStatus, loadSavedStatus, trendId]);
 
   useEffect(() => {
     loadData();
@@ -176,7 +204,8 @@ export default function TrendDetailScreen() {
 
   useEffect(() => {
     loadLikedStatus(discussionIds);
-  }, [discussionIds, loadLikedStatus]);
+    loadSavedStatus(discussionIds);
+  }, [discussionIds, loadLikedStatus, loadSavedStatus]);
 
   useEffect(() => {
     if (!trendId) return;
@@ -265,12 +294,52 @@ export default function TrendDetailScreen() {
     setDiscussions((prev) => [data as Discussion, ...prev.filter((discussion) => discussion.id !== optimisticDiscussion.id)]);
   }
 
-  function toggleDiscussionSave(discussionId: string) {
+  async function toggleTrendSave() {
+    if (!user || !trendId) return;
+    const isSaved = savedTrend;
+    setSavedTrend(!isSaved);
+
+    const { error } = isSaved
+      ? await supabase
+        .from('saved_items')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('item_type', 'trend')
+        .eq('item_id', trendId)
+      : await supabase
+        .from('saved_items')
+        .insert({ user_id: user.id, item_type: 'trend', item_id: trendId });
+
+    if (error) setSavedTrend(isSaved);
+  }
+
+  async function toggleDiscussionSave(discussionId: string) {
+    if (!user) return;
+    const isSaved = savedDiscussionIds.has(discussionId);
     setSavedDiscussionIds((prev) => {
       const next = new Set(prev);
-      next.has(discussionId) ? next.delete(discussionId) : next.add(discussionId);
+      isSaved ? next.delete(discussionId) : next.add(discussionId);
       return next;
     });
+
+    const { error } = isSaved
+      ? await supabase
+        .from('saved_items')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('item_type', 'discussion')
+        .eq('item_id', discussionId)
+      : await supabase
+        .from('saved_items')
+        .insert({ user_id: user.id, item_type: 'discussion', item_id: discussionId });
+
+    if (error) {
+      setSavedDiscussionIds((prev) => {
+        const next = new Set(prev);
+        isSaved ? next.add(discussionId) : next.delete(discussionId);
+        return next;
+      });
+    }
   }
 
   const renderDiscussion = ({ item }: { item: Discussion }) => {
@@ -321,7 +390,7 @@ export default function TrendDetailScreen() {
             <Text style={styles.back}>← 返回</Text>
           </Pressable>
           <Text numberOfLines={1} style={styles.headerTitle}>{trend?.topic ?? 'Trend'}</Text>
-          <Pressable onPress={() => setSavedTrend((current) => !current)} hitSlop={10}>
+          <Pressable onPress={toggleTrendSave} hitSlop={10}>
             <Text style={[styles.save, savedTrend && styles.savedSmall]}>🔖</Text>
           </Pressable>
         </View>
