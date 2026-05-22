@@ -8,6 +8,7 @@ import {
   Image,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ClipPlayer from '@/components/ClipPlayer';
+import { OnboardingBanner } from '@/components/OnboardingBanner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
@@ -160,6 +162,7 @@ export default function StudioLogScreen() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadRooms = useCallback(async () => {
     if (!user) return;
@@ -281,6 +284,15 @@ export default function StudioLogScreen() {
     setLoading(false);
   }, [loadRooms, user]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadData();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadData]);
+
   useEffect(() => {
     loadData();
     const roomsChannel = supabase
@@ -350,7 +362,17 @@ export default function StudioLogScreen() {
       {loading ? (
         <View style={styles.loading}><ActivityIndicator color={colors.primary} /></View>
       ) : (
-        <ScrollView style={styles.body} contentContainerStyle={[styles.bodyContent, { paddingBottom: insets.bottom + 118 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={[styles.bodyContent, { paddingBottom: insets.bottom + 118 }]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#5C2A22" />}
+        >
+          <OnboardingBanner
+            userId={user?.id}
+            onCreateRoom={() => setCreateRoomOpen(true)}
+            onStartCamera={openCameraForSelectedRoom}
+          />
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>今日 Log</Text>
             <Pressable onPress={() => router.push('/create')} hitSlop={8}>

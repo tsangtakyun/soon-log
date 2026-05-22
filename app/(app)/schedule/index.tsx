@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { EmptyState, Screen } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { endOfDay, formatScheduleTime, sameDay, scheduleTypes, startOfDay, startOfWeek } from '@/lib/schedule';
@@ -55,6 +55,7 @@ export default function ScheduleScreen() {
   const router = useRouter();
   const [events, setEvents] = useState<Schedule[]>([]);
   const [selectedDay, setSelectedDay] = useState(startOfDay(new Date()));
+  const [refreshing, setRefreshing] = useState(false);
 
   const weekDays = useMemo(() => {
     const monday = startOfWeek(selectedDay);
@@ -96,6 +97,15 @@ export default function ScheduleScreen() {
     };
   }, [loadEvents]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadEvents();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadEvents]);
+
   const todayEvents = useMemo(() => events.filter((event) => sameDay(eventDate(event), new Date())), [events]);
   const selectedEvents = useMemo(() => events.filter((event) => sameDay(eventDate(event), selectedDay)), [events, selectedDay]);
 
@@ -109,7 +119,14 @@ export default function ScheduleScreen() {
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.todayStrip}>
         {todayEvents.length > 0 ? todayEvents.map((item) => <TodayCard key={item.id} item={item} />) : (
-          <Text style={styles.emptyToday}>今日無行程</Text>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>📅</Text>
+            <Text style={styles.emptyTitle}>今日無行程</Text>
+            <Text style={styles.emptySubtitle}>記錄拍攝日程、會議同截止日期</Text>
+            <TouchableOpacity style={styles.emptyCTA} onPress={() => router.push('/schedule/create')}>
+              <Text style={styles.emptyCTAText}>+ 新增日程</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </ScrollView>
 
@@ -135,6 +152,7 @@ export default function ScheduleScreen() {
         renderItem={({ item }) => <EventRow item={item} />}
         ListEmptyComponent={<EmptyState title="呢日無行程" body="可以留白，或者加一個新安排。" />}
         contentContainerStyle={selectedEvents.length ? styles.list : styles.emptyList}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#5C2A22" />}
       />
 
       <Pressable onPress={() => router.push('/schedule/create')} style={({ pressed }) => [styles.fab, pressed && styles.pressed]}>
@@ -201,11 +219,39 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12
   },
-  emptyToday: {
+  emptyState: {
+    minWidth: 280,
+    borderRadius: 16,
+    backgroundColor: colors.bgCard,
+    padding: 16,
+    alignItems: 'flex-start',
+  },
+  emptyIcon: {
+    fontSize: 26,
+  },
+  emptyTitle: {
+    marginTop: 8,
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+  },
+  emptySubtitle: {
+    marginTop: 4,
     color: colors.textMuted,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 15,
-    paddingTop: 22
+    fontFamily: fonts.body,
+    fontSize: 13,
+  },
+  emptyCTA: {
+    backgroundColor: '#5C2A22',
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginTop: 12,
+  },
+  emptyCTAText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   weekCard: {
     marginHorizontal: 16,

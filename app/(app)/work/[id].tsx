@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { BackHeader } from '@/components/BackHeader';
 import { PriorityBadge } from '@/components/PriorityBadge';
 import { Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
@@ -180,13 +181,12 @@ export default function WorkDetailScreen() {
 
   return (
     <Screen>
+      <BackHeader
+        title="任務詳情"
+        rightElement={<Text style={styles.saveState}>{saving ? '儲存中' : '已同步'}</Text>}
+      />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.wrap} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <Pressable onPress={() => router.back()}><Text style={styles.back}>返回</Text></Pressable>
-            <Text style={styles.saveState}>{saving ? '儲存中' : '已同步'}</Text>
-          </View>
-
           <TextInput
             value={title}
             onChangeText={setTitle}

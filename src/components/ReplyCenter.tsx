@@ -104,6 +104,7 @@ export function ReplyCenter() {
   const [threads, setThreads] = useState<ReplyThread[]>([]);
   const [activeTab, setActiveTab] = useState('全部');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [newSheetVisible, setNewSheetVisible] = useState(false);
   const [selectedThread, setSelectedThread] = useState<ReplyThread | null>(null);
 
@@ -149,9 +150,9 @@ export function ReplyCenter() {
     return created.id as string;
   }, [user]);
 
-  const loadThreads = useCallback(async () => {
+  const loadThreads = useCallback(async (showLoader = true) => {
     if (!user) return;
-    setLoading(true);
+    if (showLoader) setLoading(true);
     try {
       const id = workspaceId ?? await resolveWorkspace();
       setWorkspaceId(id);
@@ -177,6 +178,15 @@ export function ReplyCenter() {
 
   useEffect(() => {
     loadThreads();
+  }, [loadThreads]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadThreads(false);
+    } finally {
+      setRefreshing(false);
+    }
   }, [loadThreads]);
 
   const filteredThreads = useMemo(
@@ -214,7 +224,7 @@ export function ReplyCenter() {
     }
 
     setNewSheetVisible(false);
-    await loadThreads();
+    await loadThreads(false);
   }
 
   async function updateThreadLocally(threadId: string, patch: Partial<ReplyThread>) {
@@ -297,11 +307,17 @@ export function ReplyCenter() {
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>💬</Text>
               <Text style={styles.emptyTitle}>仲未有訊息</Text>
-              <TouchableOpacity style={styles.emptyButton} onPress={() => setNewSheetVisible(true)}>
-                <Text style={styles.emptyButtonText}>+ 新增訊息</Text>
+              <Text style={styles.emptySubtitle}>
+                貼上 fans 或客戶嘅訊息{'\n'}
+                Mayan 幫你生成最佳回覆
+              </Text>
+              <TouchableOpacity style={styles.emptyCTA} onPress={() => setNewSheetVisible(true)}>
+                <Text style={styles.emptyCTAText}>+ 新增訊息</Text>
               </TouchableOpacity>
             </View>
           )}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
         />
       )}
 
@@ -703,14 +719,22 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 18
   },
-  emptyButton: {
+  emptySubtitle: {
+    marginTop: 8,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center'
+  },
+  emptyCTA: {
     marginTop: 16,
     borderRadius: 999,
     backgroundColor: colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 11
   },
-  emptyButtonText: {
+  emptyCTAText: {
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 14

@@ -14,6 +14,7 @@ import {
   TextInput,
   View
 } from 'react-native';
+import { BackHeader } from '@/components/BackHeader';
 import { Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -257,16 +258,9 @@ function LogDetailContent({ logId }: { logId?: string }) {
 
   return (
     <Screen>
+      <BackHeader title="紀錄" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.wrap} showsVerticalScrollIndicator={false}>
-          <View style={styles.topbar}>
-            <Pressable onPress={() => router.back()} hitSlop={10}>
-              <Text style={styles.back}>返回</Text>
-            </Pressable>
-            <Text style={styles.topTitle}>紀錄</Text>
-            <View style={styles.topbarSpacer} />
-          </View>
-
           <View style={styles.header}>
             <Avatar profile={author} size={40} />
             <View style={styles.authorText}>
@@ -375,7 +369,7 @@ const styles = StyleSheet.create({
     fontSize: 15
   },
   wrap: {
-    paddingTop: 56,
+    paddingTop: 18,
     paddingBottom: 128,
     gap: 18
   },

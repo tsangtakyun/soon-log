@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { BackHeader } from '@/components/BackHeader';
 import { Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -117,12 +118,7 @@ ${idea.tags?.length ? '標籤：' + idea.tags.join(', ') : ''}`
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>題材詳情</Text>
-      </View>
+      <BackHeader title="題材詳情" />
 
       <ScrollView contentContainerStyle={styles.content}>
         {idea ? (
@@ -186,33 +182,6 @@ ${idea.tags?.length ? '標籤：' + idea.tags.join(', ') : ''}`
 }
 
 const styles = StyleSheet.create({
-  header: {
-    paddingTop: 58,
-    paddingHorizontal: 18,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgMuted
-  },
-  backText: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 30,
-    lineHeight: 34
-  },
-  headerTitle: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 16
-  },
   content: {
     padding: 18,
     paddingBottom: 40,

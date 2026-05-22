@@ -69,7 +69,7 @@ export default function AppTabs() {
       <Tabs.Screen
         name="log/index"
         options={{
-          title: 'Their.Studio',
+          title: 'Studio',
           tabBarIcon: ({ color }) => (
             <View>
               <Text style={{ color, fontSize: 20 }}>🎬</Text>
@@ -98,14 +98,14 @@ export default function AppTabs() {
       <Tabs.Screen
         name="idea/library"
         options={{
-          title: 'Idea',
+          title: 'Ideas',
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>◈</Text>
         }}
       />
       <Tabs.Screen
         name="work/index"
         options={{
-          title: '工作',
+          title: 'Work',
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>◫</Text>
         }}
       />

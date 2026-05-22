@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PriorityBadge } from '@/components/PriorityBadge';
 import { EmptyState, Screen } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
@@ -59,6 +59,7 @@ function WorkCard({ item }: { item: WorkItem }) {
 export default function WorkBoardScreen() {
   const [items, setItems] = useState<WorkItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
 
   const loadItems = useCallback(async () => {
@@ -87,6 +88,15 @@ export default function WorkBoardScreen() {
     };
   }, [loadItems]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadItems();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadItems]);
+
   const grouped = useMemo(() => {
     return COLUMNS.reduce<Record<WorkStatus, WorkItem[]>>((acc, column) => {
       acc[column.key] = items.filter((item) => item.status === column.key);
@@ -105,7 +115,10 @@ export default function WorkBoardScreen() {
       {loading ? (
         <View style={styles.loading}><ActivityIndicator color={colors.accent} /></View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#5C2A22" />}
+        >
           {items.length === 0 ? <EmptyState title="未有任務" body="新增第一個任務，將創作流程排好。" /> : null}
           {COLUMNS.map((column) => (
             <View key={column.key} style={styles.section}>
