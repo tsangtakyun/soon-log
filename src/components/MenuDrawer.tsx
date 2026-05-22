@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import {
@@ -60,6 +61,11 @@ export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: ()
     router.push('/(app)/settings/reply');
   };
 
+  const openReplyCentre = () => {
+    onClose();
+    router.push('/(app)/reply-centre');
+  };
+
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <View style={styles.modalRoot}>
@@ -92,6 +98,7 @@ export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: ()
           <View style={styles.menu}>
             <DrawerItem icon="⚙️" label="設定" onPress={openProfile} />
             <DrawerItem icon="🧠" label="AI 設定" onPress={openReplySettings} />
+            <DrawerItem iconName="message-circle" label="回覆中心" onPress={openReplyCentre} />
             <Divider />
             <DrawerItem icon="👤" label="邀請管理" />
             <Divider />
@@ -109,18 +116,22 @@ export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: ()
 
 function DrawerItem({
   icon,
+  iconName,
   label,
   danger = false,
   onPress
 }: {
-  icon: string;
+  icon?: string;
+  iconName?: keyof typeof Feather.glyphMap;
   label: string;
   danger?: boolean;
   onPress?: () => void;
 }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.item, pressed && styles.pressed]}>
-      <Text style={styles.itemIcon}>{icon}</Text>
+      <View style={styles.itemIcon}>
+        {iconName ? <Feather name={iconName} size={20} color={danger ? colors.error : colors.text} /> : <Text style={styles.itemEmoji}>{icon}</Text>}
+      </View>
       <Text style={[styles.itemLabel, danger && styles.danger]}>{label}</Text>
     </Pressable>
   );
@@ -239,6 +250,9 @@ const styles = StyleSheet.create({
   },
   itemIcon: {
     width: 28,
+    alignItems: 'flex-start'
+  },
+  itemEmoji: {
     fontSize: 20
   },
   itemLabel: {

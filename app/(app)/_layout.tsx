@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
@@ -63,16 +64,27 @@ export default function AppTabs() {
         name="home/index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🏠</Text>
+          tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />
         }}
       />
       <Tabs.Screen
         name="log/index"
         options={{
-          title: 'Studio',
+          title: 'EGGS',
           tabBarIcon: ({ color }) => (
             <View>
-              <Text style={{ color, fontSize: 20 }}>🎬</Text>
+              <View
+                style={{
+                  width: 22,
+                  height: 26,
+                  borderTopLeftRadius: 11,
+                  borderTopRightRadius: 11,
+                  borderBottomLeftRadius: 9,
+                  borderBottomRightRadius: 9,
+                  borderWidth: 2,
+                  borderColor: color
+                }}
+              />
               {todayCount > 0 ? (
                 <View
                   style={{
@@ -99,23 +111,18 @@ export default function AppTabs() {
         name="idea/library"
         options={{
           title: 'Ideas',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>◈</Text>
+          tabBarIcon: ({ color }) => <Feather name="bookmark" size={22} color={color} />
         }}
       />
       <Tabs.Screen
         name="work/index"
         options={{
           title: 'Work',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>◫</Text>
+          tabBarIcon: ({ color }) => <Feather name="check-square" size={22} color={color} />
         }}
       />
-      <Tabs.Screen
-        name="mayan/index"
-        options={{
-          title: 'Reply',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>💬</Text>
-        }}
-      />
+      <Tabs.Screen name="mayan/index" options={{ href: null }} />
+      <Tabs.Screen name="reply-centre" options={{ href: null }} />
       <Tabs.Screen name="feed/index" options={{ href: null }} />
       <Tabs.Screen name="create" options={{ href: null }} />
       <Tabs.Screen name="profile/index" options={{ href: null }} />

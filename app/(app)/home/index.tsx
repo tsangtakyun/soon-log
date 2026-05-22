@@ -1,10 +1,12 @@
-import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Dimensions,
+  Easing,
   Image,
   Pressable,
   ScrollView,
@@ -13,6 +15,7 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ClipPlayer from '@/components/ClipPlayer';
 import { MenuDrawer } from '@/components/MenuDrawer';
 import { LogCard } from '@/components/LogCard';
 import { RegionFilter } from '@/components/RegionFilter';
@@ -40,13 +43,36 @@ type OpenStudio = {
   member_count: number;
   clip_count: number;
   last_clip_at: string | null;
+  latest_clip: {
+    id: string;
+    video_url: string | null;
+    media_urls: string[];
+    caption: string | null;
+    time_str: string | null;
+    date_str: string | null;
+    caption_align: 'left' | 'center' | 'right' | null;
+    text_size: 'small' | 'medium' | 'large' | null;
+    background_color: 'cream' | 'black' | null;
+  } | null;
+};
+type HomeProfile = {
+  avatar_url: string | null;
+  username: string | null;
+  display_name: string | null;
+};
+type StarProps = {
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+  delay: number;
 };
 
-const starColors = ['#ef4444', '#3b82f6', '#eab308', '#22c55e', '#a855f7'];
+const starColors = ['#ef4444', '#3b82f6', '#eab308', '#22c55e', '#a855f7', '#ffffff'];
 const tabs: ContentTab[] = ['Following', 'Trends', 'All', 'IG'];
 const tabLabels: Record<ContentTab, string> = {
-  Following: 'Following',
-  Trends: 'Trends',
+  Following: '追蹤',
+  Trends: '熱話',
   All: '全部',
   IG: 'IG'
 };
@@ -55,21 +81,78 @@ function formatDueDate(value: string) {
   return new Intl.DateTimeFormat('zh-HK', { month: 'short', day: 'numeric' }).format(new Date(`${value}T00:00:00`));
 }
 
-function StarNoise({ heroHeight }: { heroHeight: number }) {
-  const stars = useMemo(() => Array.from({ length: 20 }, (_, index) => {
-    const left = ((index * 37) % 100);
-    const top = 12 + ((index * 23) % 76);
-    return {
-      id: index,
-      backgroundColor: starColors[index % starColors.length],
-      left: `${left}%` as `${number}%`,
-      top: Math.round((top / 100) * heroHeight)
-    };
-  }), [heroHeight]);
+function AnimatedStar({ x, y, size, color, delay }: StarProps) {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 1000 + Math.random() * 1000,
+          delay,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.2,
+          duration: 1000 + Math.random() * 1000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(translateY, {
+          toValue: -3,
+          duration: 2000 + Math.random() * 2000,
+          delay,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 3,
+          duration: 2000 + Math.random() * 2000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [delay, opacity, translateY]);
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: color,
+        opacity,
+        transform: [{ translateY }],
+      }}
+    />
+  );
+}
+
+function StarNoise({ heroHeight, screenWidth }: { heroHeight: number; screenWidth: number }) {
+  const stars = useMemo(() => Array.from({ length: 25 }, (_, index) => ({
+    id: index,
+    x: Math.random() * screenWidth,
+    y: Math.random() * heroHeight,
+    size: 2 + Math.random() * 2,
+    color: starColors[Math.floor(Math.random() * starColors.length)],
+    delay: Math.random() * 2000,
+  })), [heroHeight, screenWidth]);
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      {stars.map(({ id, ...star }) => <View key={id} style={[styles.star, star]} />)}
+      {stars.map(({ id, ...star }) => <AnimatedStar key={id} {...star} />)}
     </View>
   );
 }
@@ -164,28 +247,45 @@ function TrendCard({ trend }: { trend: Trend }) {
   );
 }
 
-function OpenStudiosSection({ studios }: { studios: OpenStudio[] }) {
+function BlackBoxSection({ studios }: { studios: OpenStudio[] }) {
   if (studios.length === 0) return null;
 
   return (
     <View style={styles.openStudiosSection}>
-      <Text style={styles.openStudiosTitle}>🌐 Open Studios</Text>
-      <Text style={styles.openStudiosSubtitle}>創作者嘅製作過程</Text>
+      <Text style={styles.openStudiosTitle}>⬛ Black Box 黑盒</Text>
+      <Text style={styles.openStudiosSubtitle}>紀錄製作嘅黑盒子</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.openStudiosStrip}>
         {studios.map((studio) => (
           <Pressable
             key={studio.id}
             onPress={() => router.push(`/log/room/${studio.id}`)}
-            style={({ pressed }) => [styles.openStudioCard, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              studio.latest_clip?.video_url ? styles.blackBoxVideoCard : styles.openStudioCard,
+              pressed && styles.pressed
+            ]}
           >
-            <Text style={styles.openStudioBadge}>🌐</Text>
-            <View style={styles.openStudioText}>
-              <Text numberOfLines={2} style={styles.openStudioName}>{studio.name}</Text>
-              <Text numberOfLines={1} style={styles.openStudioTopic}>{studio.topic}</Text>
-              <Text numberOfLines={1} style={styles.openStudioMeta}>
-                {studio.member_count} 位成員 · {studio.clip_count} clips
-              </Text>
-            </View>
+            {studio.latest_clip?.video_url ? (
+              <>
+                <View style={styles.blackBoxPlayer}>
+                  <ClipPlayer clip={studio.latest_clip} width={200} height={140} thumbnail />
+                </View>
+                <View style={styles.blackBoxInfo}>
+                  <Text numberOfLines={1} style={styles.blackBoxName}>{studio.name}</Text>
+                  <Text numberOfLines={1} style={styles.blackBoxMeta}>{studio.member_count} 位成員 · {studio.clip_count} clips</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.openStudioBadge}>⬛</Text>
+                <View style={styles.openStudioText}>
+                  <Text numberOfLines={2} style={styles.openStudioName}>{studio.name}</Text>
+                  <Text numberOfLines={1} style={styles.openStudioTopic}>{studio.topic}</Text>
+                  <Text numberOfLines={1} style={styles.openStudioMeta}>
+                    {studio.member_count} 位成員 · {studio.clip_count} clips
+                  </Text>
+                </View>
+              </>
+            )}
           </Pressable>
         ))}
       </ScrollView>
@@ -195,9 +295,10 @@ function OpenStudiosSection({ studios }: { studios: OpenStudio[] }) {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { user, profile } = useAuth();
+  const { user, profile: authProfile } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
+  const [homeProfile, setHomeProfile] = useState<HomeProfile | null>(null);
   const [activeTab, setActiveTab] = useState<ContentTab>('Following');
   const [task, setTask] = useState<WorkItem | null>(null);
   const [trends, setTrends] = useState<Trend[]>([]);
@@ -210,14 +311,15 @@ export default function HomeScreen() {
   const [loadingAll, setLoadingAll] = useState(false);
   const [loadingTrends, setLoadingTrends] = useState(false);
   const [credits, setCredits] = useState(30);
-  const heroHeight = Math.round(Dimensions.get('window').height * 0.45);
-  const displayUsername = profile?.username ? `@${profile.username}` : '@soon';
-  const avatar = user?.user_metadata?.avatar_url || profile?.avatar_url;
-  const initial = (profile?.username || user?.email || 'S').slice(0, 1).toUpperCase();
+  const screenWidth = Dimensions.get('window').width;
+  const heroHeight = Math.round(Dimensions.get('window').height * 0.36);
+  const displayUsername = homeProfile?.username || authProfile?.username ? `@${homeProfile?.username || authProfile?.username}` : '@soon';
+  const avatar = homeProfile?.avatar_url;
+  const initial = (homeProfile?.username || authProfile?.username || user?.email || 'S').slice(0, 1).toUpperCase();
 
   const loadNudge = useCallback(async () => {
     if (!user) return;
-    const [{ data: taskData }, { data: creditData }] = await Promise.all([
+    const [{ data: taskData }, { data: creditData }, { data: profileData }] = await Promise.all([
       supabase
         .from('work_items')
         .select('*')
@@ -230,10 +332,16 @@ export default function HomeScreen() {
         .from('user_credits')
         .select('balance')
         .eq('user_id', user.id)
+        .maybeSingle(),
+      supabase
+        .from('profiles')
+        .select('avatar_url, username, display_name')
+        .eq('id', user.id)
         .maybeSingle()
     ]);
     setTask((taskData ?? null) as WorkItem | null);
     if (creditData?.balance !== undefined) setCredits(creditData.balance as number);
+    if (profileData) setHomeProfile(profileData as HomeProfile);
   }, [user]);
 
   const loadTrends = useCallback(async () => {
@@ -333,7 +441,10 @@ export default function HomeScreen() {
 
     const [{ data: members }, { data: clips }] = await Promise.all([
       supabase.from('topic_room_members').select('room_id, user_id').in('room_id', roomIds),
-      supabase.from('topic_clips').select('id, room_id, created_at').in('room_id', roomIds)
+      supabase
+        .from('topic_clips')
+        .select('id, room_id, created_at, video_url, media_urls, caption, time_str, date_str, caption_align, text_size, background_color')
+        .in('room_id', roomIds)
     ]);
 
     const memberSets = new Map<string, Set<string>>();
@@ -345,11 +456,23 @@ export default function HomeScreen() {
 
     const clipCounts = new Map<string, number>();
     const lastClips = new Map<string, string>();
+    const latestClips = new Map<string, OpenStudio['latest_clip']>();
     (clips ?? []).forEach((clip) => {
       clipCounts.set(clip.room_id, (clipCounts.get(clip.room_id) ?? 0) + 1);
       const current = lastClips.get(clip.room_id);
       if (!current || new Date(clip.created_at).getTime() > new Date(current).getTime()) {
         lastClips.set(clip.room_id, clip.created_at);
+        latestClips.set(clip.room_id, {
+          id: clip.id,
+          video_url: clip.video_url ?? null,
+          media_urls: Array.isArray(clip.media_urls) ? clip.media_urls : [],
+          caption: clip.caption ?? null,
+          time_str: clip.time_str ?? null,
+          date_str: clip.date_str ?? null,
+          caption_align: clip.caption_align ?? null,
+          text_size: clip.text_size ?? null,
+          background_color: clip.background_color ?? null,
+        });
       }
     });
 
@@ -361,7 +484,8 @@ export default function HomeScreen() {
         created_at: room.created_at,
         member_count: memberSets.get(room.id)?.size ?? 0,
         clip_count: clipCounts.get(room.id) ?? 0,
-        last_clip_at: lastClips.get(room.id) ?? null
+        last_clip_at: lastClips.get(room.id) ?? null,
+        latest_clip: latestClips.get(room.id) ?? null
       }))
       .sort((a, b) => {
         const aTime = a.last_clip_at ? new Date(a.last_clip_at).getTime() : -1;
@@ -399,21 +523,21 @@ export default function HomeScreen() {
   return (
     <View style={styles.screen}>
       <View style={[styles.hero, { height: heroHeight, paddingTop: insets.top + 14 }]}>
-        <StarNoise heroHeight={heroHeight} />
+        <StarNoise heroHeight={heroHeight} screenWidth={screenWidth} />
         <View style={styles.topBar}>
           <Pressable onPress={() => setDrawerOpen(true)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
-            <Text style={styles.squareButtonText}>☰</Text>
+            <Feather name="menu" size={20} color={colors.text} />
           </Pressable>
           <View style={styles.topActions}>
             <Pressable onPress={() => Alert.alert('AI Credits', `你今日仲有 ${credits} credits`)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
-              <Text style={styles.squareButtonText}>🪙</Text>
+              <Feather name="circle" size={20} color={colors.text} />
               <Text style={styles.creditTiny}>{credits}</Text>
             </Pressable>
             <Pressable onPress={() => router.push('/(app)/home/referrals')} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
-              <Text style={styles.squareButtonText}>🎁</Text>
+              <Feather name="gift" size={20} color={colors.text} />
             </Pressable>
             <Pressable onPress={() => setSavedOpen(true)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
-              <Text style={styles.squareButtonText}>🔖</Text>
+              <Feather name="bookmark" size={20} color={colors.text} />
             </Pressable>
           </View>
         </View>
@@ -430,10 +554,10 @@ export default function HomeScreen() {
             <Text style={styles.username}>{displayUsername}</Text>
           </Pressable>
           <Pressable onPress={() => router.push('/log')} style={({ pressed }) => pressed && styles.pressed}>
-            <LinearGradient colors={[colors.primary, colors.primaryDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cta}>
-              <Text style={styles.ctaIcon}>⌛</Text>
-              <Text style={styles.ctaText}>SOON-LOG</Text>
-            </LinearGradient>
+            <View style={styles.eggButton}>
+              <Text style={styles.eggIcon}>🥚</Text>
+              <Text style={styles.eggText}>STUDIO</Text>
+            </View>
           </Pressable>
         </View>
       </View>
@@ -446,9 +570,10 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <OpenStudiosSection studios={openStudios} />
+        <BlackBoxSection studios={openStudios} />
 
-        <Text style={styles.sectionTitle}>Content</Text>
+        <Text style={styles.sectionTitle}>Predikt</Text>
+        <Text style={styles.sectionSubtitle}>創作者社群熱話</Text>
         <View style={styles.contentTabs}>
           {tabs.map((tab) => (
             <Pressable key={tab} onPress={() => setActiveTab(tab)} style={[styles.contentTab, activeTab === tab && styles.activeContentTab]}>
@@ -516,13 +641,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     overflow: 'hidden'
   },
-  star: {
-    position: 'absolute',
-    width: 3,
-    height: 3,
-    borderRadius: 999,
-    opacity: 0.25
-  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -534,17 +652,12 @@ const styles = StyleSheet.create({
     gap: 10
   },
   squareButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: colors.bgBody,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.5)',
     alignItems: 'center',
     justifyContent: 'center'
-  },
-  squareButtonText: {
-    color: colors.text,
-    fontSize: 20,
-    fontFamily: fonts.bodyBold
   },
   creditTiny: {
     position: 'absolute',
@@ -565,17 +678,17 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   heroAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     borderWidth: 2,
     borderColor: colors.textOnDark,
     backgroundColor: colors.bgHeroSurface
   },
   heroAvatarFallback: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     borderWidth: 2,
     borderColor: colors.textOnDark,
     backgroundColor: colors.primary,
@@ -585,32 +698,41 @@ const styles = StyleSheet.create({
   heroAvatarInitial: {
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
-    fontSize: 30
+    fontSize: 24
   },
   username: {
-    marginTop: 12,
+    marginTop: 9,
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
-    fontSize: 28,
+    fontSize: 22,
     textAlign: 'center'
   },
-  cta: {
-    marginTop: 16,
-    borderRadius: 999,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    flexDirection: 'row',
+  eggButton: {
+    marginTop: 12,
+    width: 80,
+    height: 96,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    borderBottomLeftRadius: 35,
+    borderBottomRightRadius: 35,
+    backgroundColor: colors.primary,
     alignItems: 'center',
-    gap: 8
+    justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5
   },
-  ctaIcon: {
-    color: colors.textOnDark,
-    fontSize: 16
+  eggIcon: {
+    fontSize: 28
   },
-  ctaText: {
+  eggText: {
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
-    fontSize: 16
+    fontSize: 9,
+    letterSpacing: 1,
+    marginTop: 2
   },
   body: {
     flex: 1,
@@ -680,6 +802,37 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgHero,
     padding: 16
   },
+  blackBoxVideoCard: {
+    width: 200,
+    height: 196,
+    marginRight: 12,
+    borderRadius: 16,
+    backgroundColor: colors.bgHero,
+    overflow: 'hidden'
+  },
+  blackBoxPlayer: {
+    width: 200,
+    height: 140,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: colors.bgHero
+  },
+  blackBoxInfo: {
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  blackBoxName: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14
+  },
+  blackBoxMeta: {
+    marginTop: 4,
+    color: colors.textOnDarkMuted,
+    fontFamily: fonts.body,
+    fontSize: 12
+  },
   openStudioBadge: {
     alignSelf: 'flex-end',
     fontSize: 12
@@ -710,7 +863,14 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     color: colors.text,
     fontFamily: fonts.bodyBold,
-    fontSize: 24
+    fontSize: 28
+  },
+  sectionSubtitle: {
+    marginTop: 4,
+    marginHorizontal: 16,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13
   },
   contentTabs: {
     marginTop: 14,
