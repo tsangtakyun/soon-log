@@ -22,49 +22,63 @@ import { colors } from '@/theme/colors';
 
 export default function CreateTopicRoomScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { loading: authLoading, user } = useAuth();
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
   const [angle, setAngle] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const canSubmit = topic.trim().length > 0 && !saving;
+  const canSubmit = topic.trim().length > 0 && !authLoading && !saving;
 
   const submit = async () => {
-    if (!user || !canSubmit) return;
+    if (saving || authLoading) return;
+    if (!topic.trim()) {
+      Alert.alert('未填題材名稱', '請先輸入 Topic Room 嘅題材名稱。');
+      return;
+    }
+    if (!user) {
+      Alert.alert('未登入', '請重新登入後再建立 Topic Room。');
+      return;
+    }
+
     setSaving(true);
-    const trimmedTopic = topic.trim();
-    const { data: room, error: roomError } = await supabase
-      .from('topic_rooms')
-      .insert({
-        name: trimmedTopic,
-        topic: trimmedTopic,
-        description: description.trim() || null,
-        privacy: isOpen ? 'open' : 'private',
-        owner_id: user.id
-      })
-      .select('id')
-      .single();
+    try {
+      const trimmedTopic = topic.trim();
+      const { data: room, error: roomError } = await supabase
+        .from('topic_rooms')
+        .insert({
+          name: trimmedTopic,
+          topic: trimmedTopic,
+          description: description.trim() || null,
+          privacy: isOpen ? 'open' : 'private',
+          owner_id: user.id
+        })
+        .select('id')
+        .single();
 
-    if (roomError || !room) {
+      if (roomError || !room) {
+        Alert.alert('建立失敗', roomError?.message ?? '請稍後再試');
+        return;
+      }
+
+      const { error: memberError } = await supabase.from('topic_room_members').insert({
+        room_id: room.id,
+        user_id: user.id,
+        angle: angle.trim() || null,
+        role: 'owner'
+      });
+
+      if (memberError) {
+        Alert.alert('加入房間失敗', memberError.message);
+        return;
+      }
+
+      router.replace(`/log/room/${room.id}`);
+    } catch (error) {
+      Alert.alert('建立失敗', error instanceof Error ? error.message : '請稍後再試');
+    } finally {
       setSaving(false);
-      Alert.alert('建立失敗', roomError?.message ?? '請稍後再試');
-      return;
     }
-
-    const { error: memberError } = await supabase.from('topic_room_members').insert({
-      room_id: room.id,
-      user_id: user.id,
-      angle: angle.trim() || null,
-      role: 'owner'
-    });
-
-    setSaving(false);
-    if (memberError) {
-      Alert.alert('加入房間失敗', memberError.message);
-      return;
-    }
-    router.replace(`/log/room/${room.id}`);
   };
 
   return (
@@ -115,7 +129,6 @@ export default function CreateTopicRoomScreen() {
         </View>
 
         <Pressable
-          disabled={!canSubmit}
           onPress={submit}
           style={({ pressed }) => [styles.submit, (!canSubmit || pressed) && styles.submitDimmed]}
         >

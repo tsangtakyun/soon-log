@@ -240,7 +240,7 @@ export default function StudioLogScreen() {
 
           <View style={[styles.sectionHeader, styles.roomsHeader]}>
             <Text style={styles.sectionTitle}>Topic Rooms</Text>
-            <Pressable onPress={() => router.push('/log/create-room')} hitSlop={8}>
+            <Pressable onPress={() => router.push('/topic-room/create')} hitSlop={8}>
               <Text style={styles.addButton}>+ 新建</Text>
             </Pressable>
           </View>
@@ -252,7 +252,7 @@ export default function StudioLogScreen() {
             <View style={styles.emptyRooms}>
               <Text style={styles.emptyRoomsTitle}>你仲未有 Topic Room</Text>
               <Text style={styles.emptyRoomsBody}>建立一個同隊友一齊記錄創作過程</Text>
-              <Pressable onPress={() => router.push('/log/create-room')} style={({ pressed }) => [styles.createRoomButton, pressed && styles.pressed]}>
+              <Pressable onPress={() => router.push('/topic-room/create')} style={({ pressed }) => [styles.createRoomButton, pressed && styles.pressed]}>
                 <Text style={styles.createRoomText}>+ 建立 Topic Room</Text>
               </Pressable>
             </View>
