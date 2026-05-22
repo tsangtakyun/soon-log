@@ -98,6 +98,8 @@ function relativeTime(value: string) {
 
 export function ReplyCenter() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset(insets.bottom);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [threads, setThreads] = useState<ReplyThread[]>([]);
   const [activeTab, setActiveTab] = useState('全部');
@@ -303,12 +305,14 @@ export function ReplyCenter() {
         visible={newSheetVisible}
         onClose={() => setNewSheetVisible(false)}
         onCreate={createThread}
+        keyboardInset={keyboardInset}
       />
       <ThreadDetailSheet
         thread={selectedThread}
         onClose={() => setSelectedThread(null)}
         onRefresh={loadThreads}
         onLocalUpdate={updateThreadLocally}
+        keyboardInset={keyboardInset}
       />
     </View>
   );
@@ -317,14 +321,15 @@ export function ReplyCenter() {
 function NewThreadSheet({
   visible,
   onClose,
-  onCreate
+  onCreate,
+  keyboardInset
 }: {
   visible: boolean;
   onClose: () => void;
   onCreate: (draft: { inbox_type: InboxType; sender_name: string; original_message: string }) => Promise<void>;
+  keyboardInset: number;
 }) {
   const insets = useSafeAreaInsets();
-  const keyboardInset = useKeyboardInset(insets.bottom);
   const [inboxType, setInboxType] = useState<InboxType>('fans');
   const [senderName, setSenderName] = useState('');
   const [originalMessage, setOriginalMessage] = useState('');
@@ -404,16 +409,17 @@ function ThreadDetailSheet({
   thread,
   onClose,
   onRefresh,
-  onLocalUpdate
+  onLocalUpdate,
+  keyboardInset
 }: {
   thread: ReplyThread | null;
   onClose: () => void;
   onRefresh: () => Promise<void>;
   onLocalUpdate: (threadId: string, patch: Partial<ReplyThread>) => Promise<void>;
+  keyboardInset: number;
 }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const keyboardInset = useKeyboardInset(insets.bottom);
   const [replyText, setReplyText] = useState('');
   const [notes, setNotes] = useState('');
   const [generating, setGenerating] = useState(false);
