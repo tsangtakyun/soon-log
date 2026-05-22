@@ -542,8 +542,8 @@ const styles = StyleSheet.create({
     gap: 8
   },
   inboxTab: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.bodyBorder,
