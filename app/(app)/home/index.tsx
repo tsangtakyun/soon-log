@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,18 +15,16 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle, Path } from 'react-native-svg';
 import ClipPlayer from '@/components/ClipPlayer';
 import { MenuDrawer } from '@/components/MenuDrawer';
-import { LogCard } from '@/components/LogCard';
-import { RegionFilter } from '@/components/RegionFilter';
 import { SavedSheet } from '@/components/SavedSheet';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
-import { Log, WorkItem } from '@/types';
+import { WorkItem } from '@/types';
 
-type ContentTab = 'Following' | 'Trends' | 'All' | 'IG';
 type TrendAngle = { emoji: string; name: string; percentage: number };
 type Trend = {
   id: string;
@@ -68,18 +66,12 @@ type StarProps = {
   delay: number;
 };
 
-const starColors = ['#ef4444', '#3b82f6', '#eab308', '#22c55e', '#a855f7', '#ffffff'];
-const tabs: ContentTab[] = ['Following', 'Trends', 'All', 'IG'];
-const tabLabels: Record<ContentTab, string> = {
-  Following: '追蹤',
-  Trends: '熱話',
-  All: '全部',
-  IG: 'IG'
-};
-
-function formatDueDate(value: string) {
-  return new Intl.DateTimeFormat('zh-HK', { month: 'short', day: 'numeric' }).format(new Date(`${value}T00:00:00`));
-}
+const nudgeMessages = [
+  '今日想記錄咩？撳 EGGS 開始拍片 🎬',
+  '有新題材？去 Ideas 儲低靈感 💡',
+  '睇下其他 creator 嘅熱話 👀',
+  '今日無任務，係時候創作！✨',
+];
 
 function AnimatedStar({ x, y, size, color, delay }: StarProps) {
   const opacity = useRef(new Animated.Value(0.3)).current;
@@ -141,80 +133,18 @@ function AnimatedStar({ x, y, size, color, delay }: StarProps) {
 }
 
 function StarNoise({ heroHeight, screenWidth }: { heroHeight: number; screenWidth: number }) {
-  const stars = useMemo(() => Array.from({ length: 25 }, (_, index) => ({
+  const stars = useMemo(() => Array.from({ length: 50 }, (_, index) => ({
     id: index,
     x: Math.random() * screenWidth,
     y: Math.random() * heroHeight,
-    size: 2 + Math.random() * 2,
-    color: starColors[Math.floor(Math.random() * starColors.length)],
+    size: 1 + Math.random() * 3,
+    color: `rgba(255,255,255,${0.3 + Math.random() * 0.7})`,
     delay: Math.random() * 2000,
   })), [heroHeight, screenWidth]);
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       {stars.map(({ id, ...star }) => <AnimatedStar key={id} {...star} />)}
-    </View>
-  );
-}
-
-function EmptySocialState({ buttonLabel }: { buttonLabel: string }) {
-  return (
-    <View style={styles.emptySocial}>
-      <Text style={styles.emptyEmoji}>📊</Text>
-      <Text style={styles.emptyTitle}>Connect to see your data.</Text>
-      <Text style={styles.emptyBody}>See your followers, views, and which content is working.</Text>
-      <Pressable
-        onPress={() => Alert.alert('Coming soon — social platform connections')}
-        style={({ pressed }) => [styles.blackPill, pressed && styles.pressed]}
-      >
-        <Text style={styles.blackPillText}>{buttonLabel}</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-async function enrichLogs(logs: Log[], userId?: string | null): Promise<Log[]> {
-  const ids = logs.map((log) => log.id);
-  if (ids.length === 0) return logs;
-
-  const [{ data: likes }, { data: comments }, liked] = await Promise.all([
-    supabase.from('likes').select('log_id').in('log_id', ids),
-    supabase.from('comments').select('log_id').in('log_id', ids),
-    userId
-      ? supabase.from('likes').select('log_id').eq('user_id', userId).in('log_id', ids)
-      : Promise.resolve({ data: [] as { log_id: string }[] })
-  ]);
-
-  return logs.map((log) => ({
-    ...log,
-    like_count: likes?.filter((row) => row.log_id === log.id).length ?? 0,
-    comment_count: comments?.filter((row) => row.log_id === log.id).length ?? 0,
-    liked_by_me: liked.data?.some((row) => row.log_id === log.id) ?? false
-  }));
-}
-
-function FeedList({
-  logs,
-  loading,
-  empty
-}: {
-  logs: Log[];
-  loading: boolean;
-  empty: ReactNode;
-}) {
-  if (loading) {
-    return (
-      <View style={styles.feedLoading}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
-  }
-
-  if (logs.length === 0) return <>{empty}</>;
-
-  return (
-    <View style={styles.feedWrap}>
-      {logs.map((log) => <LogCard key={log.id} log={log} />)}
     </View>
   );
 }
@@ -253,12 +183,12 @@ function BlackBoxSection({ studios }: { studios: OpenStudio[] }) {
   return (
     <View style={styles.openStudiosSection}>
       <Text style={styles.openStudiosTitle}>⬛ Black Box 黑盒</Text>
-      <Text style={styles.openStudiosSubtitle}>紀錄製作嘅黑盒子</Text>
+      <Text style={styles.openStudiosSubtitle}>紀錄製作的電子黑盒</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.openStudiosStrip}>
         {studios.map((studio) => (
           <Pressable
             key={studio.id}
-            onPress={() => router.push(`/log/room/${studio.id}`)}
+            onPress={() => router.push(`/(app)/log/room/${studio.id}`)}
             style={({ pressed }) => [
               studio.latest_clip?.video_url ? styles.blackBoxVideoCard : styles.openStudioCard,
               pressed && styles.pressed
@@ -293,22 +223,92 @@ function BlackBoxSection({ studios }: { studios: OpenStudio[] }) {
   );
 }
 
+function getTaskUrgency(task: WorkItem | null) {
+  if (!task?.due_date) return null;
+  const dueDate = new Date(`${task.due_date}T23:59:59`);
+  const hoursLeft = Math.floor((dueDate.getTime() - Date.now()) / 3600000);
+  const daysLeft = Math.max(1, Math.ceil(hoursLeft / 24));
+
+  if (hoursLeft < 3) {
+    return {
+      hoursLeft,
+      badge: `⏰ ${Math.max(0, hoursLeft)}小時後截止`,
+      badgeStyle: styles.deadlineBadgeUrgent,
+      badgeTextStyle: styles.deadlineBadgeTextUrgent,
+      cardStyle: styles.nudgeCardUrgent,
+    };
+  }
+
+  if (hoursLeft < 24) {
+    return {
+      hoursLeft,
+      badge: '⏰ 今日截止',
+      badgeStyle: styles.deadlineBadgeToday,
+      badgeTextStyle: styles.deadlineBadgeTextToday,
+      cardStyle: styles.nudgeCardNormal,
+    };
+  }
+
+  return {
+    hoursLeft,
+    badge: `📅 ${daysLeft}日後截止`,
+    badgeStyle: styles.deadlineBadgeLater,
+    badgeTextStyle: styles.deadlineBadgeTextLater,
+    cardStyle: styles.nudgeCardNormal,
+  };
+}
+
+function NudgeCard({ task }: { task: WorkItem | null }) {
+  const urgency = getTaskUrgency(task);
+  const fallbackMessage = useMemo(() => nudgeMessages[Math.floor(Math.random() * nudgeMessages.length)], []);
+
+  if (task?.due_date && urgency) {
+    return (
+      <View style={[styles.nudgeCard, urgency.cardStyle]}>
+        <View style={styles.nudgeTopRow}>
+          <View style={[styles.deadlineBadge, urgency.badgeStyle]}>
+            <Text style={[styles.deadlineBadgeText, urgency.badgeTextStyle]}>{urgency.badge}</Text>
+          </View>
+          <Pressable onPress={() => router.push('/(app)/work')} style={({ pressed }) => [styles.nudgeArrowCircle, pressed && styles.pressed]}>
+            <Text style={styles.nudgeArrowText}>→</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.nudgeTaskTitle}>{task.title}</Text>
+        <Text style={styles.nudgeHint}>撳入睇詳情 →</Text>
+      </View>
+    );
+  }
+
+  if (task) {
+    return (
+      <View style={[styles.nudgeCard, styles.nudgeCardNormal, styles.nudgeSimpleCard]}>
+        <Text style={styles.nudgeSimpleText}>📋 今日待辦：{task.title}</Text>
+        <Pressable onPress={() => router.push('/(app)/work')} style={({ pressed }) => [styles.nudgeArrowCircle, pressed && styles.pressed]}>
+          <Text style={styles.nudgeArrowText}>→</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.nudgeCard, styles.nudgeCardMotivational, styles.nudgeSimpleCard]}>
+      <Text style={styles.nudgeMotivationText}>{fallbackMessage}</Text>
+      <Pressable onPress={() => router.push('/(app)/log')} style={({ pressed }) => [styles.nudgeArrowCircle, pressed && styles.pressed]}>
+        <Text style={styles.nudgeArrowText}>→</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user, profile: authProfile } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
   const [homeProfile, setHomeProfile] = useState<HomeProfile | null>(null);
-  const [activeTab, setActiveTab] = useState<ContentTab>('Following');
   const [task, setTask] = useState<WorkItem | null>(null);
   const [trends, setTrends] = useState<Trend[]>([]);
   const [openStudios, setOpenStudios] = useState<OpenStudio[]>([]);
-  const [followingLogs, setFollowingLogs] = useState<Log[]>([]);
-  const [allLogs, setAllLogs] = useState<Log[]>([]);
-  const [regionFilter, setRegionFilter] = useState<string | null>(null);
-  const [followingCount, setFollowingCount] = useState(0);
-  const [loadingFollowing, setLoadingFollowing] = useState(false);
-  const [loadingAll, setLoadingAll] = useState(false);
   const [loadingTrends, setLoadingTrends] = useState(false);
   const [credits, setCredits] = useState(30);
   const screenWidth = Dimensions.get('window').width;
@@ -359,67 +359,6 @@ export default function HomeScreen() {
     }
     setLoadingTrends(false);
   }, []);
-
-  const loadFollowingFeed = useCallback(async () => {
-    if (!user) return;
-    setLoadingFollowing(true);
-
-    const { data: follows, error: followsError } = await supabase
-      .from('follows')
-      .select('following_id')
-      .eq('follower_id', user.id);
-
-    if (followsError) {
-      setFollowingLogs([]);
-      setFollowingCount(0);
-      setLoadingFollowing(false);
-      return;
-    }
-
-    const followedIds = [...new Set((follows ?? []).map((follow) => follow.following_id).filter(Boolean))];
-    setFollowingCount(followedIds.length);
-
-    if (followedIds.length === 0) {
-      setFollowingLogs([]);
-      setLoadingFollowing(false);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('logs')
-      .select('*, profile:profiles!logs_user_id_fkey(*)')
-      .in('user_id', followedIds)
-      .eq('is_published', true)
-      .order('created_at', { ascending: false })
-      .limit(20);
-
-    if (error) {
-      setFollowingLogs([]);
-    } else {
-      setFollowingLogs(await enrichLogs((data ?? []) as Log[], user.id));
-    }
-    setLoadingFollowing(false);
-  }, [user]);
-
-  const loadAllFeed = useCallback(async () => {
-    setLoadingAll(true);
-    const { data, error } = await supabase
-      .from('logs')
-      .select('*, profile:profiles!logs_user_id_fkey(*)')
-      .eq('is_published', true)
-      .order('created_at', { ascending: false })
-      .limit(20);
-
-    if (error) {
-      setAllLogs([]);
-    } else {
-      const logs = ((data ?? []) as Log[]).filter((log) =>
-        regionFilter ? log.profile?.region === regionFilter : true
-      );
-      setAllLogs(await enrichLogs(logs, user?.id));
-    }
-    setLoadingAll(false);
-  }, [regionFilter, user?.id]);
 
   const loadOpenStudios = useCallback(async () => {
     const { data: rooms, error: roomsError } = await supabase
@@ -501,14 +440,7 @@ export default function HomeScreen() {
   useEffect(() => {
     loadNudge();
     loadTrends();
-    loadAllFeed();
-  }, [loadAllFeed, loadNudge, loadTrends]);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadFollowingFeed();
-    }, [loadFollowingFeed])
-  );
+  }, [loadNudge, loadTrends]);
 
   useFocusEffect(
     useCallback(() => {
@@ -516,15 +448,11 @@ export default function HomeScreen() {
     }, [loadOpenStudios])
   );
 
-  const nudgeMessage = task
-    ? `今日要完成：${task.title}${task.due_date ? `，截止 ${formatDueDate(task.due_date)}` : ''}`
-    : '你今日想記錄咩？撳低開始拍片 🎬';
-
   return (
     <View style={styles.screen}>
-      <View style={[styles.hero, { height: heroHeight, paddingTop: insets.top + 14 }]}>
+      <View style={[styles.hero, { height: heroHeight }]}>
         <StarNoise heroHeight={heroHeight} screenWidth={screenWidth} />
-        <View style={styles.topBar}>
+        <View style={[styles.topBar, { top: insets.top + 14 }]}>
           <Pressable onPress={() => setDrawerOpen(true)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
             <Feather name="menu" size={20} color={colors.text} />
           </Pressable>
@@ -543,7 +471,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.profileZone}>
-          <Pressable onPress={() => router.push('/profile')} style={({ pressed }) => [styles.homeProfileButton, pressed && styles.pressed]}>
+          <Pressable onPress={() => router.push('/(app)/profile')} style={({ pressed }) => [styles.homeProfileButton, pressed && styles.pressed]}>
             {avatar ? (
               <Image source={{ uri: avatar }} style={styles.heroAvatar} />
             ) : (
@@ -553,76 +481,52 @@ export default function HomeScreen() {
             )}
             <Text style={styles.username}>{displayUsername}</Text>
           </Pressable>
-          <Pressable onPress={() => router.push('/log')} style={({ pressed }) => pressed && styles.pressed}>
-            <View style={styles.eggButton}>
-              <Text style={styles.eggIcon}>🥚</Text>
-              <Text style={styles.eggText}>STUDIO</Text>
+          <Pressable onPress={() => router.push('/(app)/log')} style={({ pressed }) => pressed && styles.pressed}>
+            <View style={styles.eggSvgButton}>
+              <Svg width={100} height={100} viewBox="0 0 100 100">
+                <Path
+                  d="M50 8 C65 8, 85 20, 90 38 C95 55, 88 75, 72 85 C58 94, 38 94, 25 85 C10 75, 5 55, 10 38 C15 20, 35 8, 50 8 Z"
+                  fill="white"
+                  stroke="#1A1A1A"
+                  strokeWidth="2.5"
+                  strokeLinejoin="round"
+                />
+                <Circle cx="50" cy="52" r="18" fill="#F5A623" />
+                <Circle cx="44" cy="46" r="5" fill="white" opacity={0.4} />
+                <Circle cx="45" cy="50" r="2" fill="#1A1A1A" />
+                <Circle cx="55" cy="50" r="2" fill="#1A1A1A" />
+                <Path
+                  d="M44 56 Q50 62 56 56"
+                  stroke="#1A1A1A"
+                  strokeWidth="2"
+                  fill="none"
+                  strokeLinecap="round"
+                />
+              </Svg>
+              <Text style={styles.eggSvgLabel}>EGGS</Text>
             </View>
           </Pressable>
         </View>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.nudgeCard}>
-          <Text style={styles.nudgeText}>{nudgeMessage}</Text>
-          <Pressable onPress={() => router.push(task ? '/work' : '/log')} style={({ pressed }) => [styles.arrowButton, pressed && styles.pressed]}>
-            <Text style={styles.arrowText}>→</Text>
-          </Pressable>
-        </View>
+        <NudgeCard task={task} />
 
         <BlackBoxSection studios={openStudios} />
 
-        <Text style={styles.sectionTitle}>Predikt</Text>
-        <Text style={styles.sectionSubtitle}>創作者社群熱話</Text>
-        <View style={styles.contentTabs}>
-          {tabs.map((tab) => (
-            <Pressable key={tab} onPress={() => setActiveTab(tab)} style={[styles.contentTab, activeTab === tab && styles.activeContentTab]}>
-              <Text style={[styles.contentTabText, activeTab === tab && styles.activeContentTabText]}>{tabLabels[tab]}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {activeTab === 'Following' ? (
-          <FeedList
-            logs={followingLogs}
-            loading={loadingFollowing}
-            empty={followingCount === 0 ? (
-              <View style={styles.emptySocial}>
-                <Text style={styles.emptyEmoji}>👥</Text>
-                <Text style={styles.emptyTitle}>仲未追蹤任何創作者</Text>
-                <Text style={styles.emptyBody}>去發掘創作者，追蹤佢哋睇最新動態</Text>
-                <Pressable
-                  onPress={() => router.push('/(app)/home/discover')}
-                  style={({ pressed }) => [styles.primaryPill, pressed && styles.pressed]}
-                >
-                  <Text style={styles.primaryPillText}>去發掘</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <Text style={styles.noTrends}>暫時未有新動態</Text>
-            )}
-          />
-        ) : null}
-        {activeTab === 'All' ? (
-          <View>
-            <View style={styles.regionFilterWrap}>
-              <RegionFilter selected={regionFilter} onChange={setRegionFilter} />
-            </View>
-            <FeedList
-              logs={allLogs}
-              loading={loadingAll}
-              empty={<Text style={styles.noTrends}>暫時未有公開紀錄</Text>}
-            />
-          </View>
-        ) : null}
-        {activeTab === 'IG' ? <EmptySocialState buttonLabel="Connect Instagram" /> : null}
-        {activeTab === 'Trends' ? (
+        <View style={styles.prediktSection}>
+          <Text style={styles.sectionTitle}>預言書</Text>
+          <Text style={styles.sectionSubtitle}>Predikt · 創作者社群熱話</Text>
           <View style={styles.trendsWrap}>
             {loadingTrends ? <ActivityIndicator color={colors.primary} /> : null}
-            {!loadingTrends && trends.length === 0 ? <Text style={styles.noTrends}>暫時未有趨勢話題</Text> : null}
+            {!loadingTrends && trends.length === 0 ? (
+              <View style={styles.emptyTrends}>
+                <Text style={styles.emptyText}>暫時未有熱話</Text>
+              </View>
+            ) : null}
             {trends.map((trend) => <TrendCard key={trend.id} trend={trend} />)}
           </View>
-        ) : null}
+        </View>
       </ScrollView>
 
       <MenuDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
@@ -642,10 +546,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden'
   },
   topBar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    zIndex: 1
+    zIndex: 2
   },
   topActions: {
     flexDirection: 'row',
@@ -671,7 +578,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: 12,
+    marginTop: 60,
+    paddingBottom: 8,
     zIndex: 1
   },
   homeProfileButton: {
@@ -707,32 +615,17 @@ const styles = StyleSheet.create({
     fontSize: 22,
     textAlign: 'center'
   },
-  eggButton: {
-    marginTop: 12,
-    width: 80,
-    height: 96,
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    borderBottomLeftRadius: 35,
-    borderBottomRightRadius: 35,
-    backgroundColor: colors.primary,
+  eggSvgButton: {
+    marginTop: 16,
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.primary,
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 5
+    justifyContent: 'center'
   },
-  eggIcon: {
-    fontSize: 28
-  },
-  eggText: {
-    color: colors.textOnDark,
-    fontFamily: fonts.bodyBold,
-    fontSize: 9,
-    letterSpacing: 1,
-    marginTop: 2
+  eggSvgLabel: {
+    color: colors.textOnDarkMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 11,
+    letterSpacing: 2,
+    marginTop: 4
   },
   body: {
     flex: 1,
@@ -745,33 +638,98 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 16,
     borderWidth: 1,
-    borderColor: colors.bodyBorder,
     borderRadius: 16,
-    backgroundColor: colors.bgBodyCard,
-    padding: 16,
+    padding: 16
+  },
+  nudgeCardUrgent: {
+    borderColor: '#E8614A',
+    backgroundColor: '#FFF0EE'
+  },
+  nudgeCardNormal: {
+    borderColor: colors.bodyBorder,
+    backgroundColor: colors.bgBodyCard
+  },
+  nudgeCardMotivational: {
+    borderColor: colors.bodyBorder,
+    backgroundColor: colors.bgBodyMuted
+  },
+  nudgeSimpleCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12
   },
-  nudgeText: {
+  nudgeTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12
+  },
+  deadlineBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5
+  },
+  deadlineBadgeUrgent: {
+    backgroundColor: '#E8614A'
+  },
+  deadlineBadgeToday: {
+    backgroundColor: '#FFF0EE'
+  },
+  deadlineBadgeLater: {
+    backgroundColor: colors.bgBodyMuted
+  },
+  deadlineBadgeText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
+  },
+  deadlineBadgeTextUrgent: {
+    color: colors.textOnDark
+  },
+  deadlineBadgeTextToday: {
+    color: '#E8614A'
+  },
+  deadlineBadgeTextLater: {
+    color: colors.textMuted
+  },
+  nudgeArrowCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  nudgeArrowText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 18
+  },
+  nudgeTaskTitle: {
+    marginTop: 8,
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    lineHeight: 22
+  },
+  nudgeHint: {
+    marginTop: 4,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 12
+  },
+  nudgeSimpleText: {
     flex: 1,
     color: colors.text,
     fontFamily: fonts.bodyMedium,
     fontSize: 15,
     lineHeight: 21
   },
-  arrowButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  arrowText: {
-    color: colors.textOnDark,
-    fontFamily: fonts.bodyBold,
-    fontSize: 22
+  nudgeMotivationText: {
+    flex: 1,
+    color: '#3A3A3A',
+    fontFamily: fonts.bodyMedium,
+    fontSize: 15,
+    lineHeight: 21
   },
   openStudiosSection: {
     marginTop: 22
@@ -872,92 +830,22 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 13
   },
-  contentTabs: {
-    marginTop: 14,
-    marginHorizontal: 16,
-    flexDirection: 'row',
-    gap: 22
-  },
-  contentTab: {
-    paddingBottom: 8,
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent'
-  },
-  activeContentTab: {
-    borderBottomColor: colors.primary
-  },
-  contentTabText: {
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 15
-  },
-  activeContentTabText: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold
-  },
-  emptySocial: {
-    minHeight: 250,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 28
-  },
-  emptyEmoji: {
-    fontSize: 40
-  },
-  emptyTitle: {
-    marginTop: 14,
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 18,
-    textAlign: 'center'
-  },
-  emptyBody: {
-    marginTop: 8,
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center'
-  },
-  blackPill: {
-    marginTop: 18,
-    borderRadius: 999,
-    backgroundColor: colors.bgHero,
-    paddingHorizontal: 20,
-    paddingVertical: 12
-  },
-  blackPillText: {
-    color: colors.textOnDark,
-    fontFamily: fonts.bodyBold,
-    fontSize: 14
-  },
-  primaryPill: {
-    marginTop: 18,
-    borderRadius: 999,
-    backgroundColor: colors.primary,
-    paddingHorizontal: 22,
-    paddingVertical: 12
-  },
-  primaryPillText: {
-    color: colors.textOnDark,
-    fontFamily: fonts.bodyBold,
-    fontSize: 14
-  },
-  feedLoading: {
-    minHeight: 180,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  feedWrap: {
-    paddingTop: 8
-  },
-  regionFilterWrap: {
-    marginTop: 12,
-    paddingHorizontal: 16
+  prediktSection: {
+    marginTop: 24
   },
   trendsWrap: {
     paddingHorizontal: 16,
     paddingTop: 16
+  },
+  emptyTrends: {
+    minHeight: 120,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  emptyText: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 15
   },
   trendCard: {
     marginBottom: 12,
@@ -1035,13 +923,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: fonts.bodyMedium,
     fontSize: 14
-  },
-  noTrends: {
-    marginTop: 60,
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 15,
-    textAlign: 'center'
   },
   pressed: {
     opacity: 0.72
