@@ -45,12 +45,6 @@ type ReplySettings = {
 };
 
 const ANTHROPIC_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_KEY;
-const inboxTabs: Array<{ key: InboxType | 'all'; label: string }> = [
-  { key: 'all', label: '全部' },
-  { key: 'email', label: '電郵' },
-  { key: 'message', label: '訊息' },
-  { key: 'fans', label: '粉絲' }
-];
 const inboxLabels: Record<InboxType, string> = {
   email: '電郵',
   message: '訊息',
@@ -83,7 +77,7 @@ export function ReplyCenter() {
   const { user } = useAuth();
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [threads, setThreads] = useState<ReplyThread[]>([]);
-  const [activeInbox, setActiveInbox] = useState<InboxType | 'all'>('all');
+  const [activeTab, setActiveTab] = useState('全部');
   const [loading, setLoading] = useState(true);
   const [newSheetVisible, setNewSheetVisible] = useState(false);
   const [selectedThread, setSelectedThread] = useState<ReplyThread | null>(null);
@@ -153,8 +147,17 @@ export function ReplyCenter() {
   }, [loadThreads]);
 
   const filteredThreads = useMemo(
-    () => threads.filter((thread) => activeInbox === 'all' || thread.inbox_type === activeInbox),
-    [activeInbox, threads]
+    () => {
+      const tabToInbox: Record<string, InboxType | null> = {
+        全部: null,
+        電郵: 'email',
+        訊息: 'message',
+        粉絲: 'fans'
+      };
+      const inboxType = tabToInbox[activeTab];
+      return threads.filter((thread) => !inboxType || thread.inbox_type === inboxType);
+    },
+    [activeTab, threads]
   );
 
   async function createThread(draft: {
@@ -212,19 +215,36 @@ export function ReplyCenter() {
 
   return (
     <View style={styles.root}>
-      <ScrollView
-        horizontal
+      <ScrollView 
+        horizontal 
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.inboxTabs}
+        contentContainerStyle={{ 
+          paddingHorizontal: 16, 
+          paddingVertical: 8,
+          gap: 8,
+          flexDirection: 'row',
+          alignItems: 'center',
+        }}
       >
-        {inboxTabs.map((tab) => (
+        {['全部', '電郵', '訊息', '粉絲'].map((tab) => (
           <TouchableOpacity
-            key={tab.key}
-            style={[styles.inboxTab, activeInbox === tab.key && styles.inboxTabActive]}
-            onPress={() => setActiveInbox(tab.key)}
+            key={tab}
+            onPress={() => setActiveTab(tab)}
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 6,
+              borderRadius: 999,
+              backgroundColor: activeTab === tab ? '#5C2A22' : '#f9fafb',
+              borderWidth: 1,
+              borderColor: activeTab === tab ? '#5C2A22' : '#e5e7eb',
+            }}
           >
-            <Text style={[styles.inboxTabText, activeInbox === tab.key && styles.inboxTabTextActive]}>
-              {tab.label}
+            <Text style={{
+              fontSize: 13,
+              color: activeTab === tab ? '#ffffff' : '#6b7280',
+              fontWeight: activeTab === tab ? '600' : '400',
+            }}>
+              {tab}
             </Text>
           </TouchableOpacity>
         ))}
@@ -535,31 +555,6 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.bgBody
-  },
-  inboxTabs: {
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    gap: 8
-  },
-  inboxTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.bodyBorder,
-    backgroundColor: colors.bgBodyMuted
-  },
-  inboxTabActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary
-  },
-  inboxTabText: {
-    color: colors.textMuted,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 13
-  },
-  inboxTabTextActive: {
-    color: colors.textOnDark
   },
   loading: {
     flex: 1,
