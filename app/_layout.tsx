@@ -36,7 +36,7 @@ function RootNavigator() {
 
   useEffect(() => {
     if (session?.user) {
-      registerPushToken(session.user.id);
+      registerPushToken(session.user.id).catch(() => undefined);
     }
   }, [session]);
 

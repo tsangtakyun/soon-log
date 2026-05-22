@@ -1,8 +1,11 @@
+import { useEventListener } from 'expo';
 import { router } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -29,6 +32,10 @@ type TopicRoom = {
   invite_code?: string | null;
   member_count?: number | null;
   last_clip_at?: string | null;
+  clip_count?: number | null;
+  latest_caption?: string | null;
+  latest_video_url?: string | null;
+  latest_image_url?: string | null;
 };
 
 function formatActivity(value?: string | null) {
@@ -63,18 +70,67 @@ function MiniTodayLogCard({ log }: { log: Log }) {
 }
 
 function RoomCard({ room, onPress }: { room: TopicRoom; onPress: () => void }) {
+  const hasLatestClip = Boolean(room.clip_count);
+
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.roomCard, pressed && styles.pressed]}>
       <View style={styles.roomHeader}>
         <Text style={styles.privacyBadge}>{room.privacy === 'open' ? '🌐 Open Studio' : '🔒 私密'}</Text>
+        {hasLatestClip ? <Text style={styles.clipCountBadge}>🎬 {room.clip_count} clips</Text> : null}
       </View>
       <Text numberOfLines={1} style={styles.roomName}>{room.name}</Text>
       <Text numberOfLines={2} style={styles.roomTopic}>{room.topic}</Text>
+      {hasLatestClip ? (
+        <View style={styles.roomPreview}>
+          {room.latest_video_url ? (
+            <RoomVideoPreview url={room.latest_video_url} />
+          ) : room.latest_image_url ? (
+            <Image source={{ uri: room.latest_image_url }} style={styles.roomPreviewImage} />
+          ) : (
+            <View style={styles.roomPreviewFallback}>
+              <Text style={styles.roomPreviewIcon}>🎬</Text>
+            </View>
+          )}
+          <View style={styles.roomPreviewMeta}>
+            <Text style={styles.roomPreviewLabel}>最新 Clip</Text>
+            <Text numberOfLines={2} style={styles.roomPreviewCaption}>{room.latest_caption || '有新製作進度'}</Text>
+          </View>
+        </View>
+      ) : null}
       <View style={styles.roomMeta}>
         <Text style={styles.memberCount}>{room.member_count ?? 0} 位成員</Text>
         <Text style={styles.lastActivity}>{formatActivity(room.last_clip_at ?? room.updated_at ?? room.created_at)}</Text>
       </View>
     </Pressable>
+  );
+}
+
+function RoomVideoPreview({ url }: { url: string }) {
+  const player = useVideoPlayer(url, (videoPlayer) => {
+    videoPlayer.loop = true;
+    videoPlayer.muted = true;
+    videoPlayer.play();
+  });
+
+  useEventListener(player, 'statusChange', ({ status }) => {
+    if (status === 'readyToPlay') {
+      player.play();
+    }
+  });
+
+  useEventListener(player, 'playToEnd', () => {
+    player.replay();
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.roomPreviewVideo}
+      contentFit="cover"
+      nativeControls={false}
+      allowsVideoFrameAnalysis={false}
+      onFirstFrameRender={() => player.play()}
+    />
   );
 }
 
@@ -116,7 +172,7 @@ export default function StudioLogScreen() {
         .in('room_id', roomIds),
       supabase
         .from('topic_clips')
-        .select('room_id, created_at')
+        .select('room_id, created_at, caption, media_urls, video_url')
         .in('room_id', roomIds)
     ]);
 
@@ -131,19 +187,40 @@ export default function StudioLogScreen() {
       memberCounts.set(member.room_id, (memberCounts.get(member.room_id) ?? 0) + 1);
     });
     const lastClips = new Map<string, string>();
+    const clipCounts = new Map<string, number>();
+    const latestClipByRoom = new Map<string, {
+      created_at: string;
+      caption: string | null;
+      media_urls: string[] | null;
+      video_url: string | null;
+    }>();
     (clips ?? []).forEach((clip) => {
+      clipCounts.set(clip.room_id, (clipCounts.get(clip.room_id) ?? 0) + 1);
       const current = lastClips.get(clip.room_id);
       if (!current || new Date(clip.created_at).getTime() > new Date(current).getTime()) {
         lastClips.set(clip.room_id, clip.created_at);
+        latestClipByRoom.set(clip.room_id, {
+          created_at: clip.created_at,
+          caption: clip.caption ?? null,
+          media_urls: Array.isArray(clip.media_urls) ? clip.media_urls : null,
+          video_url: clip.video_url ?? null
+        });
       }
     });
 
     const enriched = roomRows
-      .map((room) => ({
-        ...room,
-        member_count: memberCounts.get(room.id) ?? 0,
-        last_clip_at: lastClips.get(room.id) ?? null
-      }))
+      .map((room) => {
+        const latestClip = latestClipByRoom.get(room.id);
+        return {
+          ...room,
+          member_count: memberCounts.get(room.id) ?? 0,
+          clip_count: clipCounts.get(room.id) ?? 0,
+          last_clip_at: lastClips.get(room.id) ?? null,
+          latest_caption: latestClip?.caption ?? null,
+          latest_video_url: latestClip?.video_url ?? null,
+          latest_image_url: latestClip?.media_urls?.[0] ?? null
+        };
+      })
       .sort((a, b) => {
         const aTime = new Date(a.last_clip_at ?? a.created_at).getTime();
         const bTime = new Date(b.last_clip_at ?? b.created_at).getTime();
@@ -464,7 +541,7 @@ const styles = StyleSheet.create({
   roomHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     gap: 10
   },
   roomName: {
@@ -480,10 +557,66 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 12
   },
+  clipCountBadge: {
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    paddingHorizontal: 9,
+    paddingVertical: 4
+  },
   roomTopic: {
     color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 14,
+    lineHeight: 20
+  },
+  roomPreview: {
+    marginTop: 4,
+    minHeight: 92,
+    overflow: 'hidden',
+    borderRadius: 14,
+    backgroundColor: colors.bgBodyCard,
+    flexDirection: 'row',
+    alignItems: 'stretch'
+  },
+  roomPreviewVideo: {
+    width: 72,
+    height: 128,
+    backgroundColor: colors.bgHero
+  },
+  roomPreviewImage: {
+    width: 72,
+    height: 128,
+    backgroundColor: colors.bgHero
+  },
+  roomPreviewFallback: {
+    width: 72,
+    height: 128,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgHero
+  },
+  roomPreviewIcon: {
+    fontSize: 24
+  },
+  roomPreviewMeta: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'center'
+  },
+  roomPreviewLabel: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
+  },
+  roomPreviewCaption: {
+    marginTop: 4,
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15,
     lineHeight: 20
   },
   roomMeta: {

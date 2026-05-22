@@ -8,5 +8,21 @@
     <false/>
     <key>EXUpdatesLaunchWaitMs</key>
     <integer>0</integer>
+    <key>EXExpoConfig</key>
+    <dict>
+      <key>name</key>
+      <string>SOON LOG</string>
+      <key>slug</key>
+      <string>soon-log</string>
+      <key>scheme</key>
+      <string>soonlog</string>
+      <key>version</key>
+      <string>1.0.0</string>
+      <key>ios</key>
+      <dict>
+        <key>bundleIdentifier</key>
+        <string>network.sooncreator.log</string>
+      </dict>
+    </dict>
   </dict>
 </plist>

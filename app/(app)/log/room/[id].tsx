@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -18,6 +19,7 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ClipPlayer from '@/components/ClipPlayer';
 import { useAuth } from '@/hooks/useAuth';
 import { sendPushNotification } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
@@ -56,6 +58,11 @@ type Clip = {
   notes: string | null;
   media_urls: string[];
   video_url: string | null;
+  time_str: string | null;
+  date_str: string | null;
+  caption_align: 'left' | 'center' | 'right' | null;
+  text_size: 'small' | 'medium' | 'large' | null;
+  background_color: 'cream' | 'black' | null;
   created_at: string;
   username: string | null;
   avatar_url: string | null;
@@ -373,6 +380,9 @@ export default function TopicRoomScreen() {
 }
 
 function ClipCard({ clip, angle }: { clip: Clip; angle?: string | null }) {
+  const playerWidth = Dimensions.get('window').width - 32;
+  const playerHeight = playerWidth * (16 / 9);
+
   return (
     <View style={styles.clipCard}>
       <View style={styles.clipHeader}>
@@ -389,15 +399,25 @@ function ClipCard({ clip, angle }: { clip: Clip; angle?: string | null }) {
         </View>
         {angle ? <Text numberOfLines={1} style={styles.angleBadge}>{angle}</Text> : null}
       </View>
-      {clip.caption ? <Text style={styles.caption}>{clip.caption}</Text> : null}
-      {clip.media_urls?.length ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaRow}>
-          {clip.media_urls.map((url) => <Image key={url} source={{ uri: url }} style={styles.thumbnail} />)}
-        </ScrollView>
+      {(clip.video_url || clip.media_urls?.length > 0) ? (
+        <View style={styles.clipPlayerWrap}>
+          <ClipPlayer clip={clip} width={playerWidth} height={playerHeight} />
+          <Pressable
+            style={styles.clipOpenLayer}
+            onPress={() => router.push(`/(app)/log/clip/${clip.id}`)}
+          />
+        </View>
       ) : null}
+      {!clip.video_url && clip.caption ? <Text style={styles.caption}>{clip.caption}</Text> : null}
       {clip.notes ? <Text style={styles.notes}>📝 製作筆記：{clip.notes}</Text> : null}
-      {clip.video_url ? <Text style={styles.videoUrl}>{clip.video_url}</Text> : null}
-      <Text style={styles.actions}>♡ Like   💬 Comment</Text>
+      <View style={styles.clipActions}>
+        <Pressable onPress={() => Alert.alert('Like', 'Coming soon')}>
+          <Text style={styles.clipActionText}>♡ Like</Text>
+        </Pressable>
+        <Pressable onPress={() => Alert.alert('Comment', 'Coming soon')}>
+          <Text style={styles.clipActionText}>💬 Comment</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -835,17 +855,18 @@ const styles = StyleSheet.create({
     fontSize: 15
   },
   clipCard: {
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.bodyBorder,
     borderRadius: 16,
     backgroundColor: colors.bgBodyCard,
-    padding: 14,
     marginBottom: 12
   },
   clipHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10
+    gap: 10,
+    padding: 14
   },
   clipAvatar: {
     width: 36,
@@ -892,38 +913,35 @@ const styles = StyleSheet.create({
     paddingVertical: 5
   },
   caption: {
-    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingTop: 12,
     color: colors.text,
     fontFamily: fonts.body,
     fontSize: 15,
     lineHeight: 22
   },
-  mediaRow: {
-    paddingTop: 12,
-    gap: 8
+  clipPlayerWrap: {
+    position: 'relative',
+    backgroundColor: colors.bgHero
   },
-  thumbnail: {
-    width: 112,
-    height: 112,
-    borderRadius: 12,
-    backgroundColor: colors.bgBodyMuted
+  clipOpenLayer: {
+    ...StyleSheet.absoluteFillObject
   },
   notes: {
-    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingTop: 12,
     color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 14,
     fontStyle: 'italic',
     lineHeight: 20
   },
-  videoUrl: {
-    marginTop: 8,
-    color: colors.primary,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 13
+  clipActions: {
+    padding: 14,
+    flexDirection: 'row',
+    gap: 16
   },
-  actions: {
-    marginTop: 12,
+  clipActionText: {
     color: colors.textMuted,
     fontFamily: fonts.bodyBold,
     fontSize: 13

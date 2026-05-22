@@ -64,9 +64,10 @@ export default function AppTabs() {
       <Tabs.Screen name="profile/index" options={{ href: null }} />
       <Tabs.Screen name="profile/[username]" options={{ href: null }} />
       <Tabs.Screen name="log/create-room" options={{ href: null }} />
-      <Tabs.Screen name="log/camera" options={{ href: null }} />
-      <Tabs.Screen name="log/preview" options={{ href: null }} />
+      <Tabs.Screen name="log/camera" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+      <Tabs.Screen name="log/preview" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       <Tabs.Screen name="log/room/[id]" options={{ href: null }} />
+      <Tabs.Screen name="log/clip/[id]" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       <Tabs.Screen name="log/[id]" options={{ href: null }} />
       <Tabs.Screen name="topic-room/create" options={{ href: null }} />
       <Tabs.Screen name="work/create" options={{ href: null }} />

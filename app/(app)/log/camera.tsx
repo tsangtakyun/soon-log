@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import {
   Camera,
   useCameraDevice,
@@ -8,6 +9,7 @@ import {
   useMicrophonePermission,
   VideoFile
 } from 'react-native-vision-camera';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/theme/colors';
 
 type DurationOption = '2' | '5';
@@ -26,6 +28,7 @@ function formatDate(date: Date) {
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function TopicClipCameraScreen() {
+  const insets = useSafeAreaInsets();
   const { room_id } = useLocalSearchParams<{ room_id: string }>();
   const roomId = Array.isArray(room_id) ? room_id[0] : room_id;
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -189,6 +192,7 @@ export default function TopicClipCameraScreen() {
 
   return (
     <View style={styles.screen}>
+      <StatusBar hidden />
       <Camera
         ref={cameraRef}
         style={styles.camera}
@@ -218,7 +222,7 @@ export default function TopicClipCameraScreen() {
         </View>
       ) : null}
 
-      <View style={styles.topControls}>
+      <View style={[styles.topControls, { top: insets.top + 10 }]}>
         <TouchableOpacity style={styles.topButton} onPress={() => router.back()}>
           <Text style={styles.topButtonText}>✕</Text>
         </TouchableOpacity>
@@ -233,7 +237,7 @@ export default function TopicClipCameraScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.controls}>
+      <View style={[styles.controls, { bottom: insets.bottom + 28 }]}>
         <View style={styles.zoomRow}>
           {[0.5, 1, 2, 4].map((value) => {
             const active = zoom === value;
@@ -290,13 +294,19 @@ const styles = StyleSheet.create({
   },
   timeOverlay: {
     position: 'absolute',
-    top: 155,
-    left: -36,
-    transform: [{ rotate: '-90deg' }]
+    top: '43%',
+    left: '50%',
+    width: 260,
+    height: 86,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'column',
+    transform: [{ translateX: -130 }, { translateY: -43 }]
   },
   timeText: {
     color: '#fff',
     fontSize: 48,
+    lineHeight: 52,
     fontWeight: '900',
     textShadowColor: 'rgba(0,0,0,0.7)',
     textShadowOffset: { width: 0, height: 2 },
@@ -306,6 +316,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     color: '#fff',
     fontSize: 20,
+    lineHeight: 24,
     fontWeight: '700',
     textShadowColor: 'rgba(0,0,0,0.7)',
     textShadowOffset: { width: 0, height: 1 },
@@ -313,7 +324,6 @@ const styles = StyleSheet.create({
   },
   topControls: {
     position: 'absolute',
-    top: 58,
     left: 16,
     right: 16,
     flexDirection: 'row',
@@ -378,7 +388,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 48,
     alignItems: 'center'
   },
   zoomRow: {

@@ -1,12 +1,15 @@
 import { decode } from 'base64-arraybuffer';
+import { useEventListener } from 'expo';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useMemo, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -24,7 +27,7 @@ import { colors } from '@/theme/colors';
 
 type CaptionAlign = 'left' | 'center' | 'right';
 type TextSize = 'small' | 'medium' | 'large';
-type BackgroundMode = 'cream' | 'black';
+type OverlayVertical = 'top' | 'middle' | 'bottom';
 
 const TEXT_SIZES: Record<TextSize, number> = {
   small: 14,
@@ -32,9 +35,10 @@ const TEXT_SIZES: Record<TextSize, number> = {
   large: 24
 };
 
-const BACKGROUNDS: Record<BackgroundMode, string> = {
-  cream: '#F5F0EB',
-  black: '#000000'
+const OVERLAY_TEXT_SIZES: Record<TextSize, { time: number; date: number }> = {
+  small: { time: 40, date: 17 },
+  medium: { time: 48, date: 20 },
+  large: { time: 58, date: 24 }
 };
 
 function fixedFileUri(uri: string) {
@@ -51,15 +55,69 @@ export default function TopicClipPreviewScreen() {
   const roomId = Array.isArray(params.room_id) ? params.room_id[0] : params.room_id;
   const [caption, setCaption] = useState('');
   const [captionAlign, setCaptionAlign] = useState<CaptionAlign>('center');
+  const [overlayVertical, setOverlayVertical] = useState<OverlayVertical>('middle');
   const [textSize, setTextSize] = useState<TextSize>('medium');
-  const [bgColor, setBgColor] = useState<BackgroundMode>('black');
   const [uploading, setUploading] = useState(false);
+  const [captionEditing, setCaptionEditing] = useState(false);
+  const captionInputRef = useRef<TextInput>(null);
+  const lastPreviewTapRef = useRef(0);
   const fileUri = useMemo(() => uri ? fixedFileUri(uri) : '', [uri]);
   const player = useVideoPlayer(fileUri || null, (videoPlayer) => {
     videoPlayer.loop = true;
+    videoPlayer.muted = true;
     videoPlayer.play();
   });
   const captionFontSize = TEXT_SIZES[textSize];
+  const captionLineHeight = Math.round(captionFontSize * 1.3);
+  const overlayTextSize = OVERLAY_TEXT_SIZES[textSize];
+  const overlayAlignStyle = {
+    alignItems: captionAlign === 'left' ? 'flex-start' : captionAlign === 'right' ? 'flex-end' : 'center'
+  } as const;
+  const overlayVerticalStyle = {
+    top: overlayVertical === 'top' ? '20%' : overlayVertical === 'bottom' ? '68%' : '43%'
+  } as const;
+  const captionPositionStyle = {
+    textAlign: captionAlign,
+    width: 220,
+    fontSize: captionFontSize,
+    lineHeight: captionLineHeight
+  } as const;
+
+  useEffect(() => {
+    if (!fileUri) return;
+    player.loop = true;
+    player.muted = true;
+    player.currentTime = 0;
+    const playTimeout = setTimeout(() => player.play(), 120);
+    return () => clearTimeout(playTimeout);
+  }, [fileUri, player]);
+
+  useEventListener(player, 'statusChange', ({ status }) => {
+    if (status === 'readyToPlay') {
+      player.play();
+    }
+  });
+
+  useEventListener(player, 'playToEnd', () => {
+    player.replay();
+  });
+
+  function beginCaptionEdit() {
+    setCaptionEditing(true);
+    requestAnimationFrame(() => captionInputRef.current?.focus());
+  }
+
+  function handlePreviewPress() {
+    player.play();
+    const now = Date.now();
+    if (now - lastPreviewTapRef.current < 320) {
+      beginCaptionEdit();
+      lastPreviewTapRef.current = 0;
+      return;
+    }
+
+    lastPreviewTapRef.current = now;
+  }
 
   async function saveToLibrary() {
     if (!fileUri) return;
@@ -83,7 +141,7 @@ export default function TopicClipPreviewScreen() {
     setUploading(true);
 
     try {
-      const filename = `topic_clips/${roomId}/${user.id}_${Date.now()}.mp4`;
+      const filename = `topic-clips/${roomId}/${user.id}_${Date.now()}.mp4`;
       const fileContent = await FileSystem.readAsStringAsync(fileUri, {
         encoding: FileSystem.EncodingType.Base64
       });
@@ -109,7 +167,7 @@ export default function TopicClipPreviewScreen() {
           date_str: dateStr,
           caption_align: captionAlign,
           text_size: textSize,
-          background_color: bgColor
+          background_color: 'black'
         });
 
       if (insertError) throw insertError;
@@ -136,52 +194,82 @@ export default function TopicClipPreviewScreen() {
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.screen, { backgroundColor: BACKGROUNDS[bgColor] }]}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 18 }]}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.previewWrap, { backgroundColor: BACKGROUNDS[bgColor] }]}>
+        <StatusBar hidden />
+        <Pressable onPress={handlePreviewPress} style={styles.previewWrap}>
           <VideoView
             player={player}
             style={styles.video}
-            contentFit="contain"
+            contentFit="cover"
             nativeControls={false}
+            allowsVideoFrameAnalysis={false}
+            onFirstFrameRender={() => player.play()}
           />
-          <View pointerEvents="none" style={styles.timeOverlay}>
-            <Text style={styles.timeText}>{timeStr}</Text>
-            <Text style={styles.dateText}>{dateStr}</Text>
-          </View>
-          {caption.trim() ? (
+          <View pointerEvents="box-none" style={[styles.timeOverlay, overlayVerticalStyle, overlayAlignStyle]}>
             <Text
-              pointerEvents="none"
               style={[
-                styles.captionOverlay,
+                styles.timeText,
                 {
-                  textAlign: captionAlign,
-                  fontSize: captionFontSize,
-                  left: captionAlign === 'left' ? 24 : 42,
-                  right: captionAlign === 'right' ? 24 : 42
+                  fontSize: overlayTextSize.time,
+                  lineHeight: Math.round(overlayTextSize.time * 1.08)
                 }
               ]}
             >
-              {caption}
+              {timeStr}
             </Text>
-          ) : null}
-        </View>
+            <Text
+              style={[
+                styles.dateText,
+                {
+                  fontSize: overlayTextSize.date,
+                  lineHeight: Math.round(overlayTextSize.date * 1.2)
+                }
+              ]}
+            >
+              {dateStr}
+            </Text>
+            {captionEditing ? (
+              <TextInput
+                ref={captionInputRef}
+                value={caption}
+                onChangeText={setCaption}
+                placeholder="輸入字幕..."
+                placeholderTextColor="rgba(255,255,255,0.68)"
+                maxLength={100}
+                multiline
+                returnKeyType="done"
+                blurOnSubmit
+                onSubmitEditing={() => {
+                  setCaptionEditing(false);
+                  Keyboard.dismiss();
+                }}
+                onBlur={() => setCaptionEditing(false)}
+                style={[
+                  styles.captionInlineInput,
+                  captionPositionStyle
+                ]}
+              />
+            ) : caption.trim() ? (
+              <Text
+                style={[
+                  styles.captionOverlay,
+                  captionPositionStyle
+                ]}
+              >
+                {caption}
+              </Text>
+            ) : (
+              <Text pointerEvents="none" style={styles.captionHint}>雙擊加入字幕</Text>
+            )}
+          </View>
+        </Pressable>
 
         <View style={styles.panel}>
-          <TextInput
-            value={caption}
-            onChangeText={setCaption}
-            placeholder="加入字幕..."
-            placeholderTextColor="rgba(255,255,255,0.55)"
-            maxLength={100}
-            multiline
-            style={styles.captionInput}
-          />
-
           <OptionRow
             label="字幕"
             options={[
@@ -193,6 +281,16 @@ export default function TopicClipPreviewScreen() {
             onSelect={(value) => setCaptionAlign(value as CaptionAlign)}
           />
           <OptionRow
+            label="位置"
+            options={[
+              ['top', '上'],
+              ['middle', '中'],
+              ['bottom', '下']
+            ]}
+            active={overlayVertical}
+            onSelect={(value) => setOverlayVertical(value as OverlayVertical)}
+          />
+          <OptionRow
             label="大小"
             options={[
               ['small', '小'],
@@ -201,15 +299,6 @@ export default function TopicClipPreviewScreen() {
             ]}
             active={textSize}
             onSelect={(value) => setTextSize(value as TextSize)}
-          />
-          <OptionRow
-            label="背景"
-            options={[
-              ['cream', '🤍 淺色'],
-              ['black', '🖤 深色']
-            ]}
-            active={bgColor}
-            onSelect={(value) => setBgColor(value as BackgroundMode)}
           />
 
           <View style={styles.actions}>
@@ -269,20 +358,22 @@ function OptionRow({
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1
+    flex: 1,
+    backgroundColor: '#000'
   },
   scroll: {
     flex: 1
   },
   content: {
-    paddingTop: 54
+    paddingTop: 18
   },
   previewWrap: {
     alignSelf: 'center',
-    width: '92%',
+    width: '85%',
     aspectRatio: 9 / 16,
     borderRadius: 24,
-    overflow: 'hidden'
+    overflow: 'hidden',
+    backgroundColor: '#000'
   },
   video: {
     width: '100%',
@@ -290,13 +381,18 @@ const styles = StyleSheet.create({
   },
   timeOverlay: {
     position: 'absolute',
-    top: 142,
-    left: -34,
-    transform: [{ rotate: '-90deg' }]
+    left: '50%',
+    width: 300,
+    minHeight: 132,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'column',
+    transform: [{ translateX: -150 }, { translateY: -66 }]
   },
   timeText: {
     color: '#fff',
     fontSize: 48,
+    lineHeight: 52,
     fontWeight: '900',
     textShadowColor: 'rgba(0,0,0,0.7)',
     textShadowOffset: { width: 0, height: 2 },
@@ -306,16 +402,39 @@ const styles = StyleSheet.create({
     marginTop: 4,
     color: '#fff',
     fontSize: 20,
+    lineHeight: 24,
     fontWeight: '700',
     textShadowColor: 'rgba(0,0,0,0.7)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4
   },
   captionOverlay: {
-    position: 'absolute',
-    bottom: 72,
+    marginTop: 12,
     color: '#fff',
     fontWeight: '800',
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 5
+  },
+  captionInlineInput: {
+    minHeight: 40,
+    marginTop: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.38)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: '#fff',
+    fontFamily: fonts.bodyBold,
+    fontWeight: '800',
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 5
+  },
+  captionHint: {
+    marginTop: 12,
+    color: 'rgba(255,255,255,0.72)',
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
     textShadowColor: 'rgba(0,0,0,0.7)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 5
@@ -324,16 +443,6 @@ const styles = StyleSheet.create({
     marginTop: 18,
     paddingHorizontal: 16,
     gap: 14
-  },
-  captionInput: {
-    minHeight: 54,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: '#fff',
-    fontFamily: fonts.bodyMedium,
-    fontSize: 16
   },
   optionRow: {
     flexDirection: 'row',
