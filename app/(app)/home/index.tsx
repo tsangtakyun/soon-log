@@ -182,7 +182,7 @@ function BlackBoxSection({ studios }: { studios: OpenStudio[] }) {
   return (
     <View style={styles.openStudiosSection}>
       <View style={styles.sectionBannerCard}>
-        <Image source={require('../../../assets/home-black-box-banner.jpg')} style={styles.sectionBannerImage} />
+        <Image source={require('../../../assets/home-black-box-banner.png')} style={styles.sectionBannerImage} />
         <View style={styles.sectionBannerOverlay}>
           <Text style={styles.sectionBannerTitle}>Black Box 黑盒</Text>
           <Text style={styles.sectionBannerSubtitle}>紀錄製作的電子黑盒</Text>
@@ -484,14 +484,16 @@ export default function HomeScreen() {
       <View style={[styles.hero, { height: heroHeight }]}>
         <StarNoise heroHeight={heroHeight} screenWidth={screenWidth} />
         <View style={[styles.topBar, { top: insets.top + 14 }]}>
-          <Pressable onPress={() => setDrawerOpen(true)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
-            <Feather name="menu" size={20} color={colors.text} />
-          </Pressable>
           <View style={styles.topActions}>
+            <Pressable onPress={() => setDrawerOpen(true)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
+              <Feather name="menu" size={20} color={colors.text} />
+            </Pressable>
             <Pressable onPress={() => Alert.alert('AI Credits', `你今日仲有 ${credits} credits`)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
               <Feather name="circle" size={20} color={colors.text} />
               <Text style={styles.creditTiny}>{credits}</Text>
             </Pressable>
+          </View>
+          <View style={styles.topActions}>
             <Pressable onPress={() => router.push('/(app)/home/referrals')} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
               <Feather name="gift" size={20} color={colors.text} />
             </Pressable>
@@ -530,7 +532,7 @@ export default function HomeScreen() {
 
         <View style={styles.prediktSection}>
           <View style={styles.sectionBannerCard}>
-            <Image source={require('../../../assets/home-predikt-banner.jpg')} style={styles.sectionBannerImage} />
+            <Image source={require('../../../assets/home-predikt-banner.png')} style={styles.sectionBannerImage} />
             <View style={styles.sectionBannerOverlay}>
               <Text style={styles.sectionBannerTitle}>預言書</Text>
               <Text style={styles.sectionBannerSubtitle}>Predikt · 創作者社群熱話</Text>
@@ -640,8 +642,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   eggImage: {
-    width: 100,
-    height: 100,
+    width: 80,
+    height: 80,
     resizeMode: 'contain'
   },
   body: {
