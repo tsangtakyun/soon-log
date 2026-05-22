@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
+import { sendPushNotification } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
@@ -64,6 +65,16 @@ type SelectedImage = {
   id: string;
   previewUri: string;
   base64: string;
+};
+
+type PushMember = {
+  profile?: {
+    expo_push_token: string | null;
+    username: string | null;
+  } | Array<{
+    expo_push_token: string | null;
+    username: string | null;
+  }> | null;
 };
 
 function timeAgo(value: string) {
@@ -312,7 +323,7 @@ export default function TopicRoomScreen() {
             <Text style={styles.fabText}>+ 新增 Clip</Text>
           </Pressable>
           <AddClipSheet
-            roomId={room.id}
+            room={room}
             visible={sheetOpen}
             onClose={() => setSheetOpen(false)}
             onSaved={() => {
@@ -368,18 +379,18 @@ function ClipCard({ clip, angle }: { clip: Clip; angle?: string | null }) {
 }
 
 function AddClipSheet({
-  roomId,
+  room,
   visible,
   onClose,
   onSaved
 }: {
-  roomId: string;
+  room: Room;
   visible: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [caption, setCaption] = useState('');
   const [notes, setNotes] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
@@ -421,7 +432,7 @@ function AddClipSheet({
       const mediaUrls = await uploadImages(clipId, images);
       const { error } = await supabase.from('topic_clips').insert({
         id: clipId,
-        room_id: roomId,
+        room_id: room.id,
         user_id: user.id,
         caption: caption.trim() || null,
         notes: notes.trim() || null,
@@ -429,6 +440,26 @@ function AddClipSheet({
         video_url: videoUrl.trim() || null
       });
       if (error) throw error;
+
+      const { data: members } = await supabase
+        .from('topic_room_members')
+        .select('profile:profiles!topic_room_members_user_id_fkey(expo_push_token, username)')
+        .eq('room_id', room.id)
+        .neq('user_id', user.id);
+
+      const username = profile?.username || user.email?.split('@')[0] || 'soon';
+      await Promise.all(((members ?? []) as PushMember[]).map((member) => {
+        const memberProfile = Array.isArray(member.profile) ? member.profile[0] : member.profile;
+        const token = memberProfile?.expo_push_token;
+        if (!token) return Promise.resolve();
+        return sendPushNotification(
+          token,
+          room.name,
+          `@${username} 分享咗新製作進度`,
+          { type: 'new_clip', room_id: room.id }
+        );
+      }));
+
       setCaption('');
       setNotes('');
       setVideoUrl('');
