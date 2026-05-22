@@ -112,8 +112,8 @@ export default function AppTabs() {
       <Tabs.Screen
         name="mayan/index"
         options={{
-          title: 'Mayan',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>◎</Text>
+          title: 'Reply',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>💬</Text>
         }}
       />
       <Tabs.Screen name="feed/index" options={{ href: null }} />
@@ -137,6 +137,7 @@ export default function AppTabs() {
       <Tabs.Screen name="home/trend/[id]" options={{ href: null }} />
       <Tabs.Screen name="home/referrals" options={{ href: null }} />
       <Tabs.Screen name="home/discover" options={{ href: null }} />
+      <Tabs.Screen name="settings/reply" options={{ href: null }} />
     </Tabs>
   );
 }

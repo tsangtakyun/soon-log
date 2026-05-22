@@ -55,6 +55,11 @@ export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: ()
     router.push('/profile');
   };
 
+  const openReplySettings = () => {
+    onClose();
+    router.push('/(app)/settings/reply');
+  };
+
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <View style={styles.modalRoot}>
@@ -86,7 +91,7 @@ export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: ()
 
           <View style={styles.menu}>
             <DrawerItem icon="⚙️" label="設定" onPress={openProfile} />
-            <DrawerItem icon="🧠" label="AI 設定" />
+            <DrawerItem icon="🧠" label="AI 設定" onPress={openReplySettings} />
             <Divider />
             <DrawerItem icon="👤" label="邀請管理" />
             <Divider />

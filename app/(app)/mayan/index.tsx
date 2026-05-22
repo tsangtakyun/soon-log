@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View
 } from 'react-native';
 import Markdown from 'react-native-markdown-display';
@@ -18,6 +19,7 @@ import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 import { useAuth } from '@/hooks/useAuth';
 import { MayanMessageRole } from '@/types';
+import { ReplyCenter } from '@/components/ReplyCenter';
 
 const ANTHROPIC_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_KEY;
 
@@ -51,6 +53,7 @@ type AnthropicTextBlock = {
 
 export default function MayanScreen() {
   const { user } = useAuth();
+  const [mode, setMode] = useState<'reply' | 'chat'>('reply');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -226,52 +229,77 @@ export default function MayanScreen() {
         style={styles.container}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>◎ Mayan</Text>
-          <Text style={styles.subtitle}>你嘅 AI 創作助手</Text>
+          <Text style={styles.title}>💬 Reply</Text>
+          <Text style={styles.subtitle}>回覆中心同 Mayan AI 助手</Text>
         </View>
 
-        {initializing ? (
-          <View style={styles.loadingPanel}>
-            <ActivityIndicator color={colors.accent} />
-          </View>
-        ) : (
-          <FlatList
-            data={displayMessages}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMessage}
-            inverted
-            contentContainerStyle={styles.messagesContent}
-            keyboardShouldPersistTaps="handled"
-          />
-        )}
-
-        {loading && (
-          <View style={styles.thinkingRow}>
-            <View style={styles.avatarSmall}>
-              <Text style={styles.avatarTextSmall}>M</Text>
-            </View>
-            <ActivityIndicator color={colors.gold} />
-            <Text style={styles.thinkingText}>Mayan 諗緊...</Text>
-          </View>
-        )}
-
-        <View style={styles.inputBar}>
-          <TextInput
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="問 Mayan..."
-            placeholderTextColor={colors.textMuted}
-            multiline
-            style={styles.input}
-          />
-          <Pressable
-            style={[styles.sendButton, (!inputText.trim() || loading) && styles.sendButtonDisabled]}
-            onPress={() => sendMessage()}
-            disabled={!inputText.trim() || loading}
+        <View style={styles.segmentedControl}>
+          <TouchableOpacity
+            style={[styles.segment, mode === 'reply' && styles.segmentActive]}
+            onPress={() => setMode('reply')}
           >
-            <Text style={styles.sendButtonText}>↑</Text>
-          </Pressable>
+            <Text style={mode === 'reply' ? styles.segmentTextActive : styles.segmentText}>
+              回覆中心
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segment, mode === 'chat' && styles.segmentActive]}
+            onPress={() => setMode('chat')}
+          >
+            <Text style={mode === 'chat' ? styles.segmentTextActive : styles.segmentText}>
+              AI 助手
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        {mode === 'reply' ? (
+          <ReplyCenter />
+        ) : (
+          <>
+            {initializing ? (
+              <View style={styles.loadingPanel}>
+                <ActivityIndicator color={colors.accent} />
+              </View>
+            ) : (
+              <FlatList
+                data={displayMessages}
+                keyExtractor={(item) => item.id}
+                renderItem={renderMessage}
+                inverted
+                contentContainerStyle={styles.messagesContent}
+                keyboardShouldPersistTaps="handled"
+              />
+            )}
+
+            {loading && (
+              <View style={styles.thinkingRow}>
+                <View style={styles.avatarSmall}>
+                  <Text style={styles.avatarTextSmall}>M</Text>
+                </View>
+                <ActivityIndicator color={colors.gold} />
+                <Text style={styles.thinkingText}>Mayan 諗緊...</Text>
+              </View>
+            )}
+
+            <View style={styles.inputBar}>
+              <TextInput
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="問 Mayan..."
+                placeholderTextColor={colors.textMuted}
+                multiline
+                style={styles.input}
+              />
+              <Pressable
+                style={[styles.sendButton, (!inputText.trim() || loading) && styles.sendButtonDisabled]}
+                onPress={() => sendMessage()}
+                disabled={!inputText.trim() || loading}
+              >
+                <Text style={styles.sendButtonText}>↑</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -303,6 +331,36 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     color: colors.textMuted
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: '#f9fafb',
+    borderRadius: 10,
+    padding: 4,
+    marginHorizontal: 16,
+    marginVertical: 12
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  segmentActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2
+  },
+  segmentText: {
+    fontSize: 14,
+    color: '#6b7280'
+  },
+  segmentTextActive: {
+    fontSize: 14,
+    color: '#5C2A22',
+    fontWeight: '600'
   },
   loadingPanel: {
     flex: 1,
