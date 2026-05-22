@@ -23,6 +23,7 @@ export function LogCard({ log, onPress }: { log: Log; onPress?: () => void }) {
   const { user } = useAuth();
   const [isLiked, setIsLiked] = useState(Boolean(log.liked_by_me));
   const [likeCount, setLikeCount] = useState(log.like_count ?? 0);
+  const [isFollowing, setIsFollowing] = useState(false);
   const profile = log.profile;
   const username = profile?.username ?? 'soon';
   const displayName = profile?.display_name || username;
@@ -33,6 +34,21 @@ export function LogCard({ log, onPress }: { log: Log; onPress?: () => void }) {
     setIsLiked(Boolean(log.liked_by_me));
     setLikeCount(log.like_count ?? 0);
   }, [log.liked_by_me, log.like_count]);
+
+  useEffect(() => {
+    if (!user || log.user_id === user.id) {
+      setIsFollowing(false);
+      return;
+    }
+
+    supabase
+      .from('follows')
+      .select('id')
+      .eq('follower_id', user.id)
+      .eq('following_id', log.user_id)
+      .maybeSingle()
+      .then(({ data }) => setIsFollowing(Boolean(data)));
+  }, [log.user_id, user]);
 
   const openDetail = () => {
     if (onPress) {
@@ -81,6 +97,42 @@ export function LogCard({ log, onPress }: { log: Log; onPress?: () => void }) {
     }
   };
 
+  const toggleFollow = async (event?: GestureResponderEvent) => {
+    event?.stopPropagation();
+    if (!user || log.user_id === user.id) return;
+
+    if (isFollowing) {
+      setIsFollowing(false);
+      const { error } = await supabase
+        .from('follows')
+        .delete()
+        .eq('follower_id', user.id)
+        .eq('following_id', log.user_id);
+
+      if (error) setIsFollowing(true);
+      return;
+    }
+
+    setIsFollowing(true);
+    const { error } = await supabase
+      .from('follows')
+      .insert({ follower_id: user.id, following_id: log.user_id });
+
+    if (error) setIsFollowing(false);
+  };
+
+  const followButton = user?.id !== log.user_id ? (
+    <Pressable
+      onPress={toggleFollow}
+      hitSlop={8}
+      style={[styles.followButton, isFollowing && styles.followingButton]}
+    >
+      <Text style={[styles.followText, isFollowing && styles.followingText]}>
+        {isFollowing ? '已追蹤' : '追蹤'}
+      </Text>
+    </Pressable>
+  ) : null;
+
   return (
     <Pressable onPress={openDetail} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       {hasCover ? (
@@ -90,16 +142,22 @@ export function LogCard({ log, onPress }: { log: Log; onPress?: () => void }) {
             colors={['transparent', 'rgba(0,0,0,0.56)']}
             style={styles.coverGradient}
           >
-            <Pressable onPress={openProfile} hitSlop={8}>
-              <Text style={styles.overlayName}>@{username}</Text>
-            </Pressable>
+            <View style={styles.overlayUserRow}>
+              <Pressable onPress={openProfile} hitSlop={8}>
+                <Text style={styles.overlayName}>@{username}</Text>
+              </Pressable>
+              {followButton}
+            </View>
           </LinearGradient>
         </View>
       ) : (
         <View style={styles.textOnlyHeader}>
-          <Pressable onPress={openProfile} hitSlop={8}>
-            <Text style={styles.username}>@{username}</Text>
-          </Pressable>
+          <View style={styles.userRow}>
+            <Pressable onPress={openProfile} hitSlop={8}>
+              <Text style={styles.username}>@{username}</Text>
+            </Pressable>
+            {followButton}
+          </View>
         </View>
       )}
 
@@ -174,14 +232,45 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 15
   },
+  overlayUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start'
+  },
   textOnlyHeader: {
     paddingHorizontal: 18,
     paddingTop: 18
+  },
+  userRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start'
   },
   username: {
     color: colors.text,
     fontFamily: fonts.bodyBold,
     fontSize: 15
+  },
+  followButton: {
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 3
+  },
+  followingButton: {
+    borderColor: colors.bodyBorder,
+    backgroundColor: colors.bgBodyMuted
+  },
+  followText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 11
+  },
+  followingText: {
+    color: colors.textMuted
   },
   content: {
     padding: 16,

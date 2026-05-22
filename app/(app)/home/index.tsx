@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,14 +14,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MenuDrawer } from '@/components/MenuDrawer';
+import { LogCard } from '@/components/LogCard';
 import { SavedSheet } from '@/components/SavedSheet';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
-import { WorkItem } from '@/types';
+import { Log, WorkItem } from '@/types';
 
-type ContentTab = 'All' | 'Trends' | 'YouTube' | 'IG';
+type ContentTab = 'Following' | 'Trends' | 'All' | 'IG';
 type TrendAngle = { emoji: string; name: string; percentage: number };
 type Trend = {
   id: string;
@@ -41,7 +42,13 @@ type OpenStudio = {
 };
 
 const starColors = ['#ef4444', '#3b82f6', '#eab308', '#22c55e', '#a855f7'];
-const tabs: ContentTab[] = ['All', 'Trends', 'YouTube', 'IG'];
+const tabs: ContentTab[] = ['Following', 'Trends', 'All', 'IG'];
+const tabLabels: Record<ContentTab, string> = {
+  Following: 'Following',
+  Trends: 'Trends',
+  All: '全部',
+  IG: 'IG'
+};
 
 function formatDueDate(value: string) {
   return new Intl.DateTimeFormat('zh-HK', { month: 'short', day: 'numeric' }).format(new Date(`${value}T00:00:00`));
@@ -78,6 +85,52 @@ function EmptySocialState({ buttonLabel }: { buttonLabel: string }) {
       >
         <Text style={styles.blackPillText}>{buttonLabel}</Text>
       </Pressable>
+    </View>
+  );
+}
+
+async function enrichLogs(logs: Log[], userId?: string | null): Promise<Log[]> {
+  const ids = logs.map((log) => log.id);
+  if (ids.length === 0) return logs;
+
+  const [{ data: likes }, { data: comments }, liked] = await Promise.all([
+    supabase.from('likes').select('log_id').in('log_id', ids),
+    supabase.from('comments').select('log_id').in('log_id', ids),
+    userId
+      ? supabase.from('likes').select('log_id').eq('user_id', userId).in('log_id', ids)
+      : Promise.resolve({ data: [] as { log_id: string }[] })
+  ]);
+
+  return logs.map((log) => ({
+    ...log,
+    like_count: likes?.filter((row) => row.log_id === log.id).length ?? 0,
+    comment_count: comments?.filter((row) => row.log_id === log.id).length ?? 0,
+    liked_by_me: liked.data?.some((row) => row.log_id === log.id) ?? false
+  }));
+}
+
+function FeedList({
+  logs,
+  loading,
+  empty
+}: {
+  logs: Log[];
+  loading: boolean;
+  empty: ReactNode;
+}) {
+  if (loading) {
+    return (
+      <View style={styles.feedLoading}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (logs.length === 0) return <>{empty}</>;
+
+  return (
+    <View style={styles.feedWrap}>
+      {logs.map((log) => <LogCard key={log.id} log={log} />)}
     </View>
   );
 }
@@ -144,10 +197,15 @@ export default function HomeScreen() {
   const { user, profile } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<ContentTab>('All');
+  const [activeTab, setActiveTab] = useState<ContentTab>('Following');
   const [task, setTask] = useState<WorkItem | null>(null);
   const [trends, setTrends] = useState<Trend[]>([]);
   const [openStudios, setOpenStudios] = useState<OpenStudio[]>([]);
+  const [followingLogs, setFollowingLogs] = useState<Log[]>([]);
+  const [allLogs, setAllLogs] = useState<Log[]>([]);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [loadingFollowing, setLoadingFollowing] = useState(false);
+  const [loadingAll, setLoadingAll] = useState(false);
   const [loadingTrends, setLoadingTrends] = useState(false);
   const [credits, setCredits] = useState(30);
   const heroHeight = Math.round(Dimensions.get('window').height * 0.45);
@@ -191,6 +249,64 @@ export default function HomeScreen() {
     }
     setLoadingTrends(false);
   }, []);
+
+  const loadFollowingFeed = useCallback(async () => {
+    if (!user) return;
+    setLoadingFollowing(true);
+
+    const { data: follows, error: followsError } = await supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', user.id);
+
+    if (followsError) {
+      setFollowingLogs([]);
+      setFollowingCount(0);
+      setLoadingFollowing(false);
+      return;
+    }
+
+    const followedIds = [...new Set((follows ?? []).map((follow) => follow.following_id).filter(Boolean))];
+    setFollowingCount(followedIds.length);
+
+    if (followedIds.length === 0) {
+      setFollowingLogs([]);
+      setLoadingFollowing(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('logs')
+      .select('*, profile:profiles!logs_user_id_fkey(*)')
+      .in('user_id', followedIds)
+      .eq('is_published', true)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      setFollowingLogs([]);
+    } else {
+      setFollowingLogs(await enrichLogs((data ?? []) as Log[], user.id));
+    }
+    setLoadingFollowing(false);
+  }, [user]);
+
+  const loadAllFeed = useCallback(async () => {
+    setLoadingAll(true);
+    const { data, error } = await supabase
+      .from('logs')
+      .select('*, profile:profiles!logs_user_id_fkey(*)')
+      .eq('is_published', true)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      setAllLogs([]);
+    } else {
+      setAllLogs(await enrichLogs((data ?? []) as Log[], user?.id));
+    }
+    setLoadingAll(false);
+  }, [user?.id]);
 
   const loadOpenStudios = useCallback(async () => {
     const { data: rooms, error: roomsError } = await supabase
@@ -257,7 +373,9 @@ export default function HomeScreen() {
     loadNudge();
     loadTrends();
     loadOpenStudios();
-  }, [loadNudge, loadOpenStudios, loadTrends]);
+    loadFollowingFeed();
+    loadAllFeed();
+  }, [loadAllFeed, loadFollowingFeed, loadNudge, loadOpenStudios, loadTrends]);
 
   const nudgeMessage = task
     ? `今日要完成：${task.title}${task.due_date ? `，截止 ${formatDueDate(task.due_date)}` : ''}`
@@ -319,13 +437,39 @@ export default function HomeScreen() {
         <View style={styles.contentTabs}>
           {tabs.map((tab) => (
             <Pressable key={tab} onPress={() => setActiveTab(tab)} style={[styles.contentTab, activeTab === tab && styles.activeContentTab]}>
-              <Text style={[styles.contentTabText, activeTab === tab && styles.activeContentTabText]}>{tab}</Text>
+              <Text style={[styles.contentTabText, activeTab === tab && styles.activeContentTabText]}>{tabLabels[tab]}</Text>
             </Pressable>
           ))}
         </View>
 
-        {activeTab === 'All' ? <EmptySocialState buttonLabel="Connect socials" /> : null}
-        {activeTab === 'YouTube' ? <EmptySocialState buttonLabel="Connect YouTube" /> : null}
+        {activeTab === 'Following' ? (
+          <FeedList
+            logs={followingLogs}
+            loading={loadingFollowing}
+            empty={followingCount === 0 ? (
+              <View style={styles.emptySocial}>
+                <Text style={styles.emptyEmoji}>👥</Text>
+                <Text style={styles.emptyTitle}>仲未追蹤任何創作者</Text>
+                <Text style={styles.emptyBody}>去發掘創作者，追蹤佢哋睇最新動態</Text>
+                <Pressable
+                  onPress={() => router.push('/(app)/home/discover')}
+                  style={({ pressed }) => [styles.primaryPill, pressed && styles.pressed]}
+                >
+                  <Text style={styles.primaryPillText}>去發掘</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Text style={styles.noTrends}>暫時未有新動態</Text>
+            )}
+          />
+        ) : null}
+        {activeTab === 'All' ? (
+          <FeedList
+            logs={allLogs}
+            loading={loadingAll}
+            empty={<Text style={styles.noTrends}>暫時未有公開紀錄</Text>}
+          />
+        ) : null}
         {activeTab === 'IG' ? <EmptySocialState buttonLabel="Connect Instagram" /> : null}
         {activeTab === 'Trends' ? (
           <View style={styles.trendsWrap}>
@@ -606,6 +750,26 @@ const styles = StyleSheet.create({
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 14
+  },
+  primaryPill: {
+    marginTop: 18,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 22,
+    paddingVertical: 12
+  },
+  primaryPillText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14
+  },
+  feedLoading: {
+    minHeight: 180,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  feedWrap: {
+    paddingTop: 8
   },
   trendsWrap: {
     paddingHorizontal: 16,
