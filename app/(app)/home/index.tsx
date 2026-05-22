@@ -749,12 +749,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: 'transparent'
+    backgroundColor: 'transparent',
+    alignItems: 'center'
   },
   sectionBannerImage: {
-    width: '100%',
-    height: 31,
-    resizeMode: 'cover'
+    width: '50%',
+    height: 62,
+    resizeMode: 'contain'
   },
   openStudiosStrip: {
     paddingLeft: 16,
