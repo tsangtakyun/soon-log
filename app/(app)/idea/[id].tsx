@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -23,7 +23,6 @@ export default function IdeaDetailScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [idea, setIdea] = useState<Idea | null>(null);
-  const [script, setScript] = useState<Script | null>(null);
   const [generating, setGenerating] = useState(false);
 
   const loadIdea = useCallback(async () => {
@@ -98,25 +97,22 @@ ${idea.tags?.length ? '標籤：' + idea.tags.join(', ') : ''}`
       const text = data?.content?.[0]?.text ?? '';
       const clean = text.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(clean) as Script;
-      setScript(parsed);
+      router.push({
+        pathname: '/(app)/idea/script',
+        params: {
+          hook: parsed.hook,
+          background: parsed.background,
+          test: parsed.test,
+          ending: parsed.ending,
+          title: idea.title || '題材劇本',
+        }
+      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '生成失敗';
       Alert.alert('生成失敗', message);
     } finally {
       setGenerating(false);
     }
-  }
-
-  async function copyScript() {
-    if (!script) return;
-    const full = `【Hook】\n${script.hook}\n\n【背景】\n${script.background}\n\n【主體】\n${script.test}\n\n【結尾】\n${script.ending}`;
-    const clipboard = (globalThis.navigator as { clipboard?: { writeText: (text: string) => Promise<void> } } | undefined)?.clipboard;
-    if (clipboard) {
-      await clipboard.writeText(full);
-      Alert.alert('已複製', '劇本已複製到剪貼板');
-      return;
-    }
-    await Share.share({ message: full });
   }
 
   return (
@@ -174,37 +170,6 @@ ${idea.tags?.length ? '標籤：' + idea.tags.join(', ') : ''}`
                 <Text style={styles.generateButtonText}>🎬 生成劇本</Text>
               </TouchableOpacity>
             )}
-
-            {script ? (
-              <View style={styles.scriptContainer}>
-                <View style={styles.scriptHeader}>
-                  <Text style={styles.scriptTitle}>🎬 60秒 Reel 劇本</Text>
-                  <TouchableOpacity onPress={() => setScript(null)}>
-                    <Text style={styles.scriptClose}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {[
-                  { key: 'hook', label: '🎣 Hook', color: '#E8614A' },
-                  { key: 'background', label: '📖 背景', color: '#7c3aed' },
-                  { key: 'test', label: '🎬 主體', color: '#5C2A22' },
-                  { key: 'ending', label: '🏁 結尾', color: '#34d399' },
-                ].map((section) => (
-                  <View key={section.key} style={styles.scriptSection}>
-                    <Text style={[styles.sectionLabel, { color: section.color }]}>
-                      {section.label}
-                    </Text>
-                    <Text style={styles.sectionContent}>
-                      {script[section.key as keyof Script]}
-                    </Text>
-                  </View>
-                ))}
-
-                <TouchableOpacity style={styles.copyScriptBtn} onPress={copyScript}>
-                  <Text style={styles.copyScriptBtnText}>📋 複製全部劇本</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
 
             {sourceUrl ? (
               <Pressable onPress={() => Linking.openURL(sourceUrl)} style={styles.sourceButton}>
@@ -384,60 +349,6 @@ const styles = StyleSheet.create({
     color: '#5C2A22',
     fontFamily: fonts.bodyBold,
     fontSize: 14
-  },
-  scriptContainer: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  scriptHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  scriptTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0a0a0a'
-  },
-  scriptClose: {
-    color: colors.textMuted,
-    fontSize: 18,
-    fontWeight: '700'
-  },
-  scriptSection: {
-    marginBottom: 14,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  sectionContent: {
-    fontSize: 15,
-    color: '#3A3A3A',
-    lineHeight: 22
-  },
-  copyScriptBtn: {
-    backgroundColor: '#5C2A22',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  copyScriptBtnText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600'
   },
   empty: {
     color: colors.textMuted,
