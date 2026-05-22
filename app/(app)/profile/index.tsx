@@ -12,7 +12,7 @@ import {
   TextInput,
   View
 } from 'react-native';
-import { EmptyState, Screen } from '@/components/ui';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
@@ -51,7 +51,6 @@ export default function OwnProfileScreen() {
   const [followingCount, setFollowingCount] = useState(0);
   const [editing, setEditing] = useState(false);
   const [displayNameInput, setDisplayNameInput] = useState('');
-  const [usernameInput, setUsernameInput] = useState('');
   const [bioInput, setBioInput] = useState('');
   const [regionInput, setRegionInput] = useState<Region>('HK');
   const [saving, setSaving] = useState(false);
@@ -107,18 +106,12 @@ export default function OwnProfileScreen() {
 
   useEffect(() => {
     setDisplayNameInput(profile?.display_name ?? '');
-    setUsernameInput(profile?.username ?? '');
     setBioInput(profile?.bio ?? '');
     setRegionInput(profile?.region ?? 'HK');
   }, [profile]);
 
   const saveProfile = async () => {
     if (!user) return;
-    const username = usernameInput.trim().toLowerCase();
-    if (!username) {
-      Alert.alert('請輸入 username', 'Username 會用喺個人頁連結。');
-      return;
-    }
 
     try {
       setSaving(true);
@@ -126,7 +119,6 @@ export default function OwnProfileScreen() {
         .from('profiles')
         .update({
           display_name: displayNameInput.trim() || null,
-          username,
           bio: bioInput.trim() || null,
           region: regionInput
         })
@@ -203,9 +195,10 @@ export default function OwnProfileScreen() {
   };
 
   const displayName = profile?.display_name || profile?.username || '創作者';
+  const canGoBack = router.canGoBack();
 
   return (
-    <Screen>
+    <View style={styles.screen}>
       <FlatList
         data={logs}
         numColumns={2}
@@ -213,72 +206,100 @@ export default function OwnProfileScreen() {
         onRefresh={() => load().catch((error) => Alert.alert('載入失敗', error.message))}
         refreshing={refreshing}
         ListHeaderComponent={(
-          <View style={styles.header}>
-            <View style={styles.topRow}>
-              <View style={{ flex: 1 }} />
-              <Pressable onPress={() => setEditing((value) => !value)} style={styles.editTopButton}>
-                <Text style={styles.editTopText}>{editing ? '完成' : '編輯'}</Text>
-              </Pressable>
-            </View>
-
-            <Pressable onPress={changeAvatar} disabled={uploadingAvatar} style={styles.avatarButton}>
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-              ) : (
-                <View style={styles.avatarFallback}>
-                  <Text style={styles.avatarText}>{displayName.slice(0, 1).toUpperCase()}</Text>
-                </View>
-              )}
-              <View style={styles.cameraBadge}>
-                <Text style={styles.cameraText}>{uploadingAvatar ? '...' : '◎'}</Text>
-              </View>
-            </Pressable>
-
-            <Text style={styles.name}>{displayName}</Text>
-            <Text style={styles.username}>@{profile?.username ?? 'soon'}</Text>
-            {!!profile?.region && <Text style={styles.regionBadge}>{profile.region}</Text>}
-            {!!profile?.bio && <Text numberOfLines={2} style={styles.bio}>{profile.bio}</Text>}
-
-            <View style={styles.statsRow}>
-              <Pressable onPress={() => Alert.alert('作品', `${logs.length} 個作品`)}>
-                <Text style={styles.statNumber}>{logs.length}</Text>
-                <Text style={styles.statLabel}>作品</Text>
-              </Pressable>
-              <Pressable onPress={() => Alert.alert('追蹤者', `${followerCount} 位追蹤者`)}>
-                <Text style={styles.statNumber}>{followerCount}</Text>
-                <Text style={styles.statLabel}>追蹤者</Text>
-              </Pressable>
-              <Pressable onPress={() => Alert.alert('追蹤中', `${followingCount} 位創作者`)}>
-                <Text style={styles.statNumber}>{followingCount}</Text>
-                <Text style={styles.statLabel}>追蹤中</Text>
-              </Pressable>
-            </View>
-
-            {editing && (
-              <View style={styles.editPanel}>
-                <TextInput value={displayNameInput} onChangeText={setDisplayNameInput} placeholder="顯示名稱" placeholderTextColor={colors.textMuted} style={styles.input} />
-                <TextInput value={usernameInput} onChangeText={setUsernameInput} placeholder="username" placeholderTextColor={colors.textMuted} autoCapitalize="none" style={styles.input} />
-                <TextInput value={bioInput} onChangeText={setBioInput} placeholder="簡介" placeholderTextColor={colors.textMuted} multiline style={[styles.input, styles.bioInput]} />
-                <View style={styles.regionRow}>
-                  {regions.map((region) => (
-                    <Pressable key={region} onPress={() => setRegionInput(region)} style={[styles.regionChoice, regionInput === region && styles.regionChoiceActive]}>
-                      <Text style={[styles.regionChoiceText, regionInput === region && styles.regionChoiceTextActive]}>{region}</Text>
+          <>
+            <View style={styles.hero}>
+              <SafeAreaView edges={['top']} style={styles.heroSafe}>
+                <View style={styles.topRow}>
+                  {canGoBack ? (
+                    <Pressable onPress={() => router.back()} hitSlop={10}>
+                      <Text style={styles.backText}>← 返回</Text>
                     </Pressable>
-                  ))}
-                </View>
-                <View style={styles.actions}>
-                  <Pressable onPress={saveProfile} style={styles.saveButton} disabled={saving}>
-                    <Text style={styles.saveButtonText}>{saving ? '儲存中' : '儲存'}</Text>
+                  ) : (
+                    <View style={styles.topSpacer} />
+                  )}
+                  <Pressable onPress={editing ? saveProfile : () => setEditing(true)} disabled={saving} hitSlop={10}>
+                    <Text style={[styles.editTopText, editing && styles.saveTopText]}>
+                      {editing ? (saving ? '儲存中' : '儲存') : '編輯'}
+                    </Text>
                   </Pressable>
-                  <Pressable onPress={() => setEditing(false)} style={styles.cancelButton}>
-                    <Text style={styles.cancelButtonText}>取消</Text>
-                  </Pressable>
                 </View>
-              </View>
-            )}
 
-            <Text style={styles.section}>我的紀錄</Text>
-          </View>
+                <View style={styles.profileCenter}>
+                  <Pressable onPress={changeAvatar} disabled={uploadingAvatar} style={styles.avatarButton}>
+                    {profile?.avatar_url ? (
+                      <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+                    ) : (
+                      <View style={styles.avatarFallback}>
+                        <Text style={styles.avatarText}>{displayName.slice(0, 1).toUpperCase()}</Text>
+                      </View>
+                    )}
+                    <View style={styles.cameraBadge}>
+                      <Text style={styles.cameraText}>{uploadingAvatar ? '…' : '📷'}</Text>
+                    </View>
+                  </Pressable>
+
+                  {editing ? (
+                    <View style={styles.editFields}>
+                      <TextInput
+                        value={displayNameInput}
+                        onChangeText={setDisplayNameInput}
+                        placeholder="顯示名稱"
+                        placeholderTextColor={colors.textOnDarkMuted}
+                        style={styles.heroInput}
+                      />
+                      <TextInput
+                        value={bioInput}
+                        onChangeText={setBioInput}
+                        placeholder="簡介"
+                        placeholderTextColor={colors.textOnDarkMuted}
+                        multiline
+                        style={[styles.heroInput, styles.heroBioInput]}
+                      />
+                      <View style={styles.regionRow}>
+                        {regions.map((region) => (
+                          <Pressable
+                            key={region}
+                            onPress={() => setRegionInput(region)}
+                            style={[styles.regionChoice, regionInput === region && styles.regionChoiceActive]}
+                          >
+                            <Text style={styles.regionChoiceText}>{region}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  ) : (
+                    <>
+                      <Text style={styles.name}>{displayName}</Text>
+                      <Text style={styles.username}>@{profile?.username ?? 'soon'}</Text>
+                      {!!profile?.region && <Text style={styles.regionBadge}>{profile.region}</Text>}
+                      {!!profile?.bio && <Text numberOfLines={2} style={styles.bio}>{profile.bio}</Text>}
+                    </>
+                  )}
+                </View>
+
+                <View style={styles.statsRow}>
+                  <View style={styles.statColumn}>
+                    <Text style={styles.statNumber}>{followerCount}</Text>
+                    <Text style={styles.statLabel}>追蹤者</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statColumn}>
+                    <Text style={styles.statNumber}>{followingCount}</Text>
+                    <Text style={styles.statLabel}>追蹤中</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statColumn}>
+                    <Text style={styles.statNumber}>{logs.length}</Text>
+                    <Text style={styles.statLabel}>作品</Text>
+                  </View>
+                </View>
+              </SafeAreaView>
+            </View>
+
+            <View style={styles.bodyHeader}>
+              <Text style={styles.section}>我的紀錄</Text>
+            </View>
+          </>
         )}
         renderItem={({ item }) => (
           <Pressable onPress={() => router.push(`/log/${item.id}`)} style={styles.tile}>
@@ -296,249 +317,280 @@ export default function OwnProfileScreen() {
             <Text style={styles.signOutText}>登出</Text>
           </Pressable>
         )}
-        ListEmptyComponent={<EmptyState title="未有紀錄" body="按下記錄頁籤，建立第一篇創作日誌。" />}
+        ListEmptyComponent={(
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>仲未有紀錄</Text>
+            <Text style={styles.emptyBody}>撳下面 ⌛ 開始記錄你嘅創作</Text>
+          </View>
+        )}
         contentContainerStyle={styles.list}
       />
-    </Screen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  list: {
-    paddingBottom: 110
+  screen: {
+    flex: 1,
+    backgroundColor: colors.bgBody
   },
-  header: {
-    paddingTop: 46,
+  list: {
+    backgroundColor: colors.bgBody,
+    paddingBottom: 48
+  },
+  hero: {
+    backgroundColor: colors.bgHero
+  },
+  heroSafe: {
     paddingHorizontal: 16,
-    paddingBottom: 18,
-    alignItems: 'center',
-    gap: 9
+    paddingBottom: 22
   },
   topRow: {
     width: '100%',
     flexDirection: 'row',
-    justifyContent: 'flex-end'
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 38
   },
-  editTopButton: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bgCard,
-    paddingHorizontal: 14,
-    paddingVertical: 7
+  topSpacer: {
+    width: 52
+  },
+  backText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15
   },
   editTopText: {
-    color: colors.text,
+    color: 'rgba(255,255,255,0.7)',
     fontFamily: fonts.bodyBold,
-    fontSize: 13
+    fontSize: 14
+  },
+  saveTopText: {
+    color: colors.primary
+  },
+  profileCenter: {
+    alignItems: 'center',
+    paddingTop: 18
   },
   avatarButton: {
-    width: 88,
-    height: 88
+    width: 108,
+    height: 108,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.bgCard
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 2,
+    borderColor: colors.textOnDark,
+    backgroundColor: colors.bgHeroSurface
   },
   avatarFallback: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 2,
+    borderColor: colors.textOnDark,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accent
+    backgroundColor: colors.primary
   },
   avatarText: {
-    color: colors.bgCard,
-    fontFamily: fonts.heading,
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
     fontSize: 36
   },
   cameraBadge: {
     position: 'absolute',
-    right: 2,
-    bottom: 4,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    right: 4,
+    bottom: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.bg,
-    backgroundColor: colors.gold
+    backgroundColor: colors.primary
   },
   cameraText: {
-    color: colors.bgCard,
+    color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
-    fontSize: 13
+    fontSize: 10
   },
   name: {
-    color: colors.text,
-    fontFamily: fonts.heading,
+    marginTop: 12,
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
     fontSize: 24,
     lineHeight: 30,
     textAlign: 'center'
   },
   username: {
-    color: colors.textMuted,
+    marginTop: 2,
+    color: 'rgba(255,255,255,0.6)',
     fontFamily: fonts.body,
     fontSize: 14
   },
   regionBadge: {
+    marginTop: 10,
     overflow: 'hidden',
     borderRadius: 999,
-    backgroundColor: colors.bgMuted,
-    color: colors.textMuted,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5
+    paddingHorizontal: 12,
+    paddingVertical: 4
   },
   bio: {
+    marginTop: 8,
     maxWidth: 320,
-    color: '#3A3A3A',
+    color: 'rgba(255,255,255,0.7)',
     fontFamily: fonts.body,
     textAlign: 'center',
     fontSize: 14,
     lineHeight: 20
   },
-  statsRow: {
+  editFields: {
     width: '100%',
-    marginTop: 4,
-    paddingVertical: 14,
-    borderTopWidth: 1,
+    maxWidth: 340,
+    marginTop: 14,
+    gap: 12,
+    alignItems: 'center'
+  },
+  heroInput: {
+    width: '100%',
+    minHeight: 42,
     borderBottomWidth: 1,
-    borderColor: colors.border,
-    flexDirection: 'row',
-    justifyContent: 'space-around'
-  },
-  statNumber: {
-    color: colors.text,
+    borderBottomColor: colors.heroBorder,
+    color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
-    fontSize: 18,
-    textAlign: 'center'
+    fontSize: 20,
+    textAlign: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 8
   },
-  statLabel: {
-    marginTop: 2,
-    color: colors.textMuted,
+  heroBioInput: {
+    minHeight: 64,
     fontFamily: fonts.body,
-    fontSize: 12,
-    textAlign: 'center'
-  },
-  editPanel: {
-    alignSelf: 'stretch',
-    gap: 10,
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bgCard
-  },
-  input: {
-    minHeight: 46,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
-    fontFamily: fonts.body,
-    paddingHorizontal: 12,
-    backgroundColor: colors.bg
-  },
-  bioInput: {
-    minHeight: 84,
-    paddingTop: 12,
+    fontSize: 14,
+    lineHeight: 20,
     textAlignVertical: 'top'
   },
   regionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: 8
   },
   regionChoice: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.primary,
     paddingHorizontal: 12,
-    paddingVertical: 8
+    paddingVertical: 7
   },
   regionChoiceActive: {
-    borderColor: colors.gold,
-    backgroundColor: colors.bgMuted
+    backgroundColor: colors.primary
   },
   regionChoiceText: {
-    color: colors.textMuted,
-    fontFamily: fonts.bodyMedium
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
   },
-  regionChoiceTextActive: {
-    color: colors.text
-  },
-  actions: {
+  statsRow: {
+    width: '100%',
+    marginTop: 24,
     flexDirection: 'row',
-    gap: 8
-  },
-  saveButton: {
-    flex: 1,
     alignItems: 'center',
-    borderRadius: 8,
-    backgroundColor: colors.accent,
-    paddingVertical: 12
+    justifyContent: 'space-between'
   },
-  saveButtonText: {
-    color: colors.bgCard,
-    fontFamily: fonts.bodyBold
-  },
-  cancelButton: {
+  statColumn: {
     flex: 1,
-    alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bgCard,
-    paddingVertical: 12
+    alignItems: 'center'
   },
-  cancelButtonText: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold
+  statNumber: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 20,
+    textAlign: 'center'
+  },
+  statLabel: {
+    marginTop: 2,
+    color: 'rgba(255,255,255,0.5)',
+    fontFamily: fonts.body,
+    fontSize: 11,
+    textAlign: 'center'
+  },
+  statDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: 'rgba(255,255,255,0.1)'
+  },
+  bodyHeader: {
+    backgroundColor: colors.bgBody,
+    paddingTop: 24,
+    paddingHorizontal: 16,
+    paddingBottom: 12
   },
   section: {
-    alignSelf: 'flex-start',
     color: colors.text,
     fontFamily: fonts.bodyBold,
-    fontSize: 17,
-    marginTop: 12
+    fontSize: 20
   },
   tile: {
     width: '50%',
     aspectRatio: 1,
-    padding: 4
+    padding: 1,
+    backgroundColor: colors.bgBody
   },
   tileImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 12,
-    backgroundColor: colors.bgCard
+    backgroundColor: colors.bgBodyMuted
   },
   tileFallback: {
     flex: 1,
-    borderRadius: 12,
-    padding: 12,
+    padding: 8,
     justifyContent: 'flex-end',
-    backgroundColor: colors.gold
+    backgroundColor: colors.primary
   },
   tileText: {
-    color: colors.bgCard,
+    color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
-    fontSize: 14
+    fontSize: 12,
+    lineHeight: 16
+  },
+  emptyState: {
+    minHeight: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32
+  },
+  emptyTitle: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    textAlign: 'center'
+  },
+  emptyBody: {
+    marginTop: 6,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center'
   },
   signOutButton: {
     alignSelf: 'center',
-    paddingVertical: 22,
+    marginTop: 32,
+    marginBottom: 48,
+    paddingVertical: 12,
     paddingHorizontal: 20
   },
   signOutText: {
     color: colors.textMuted,
-    fontFamily: fonts.bodyMedium,
+    fontFamily: fonts.body,
     fontSize: 14
   }
 });
