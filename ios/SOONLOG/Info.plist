@@ -53,15 +53,17 @@
       <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>SOON LOG 需要存取相機以拍攝製作相片</string>
+    <string>SOON-LOG 需要使用相機來拍攝製作影片</string>
     <key>NSLocationAlwaysUsageDescription</key>
     <string>SOON LOG 需要你的位置以顯示附近題材</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>SOON LOG 需要你的位置以顯示附近題材</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
+    <string>SOON-LOG 需要使用麥克風來錄製聲音</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>SOON-LOG 需要儲存影片到相簿</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>SOON-LOG 需要存取相片，用作上載創作紀錄圖片。</string>
+    <string>SOON-LOG 需要存取相簿</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

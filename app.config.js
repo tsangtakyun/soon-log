@@ -26,7 +26,9 @@ module.exports = {
           'comgooglemaps'
         ],
         NSLocationWhenInUseUsageDescription: 'SOON LOG 需要你的位置以顯示附近題材',
-        NSLocationAlwaysUsageDescription: 'SOON LOG 需要你的位置以顯示附近題材'
+        NSLocationAlwaysUsageDescription: 'SOON LOG 需要你的位置以顯示附近題材',
+        NSPhotoLibraryAddUsageDescription: 'SOON-LOG 需要儲存影片到相簿',
+        NSPhotoLibraryUsageDescription: 'SOON-LOG 需要存取相簿'
       }
     },
     android: {
@@ -40,7 +42,7 @@ module.exports = {
       [
         'expo-image-picker',
         {
-          photosPermission: 'SOON-LOG 需要存取相片，用作上載創作紀錄圖片。'
+          photosPermission: 'SOON-LOG 需要存取相簿'
         }
       ],
       [
@@ -52,7 +54,16 @@ module.exports = {
           },
           iosShareExtensionBundleIdentifier: 'network.sooncreator.log.ShareExtension'
         }
-      ]
+      ],
+      [
+        'react-native-vision-camera',
+        {
+          cameraPermissionText: 'SOON-LOG 需要使用相機來拍攝製作影片',
+          enableMicrophonePermission: true,
+          microphonePermissionText: 'SOON-LOG 需要使用麥克風來錄製聲音'
+        }
+      ],
+      'expo-video'
     ]
   }
 };

@@ -8,37 +8,37 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		159ACD4BA83041598DB2249C /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9368215E7DCB4F3CB230FC91 /* ShareViewController.swift */; };
-		16A95AEE95A7FDA9F5133B64 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D15C1BCAD0D26539683E064 /* ExpoModulesProvider.swift */; };
-		35200BE1470340D8A0BBA6C4 /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9CFA6689E2F0461E971333C2 /* MainInterface.storyboard */; };
-		3CF0742E7C625D694FA5F1CD /* libPods-SOONLOG.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 2121A829CFAAE211A1BAE1F5 /* libPods-SOONLOG.a */; };
+		16E8CDA4E1A14C7FABBDE038 /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = EC55A420234F4D3791336DC1 /* MainInterface.storyboard */; };
+		34B76A09326044BBB7A58CB5 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08EA97E48C5243729DB8EE3B /* ShareViewController.swift */; };
+		3C1C03A00C6946478E12DD89 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		69BC317624CD4288993A49CF /* ShareExtensionPreprocessor.js in Resources */ = {isa = PBXBuildFile; fileRef = C573C587C3234B9C917C11C6 /* ShareExtensionPreprocessor.js */; };
-		89AB96B74A2A45059281432D /* ShareExtension.appex in Copy Files */ = {isa = PBXBuildFile; fileRef = BF958D2F627A4893800C990F /* ShareExtension.appex */; };
-		A30974C7A221442E91F2D855 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1ADE128DA29C4BEEB746A237 /* PrivacyInfo.xcprivacy */; };
-		A46156BCDF7CBAEB2CCFCBF3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F9B1EF415E64E2B0EEFFA284 /* PrivacyInfo.xcprivacy */; };
+		55009D25EEBEA6F588CCE93B /* libPods-SOONLOG.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 66708DC70A49CD96870F2473 /* libPods-SOONLOG.a */; };
+		A4C8C2C80B24457C92A9D032 /* ShareExtensionPreprocessor.js in Resources */ = {isa = PBXBuildFile; fileRef = A142CE13B04A4693A1D68415 /* ShareExtensionPreprocessor.js */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		BEF79A0AFB9ECF473D0B78A7 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 359CCD053C9268BF580CDB87 /* ExpoModulesProvider.swift */; };
+		DDE089907FF6E03CAF8DF800 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
+		F44545A25BA14252BDF72D9E /* ShareExtension.appex in Copy Files */ = {isa = PBXBuildFile; fileRef = 5EEC31ACE11846CA9067CE2F /* ShareExtension.appex */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		6090A49B15514A64B2B4AB4E /* PBXContainerItemProxy */ = {
+		6A4EEF147E72435DA72BC59B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = EF03C87909E74B56B40ECE7B;
+			remoteGlobalIDString = ED6B13FB88B441BDA9C8E670;
 			remoteInfo = ShareExtension;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		10BD55DD8C344EE091FE6C92 /* Copy Files */ = {
+		A8B2373F91F7427BA40FAC0E /* Copy Files */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				89AB96B74A2A45059281432D /* ShareExtension.appex in Copy Files */,
+				F44545A25BA14252BDF72D9E /* ShareExtension.appex in Copy Files */,
 			);
 			name = "Copy Files";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -46,26 +46,25 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		08EA97E48C5243729DB8EE3B /* ShareViewController.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = ShareViewController.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* SOONLOG.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SOONLOG.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = SOONLOG/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = SOONLOG/Info.plist; sourceTree = "<group>"; };
-		1ADE128DA29C4BEEB746A237 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = PrivacyInfo.xcprivacy; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		1D15C1BCAD0D26539683E064 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SOONLOG/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		2121A829CFAAE211A1BAE1F5 /* libPods-SOONLOG.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SOONLOG.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		30884717A4B2832DFB3EDC2B /* Pods-SOONLOG.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SOONLOG.debug.xcconfig"; path = "Target Support Files/Pods-SOONLOG/Pods-SOONLOG.debug.xcconfig"; sourceTree = "<group>"; };
-		70962DC09E724CF7ADBEE9DF /* ShareExtension-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "ShareExtension-Info.plist"; path = "ShareExtension-Info.plist"; sourceTree = "<group>"; };
-		75EA61810649C0B424A42918 /* Pods-SOONLOG.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SOONLOG.release.xcconfig"; path = "Target Support Files/Pods-SOONLOG/Pods-SOONLOG.release.xcconfig"; sourceTree = "<group>"; };
-		7B27B07DDDD7442DBA9E59C1 /* ShareExtension.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ShareExtension.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
-		9368215E7DCB4F3CB230FC91 /* ShareViewController.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = ShareViewController.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
-		9CFA6689E2F0461E971333C2 /* MainInterface.storyboard */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = MainInterface.storyboard; path = MainInterface.storyboard; sourceTree = "<group>"; };
+		15E39999CA92478FB300CA58 /* ShareExtension.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ShareExtension.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
+		359CCD053C9268BF580CDB87 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SOONLOG/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = PrivacyInfo.xcprivacy; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		5EEC31ACE11846CA9067CE2F /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = ShareExtension.appex; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		66708DC70A49CD96870F2473 /* libPods-SOONLOG.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SOONLOG.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		73B2750F5CF14540A64500F5 /* ShareExtension-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "ShareExtension-Info.plist"; path = "ShareExtension-Info.plist"; sourceTree = "<group>"; };
+		A142CE13B04A4693A1D68415 /* ShareExtensionPreprocessor.js */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ShareExtensionPreprocessor.js; path = ShareExtensionPreprocessor.js; sourceTree = "<group>"; };
+		A4A48C389423C684B4763FB1 /* Pods-SOONLOG.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SOONLOG.release.xcconfig"; path = "Target Support Files/Pods-SOONLOG/Pods-SOONLOG.release.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = SOONLOG/SplashScreen.storyboard; sourceTree = "<group>"; };
+		B55DF464A5B32E93A2D04735 /* Pods-SOONLOG.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SOONLOG.debug.xcconfig"; path = "Target Support Files/Pods-SOONLOG/Pods-SOONLOG.debug.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		BF958D2F627A4893800C990F /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = ShareExtension.appex; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		C573C587C3234B9C917C11C6 /* ShareExtensionPreprocessor.js */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ShareExtensionPreprocessor.js; path = ShareExtensionPreprocessor.js; sourceTree = "<group>"; };
+		EC55A420234F4D3791336DC1 /* MainInterface.storyboard */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = MainInterface.storyboard; path = MainInterface.storyboard; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = SOONLOG/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* SOONLOG-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "SOONLOG-Bridging-Header.h"; path = "SOONLOG/SOONLOG-Bridging-Header.h"; sourceTree = "<group>"; };
-		F9B1EF415E64E2B0EEFFA284 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = SOONLOG/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,11 +72,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3CF0742E7C625D694FA5F1CD /* libPods-SOONLOG.a in Frameworks */,
+				55009D25EEBEA6F588CCE93B /* libPods-SOONLOG.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		6CB9ABC046864C4988751421 /* Frameworks */ = {
+		7936FF6D401846C9905773DA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -96,7 +95,6 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				F9B1EF415E64E2B0EEFFA284 /* PrivacyInfo.xcprivacy */,
 			);
 			name = SOONLOG;
 			sourceTree = "<group>";
@@ -105,37 +103,15 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				2121A829CFAAE211A1BAE1F5 /* libPods-SOONLOG.a */,
+				66708DC70A49CD96870F2473 /* libPods-SOONLOG.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		32D4A0A3737344D8B3FC30A6 /* ShareExtension */ = {
+		6F7513661C7913D88E73CC08 /* ExpoModulesProviders */ = {
 			isa = PBXGroup;
 			children = (
-				9368215E7DCB4F3CB230FC91 /* ShareViewController.swift */,
-				9CFA6689E2F0461E971333C2 /* MainInterface.storyboard */,
-				C573C587C3234B9C917C11C6 /* ShareExtensionPreprocessor.js */,
-				1ADE128DA29C4BEEB746A237 /* PrivacyInfo.xcprivacy */,
-				70962DC09E724CF7ADBEE9DF /* ShareExtension-Info.plist */,
-				7B27B07DDDD7442DBA9E59C1 /* ShareExtension.entitlements */,
-			);
-			name = ShareExtension;
-			path = ShareExtension;
-			sourceTree = "<group>";
-		};
-		65D8E40C3F804727B0B2E191 /* SOONLOG */ = {
-			isa = PBXGroup;
-			children = (
-				1D15C1BCAD0D26539683E064 /* ExpoModulesProvider.swift */,
-			);
-			name = SOONLOG;
-			sourceTree = "<group>";
-		};
-		8220ABBEA37FD8C77AF4A535 /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				65D8E40C3F804727B0B2E191 /* SOONLOG */,
+				EC51CDB871F66114ADE1D5C3 /* SOONLOG */,
 			);
 			name = ExpoModulesProviders;
 			sourceTree = "<group>";
@@ -154,9 +130,9 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				BF586C6FB213307D06E8307C /* Pods */,
-				8220ABBEA37FD8C77AF4A535 /* ExpoModulesProviders */,
-				32D4A0A3737344D8B3FC30A6 /* ShareExtension */,
+				8A9AB26CECBA4511814C4BE0 /* ShareExtension */,
+				C41758055A9CD753A7AEAD08 /* Pods */,
+				6F7513661C7913D88E73CC08 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -167,9 +143,23 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* SOONLOG.app */,
-				BF958D2F627A4893800C990F /* ShareExtension.appex */,
+				5EEC31ACE11846CA9067CE2F /* ShareExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		8A9AB26CECBA4511814C4BE0 /* ShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				08EA97E48C5243729DB8EE3B /* ShareViewController.swift */,
+				EC55A420234F4D3791336DC1 /* MainInterface.storyboard */,
+				A142CE13B04A4693A1D68415 /* ShareExtensionPreprocessor.js */,
+				4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */,
+				73B2750F5CF14540A64500F5 /* ShareExtension-Info.plist */,
+				15E39999CA92478FB300CA58 /* ShareExtension.entitlements */,
+			);
+			name = ShareExtension;
+			path = ShareExtension;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -181,13 +171,22 @@
 			path = SOONLOG/Supporting;
 			sourceTree = "<group>";
 		};
-		BF586C6FB213307D06E8307C /* Pods */ = {
+		C41758055A9CD753A7AEAD08 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				30884717A4B2832DFB3EDC2B /* Pods-SOONLOG.debug.xcconfig */,
-				75EA61810649C0B424A42918 /* Pods-SOONLOG.release.xcconfig */,
+				B55DF464A5B32E93A2D04735 /* Pods-SOONLOG.debug.xcconfig */,
+				A4A48C389423C684B4763FB1 /* Pods-SOONLOG.release.xcconfig */,
 			);
+			name = Pods;
 			path = Pods;
+			sourceTree = "<group>";
+		};
+		EC51CDB871F66114ADE1D5C3 /* SOONLOG */ = {
+			isa = PBXGroup;
+			children = (
+				359CCD053C9268BF580CDB87 /* ExpoModulesProvider.swift */,
+			);
+			name = SOONLOG;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -200,25 +199,25 @@
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
-				10BD55DD8C344EE091FE6C92 /* Copy Files */,
+				A8B2373F91F7427BA40FAC0E /* Copy Files */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				4ED1810554004468ADAE0F74 /* PBXTargetDependency */,
+				6781FA60BA2449BB9BE4C82F /* PBXTargetDependency */,
 			);
 			name = SOONLOG;
 			productName = SOONLOG;
 			productReference = 13B07F961A680F5B00A75B9A /* SOONLOG.app */;
 			productType = "com.apple.product-type.application";
 		};
-		EF03C87909E74B56B40ECE7B /* ShareExtension */ = {
+		ED6B13FB88B441BDA9C8E670 /* ShareExtension */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = D6388DA10F944A6CB649AF9B /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildConfigurationList = 617416B0F2AF4C7EAD1514E7 /* Build configuration list for PBXNativeTarget "ShareExtension" */;
 			buildPhases = (
-				E81E99719D464C33B9E8F721 /* Sources */,
-				661E1B661717467DBCF15016 /* Resources */,
-				6CB9ABC046864C4988751421 /* Frameworks */,
+				F3CD950CABBA4070877D6A4F /* Sources */,
+				34B71832405549C8890E70D3 /* Resources */,
+				7936FF6D401846C9905773DA /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -226,7 +225,7 @@
 			);
 			name = ShareExtension;
 			productName = ShareExtension;
-			productReference = BF958D2F627A4893800C990F /* ShareExtension.appex */;
+			productReference = 5EEC31ACE11846CA9067CE2F /* ShareExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -235,8 +234,7 @@
 		83CBB9F71A601CBA00E9B192 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2640;
+				LastUpgradeCheck = 1130;
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
 						LastSwiftMigration = 1250;
@@ -257,7 +255,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* SOONLOG */,
-				EF03C87909E74B56B40ECE7B /* ShareExtension */,
+				ED6B13FB88B441BDA9C8E670 /* ShareExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -270,17 +268,17 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				A46156BCDF7CBAEB2CCFCBF3 /* PrivacyInfo.xcprivacy in Resources */,
+				DDE089907FF6E03CAF8DF800 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		661E1B661717467DBCF15016 /* Resources */ = {
+		34B71832405549C8890E70D3 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				35200BE1470340D8A0BBA6C4 /* MainInterface.storyboard in Resources */,
-				69BC317624CD4288993A49CF /* ShareExtensionPreprocessor.js in Resources */,
-				A30974C7A221442E91F2D855 /* PrivacyInfo.xcprivacy in Resources */,
+				16E8CDA4E1A14C7FABBDE038 /* MainInterface.storyboard in Resources */,
+				A4C8C2C80B24457C92A9D032 /* ShareExtensionPreprocessor.js in Resources */,
+				3C1C03A00C6946478E12DD89 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -292,36 +290,35 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				16A95AEE95A7FDA9F5133B64 /* ExpoModulesProvider.swift in Sources */,
+				BEF79A0AFB9ECF473D0B78A7 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		E81E99719D464C33B9E8F721 /* Sources */ = {
+		F3CD950CABBA4070877D6A4F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				159ACD4BA83041598DB2249C /* ShareViewController.swift in Sources */,
+				34B76A09326044BBB7A58CB5 /* ShareViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		4ED1810554004468ADAE0F74 /* PBXTargetDependency */ = {
+		6781FA60BA2449BB9BE4C82F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = EF03C87909E74B56B40ECE7B /* ShareExtension */;
-			targetProxy = 6090A49B15514A64B2B4AB4E /* PBXContainerItemProxy */;
+			target = ED6B13FB88B441BDA9C8E670 /* ShareExtension */;
+			targetProxy = 6A4EEF147E72435DA72BC59B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 30884717A4B2832DFB3EDC2B /* Pods-SOONLOG.debug.xcconfig */;
+			baseConfigurationReference = B55DF464A5B32E93A2D04735 /* Pods-SOONLOG.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				"CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]" = NO;
 				CODE_SIGN_ENTITLEMENTS = SOONLOG/SOONLOG.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_BITCODE = NO;
@@ -356,7 +353,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 75EA61810649C0B424A42918 /* Pods-SOONLOG.release.xcconfig */;
+			baseConfigurationReference = A4A48C389423C684B4763FB1 /* Pods-SOONLOG.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -386,11 +383,10 @@
 			};
 			name = Release;
 		};
-		1BB3109AFBC74BC3B7B12C84 /* Debug */ = {
+		519FB7B5D5CD409AB628C2BD /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_MODULES = YES;
-				"CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]" = NO;
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -418,7 +414,7 @@
 			};
 			name = Debug;
 		};
-		386F99DB16874F509D4790AA /* Release */ = {
+		67EF18A4E16F4FEAB6CF2E44 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_MODULES = YES;
@@ -468,7 +464,6 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
@@ -476,10 +471,8 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
-				DEVELOPMENT_TEAM = WGK73GTPCX;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -509,7 +502,6 @@
 				);
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
 				USE_HERMES = false;
 			};
@@ -538,7 +530,6 @@
 				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
 				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
@@ -546,10 +537,8 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = YES;
-				DEVELOPMENT_TEAM = WGK73GTPCX;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -571,8 +560,6 @@
 				);
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_COMPILATION_MODE = wholemodule;
 				USE_HERMES = false;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -590,20 +577,20 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		617416B0F2AF4C7EAD1514E7 /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				519FB7B5D5CD409AB628C2BD /* Debug */,
+				67EF18A4E16F4FEAB6CF2E44 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "SOONLOG" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,
 				83CBBA211A601CBA00E9B192 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		D6388DA10F944A6CB649AF9B /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				1BB3109AFBC74BC3B7B12C84 /* Debug */,
-				386F99DB16874F509D4790AA /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

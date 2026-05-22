@@ -337,7 +337,13 @@ export default function TopicRoomScreen() {
 
       {isMember ? (
         <>
-          <Pressable onPress={() => setSheetOpen(true)} style={({ pressed }) => [styles.fab, { bottom: insets.bottom + 22 }, pressed && styles.pressed]}>
+          <Pressable
+            onPress={() => router.push({
+              pathname: '/(app)/log/camera',
+              params: { room_id: Array.isArray(id) ? id[0] : id }
+            })}
+            style={({ pressed }) => [styles.fab, { bottom: insets.bottom + 22 }, pressed && styles.pressed]}
+          >
             <Text style={styles.fabText}>+ 新增 Clip</Text>
           </Pressable>
           <AddClipSheet

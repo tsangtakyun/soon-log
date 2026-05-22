@@ -41,9 +41,9 @@ function formatActivity(value?: string | null) {
   return `${Math.floor(hours / 24)} 日前`;
 }
 
-function EmptyTodayLog() {
+function EmptyTodayLog({ onPress }: { onPress: () => void }) {
   return (
-    <Pressable onPress={() => router.push('/create')} style={({ pressed }) => [styles.emptyLogCard, pressed && styles.pressed]}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.emptyLogCard, pressed && styles.pressed]}>
       <Text style={styles.emptyLogText}>🎬 記錄今日創作</Text>
     </Pressable>
   );
@@ -62,9 +62,9 @@ function MiniTodayLogCard({ log }: { log: Log }) {
   );
 }
 
-function RoomCard({ room }: { room: TopicRoom }) {
+function RoomCard({ room, onPress }: { room: TopicRoom; onPress: () => void }) {
   return (
-    <Pressable onPress={() => router.push(`/log/room/${room.id}`)} style={({ pressed }) => [styles.roomCard, pressed && styles.pressed]}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.roomCard, pressed && styles.pressed]}>
       <View style={styles.roomHeader}>
         <Text style={styles.privacyBadge}>{room.privacy === 'open' ? '🌐 Open Studio' : '🔒 私密'}</Text>
       </View>
@@ -83,6 +83,7 @@ export default function StudioLogScreen() {
   const { user } = useAuth();
   const [todayLogs, setTodayLogs] = useState<Log[]>([]);
   const [rooms, setRooms] = useState<TopicRoom[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -150,6 +151,10 @@ export default function StudioLogScreen() {
       });
 
     setRooms(enriched);
+    setSelectedRoomId((current) => {
+      if (current && enriched.some((room) => room.id === current)) return current;
+      return enriched[0]?.id ?? null;
+    });
   }, [user]);
 
   const loadData = useCallback(async () => {
@@ -220,6 +225,18 @@ export default function StudioLogScreen() {
     );
   };
 
+  const openCameraForSelectedRoom = () => {
+    if (!selectedRoomId) {
+      Alert.alert('請先選擇 Topic Room', '請撳入一個 Topic Room 先開始拍攝');
+      return;
+    }
+
+    router.push({
+      pathname: '/(app)/log/camera',
+      params: { room_id: selectedRoomId }
+    });
+  };
+
   return (
     <View style={styles.screen}>
       <View style={[styles.hero, { paddingTop: insets.top + 22 }]}>
@@ -239,7 +256,7 @@ export default function StudioLogScreen() {
           </View>
 
           {todayLogs.length === 0 ? (
-            <EmptyTodayLog />
+            <EmptyTodayLog onPress={openCameraForSelectedRoom} />
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.todayStrip}>
               {todayLogs.map((log) => (
@@ -268,13 +285,22 @@ export default function StudioLogScreen() {
             </View>
           ) : (
             <View style={styles.roomList}>
-              {rooms.map((room) => <RoomCard key={room.id} room={room} />)}
+              {rooms.map((room) => (
+                <RoomCard
+                  key={room.id}
+                  room={room}
+                  onPress={() => {
+                    setSelectedRoomId(room.id);
+                    router.push(`/log/room/${room.id}`);
+                  }}
+                />
+              ))}
             </View>
           )}
         </ScrollView>
       )}
 
-      <Pressable onPress={() => router.push('/create')} style={({ pressed }) => [styles.fab, { bottom: insets.bottom + 94 }, pressed && styles.pressed]}>
+      <Pressable onPress={openCameraForSelectedRoom} style={({ pressed }) => [styles.fab, { bottom: insets.bottom + 94 }, pressed && styles.pressed]}>
         <Text style={styles.fabText}>🎬</Text>
       </Pressable>
 
