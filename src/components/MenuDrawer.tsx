@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { router } from 'expo-router';
 import {
   Dimensions,
   Image,
@@ -49,13 +50,18 @@ export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: ()
     onClose();
   };
 
+  const openProfile = () => {
+    onClose();
+    router.push('/profile');
+  };
+
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <View style={styles.modalRoot}>
         <View style={[styles.drawer, { width, paddingTop: insets.top + 22 }]}>
           <Text style={styles.kicker}>我嘅帳戶</Text>
 
-          <View style={styles.userRow}>
+          <Pressable onPress={openProfile} style={({ pressed }) => [styles.userRow, pressed && styles.pressed]}>
             {profile?.avatar_url ? (
               <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
             ) : (
@@ -67,7 +73,7 @@ export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: ()
               <Text numberOfLines={1} style={styles.displayName}>{displayName}</Text>
               <Text numberOfLines={1} style={styles.email}>{email}</Text>
             </View>
-          </View>
+          </Pressable>
 
           <View style={styles.creditCard}>
             <Text style={styles.creditLabel}>🪙 AI Credit Balance</Text>
@@ -79,7 +85,7 @@ export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: ()
           </View>
 
           <View style={styles.menu}>
-            <DrawerItem icon="⚙️" label="設定" />
+            <DrawerItem icon="⚙️" label="設定" onPress={openProfile} />
             <DrawerItem icon="🧠" label="AI 設定" />
             <Divider />
             <DrawerItem icon="👤" label="邀請管理" />

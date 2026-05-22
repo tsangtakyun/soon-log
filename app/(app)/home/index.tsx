@@ -288,14 +288,16 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.profileZone}>
-          {avatar ? (
-            <Image source={{ uri: avatar }} style={styles.heroAvatar} />
-          ) : (
-            <View style={styles.heroAvatarFallback}>
-              <Text style={styles.heroAvatarInitial}>{initial}</Text>
-            </View>
-          )}
-          <Text style={styles.username}>{displayUsername}</Text>
+          <Pressable onPress={() => router.push('/profile')} style={({ pressed }) => [styles.homeProfileButton, pressed && styles.pressed]}>
+            {avatar ? (
+              <Image source={{ uri: avatar }} style={styles.heroAvatar} />
+            ) : (
+              <View style={styles.heroAvatarFallback}>
+                <Text style={styles.heroAvatarInitial}>{initial}</Text>
+              </View>
+            )}
+            <Text style={styles.username}>{displayUsername}</Text>
+          </Pressable>
           <Pressable onPress={() => router.push('/log')} style={({ pressed }) => pressed && styles.pressed}>
             <LinearGradient colors={[colors.primary, colors.primaryDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cta}>
               <Text style={styles.ctaIcon}>⌛</Text>
@@ -410,6 +412,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingBottom: 12,
     zIndex: 1
+  },
+  homeProfileButton: {
+    alignItems: 'center'
   },
   heroAvatar: {
     width: 80,
