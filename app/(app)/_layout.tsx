@@ -1,9 +1,44 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Text, View } from 'react-native';
+import { useAuth } from '@/hooks/useAuth';
 import { fonts } from '@/lib/theme';
+import { supabase } from '@/lib/supabase';
 import { colors } from '@/theme/colors';
 
 export default function AppTabs() {
+  const { user } = useAuth();
+  const [todayCount, setTodayCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) {
+      setTodayCount(0);
+      return;
+    }
+
+    const loadTodayCount = async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const { count } = await supabase
+        .from('topic_clips')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', today.toISOString());
+
+      setTodayCount(count || 0);
+    };
+
+    loadTodayCount();
+    const channel = supabase
+      .channel(`today-clip-count-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_clips', filter: `user_id=eq.${user.id}` }, () => loadTodayCount())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   return (
     <Tabs
       screenOptions={{
@@ -35,7 +70,29 @@ export default function AppTabs() {
         name="log/index"
         options={{
           title: 'Their.Studio',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🎬</Text>
+          tabBarIcon: ({ color }) => (
+            <View>
+              <Text style={{ color, fontSize: 20 }}>🎬</Text>
+              {todayCount > 0 ? (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -8,
+                    minWidth: 16,
+                    height: 16,
+                    borderRadius: 999,
+                    backgroundColor: colors.primary,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingHorizontal: 3
+                  }}
+                >
+                  <Text style={{ color: colors.textOnDark, fontSize: 10, fontWeight: '700' }}>{todayCount}</Text>
+                </View>
+              ) : null}
+            </View>
+          )
         }}
       />
       <Tabs.Screen

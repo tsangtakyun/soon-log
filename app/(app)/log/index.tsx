@@ -14,12 +14,11 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ClipPlayer from '@/components/ClipPlayer';
 import { useAuth } from '@/hooks/useAuth';
-import { endOfDay, startOfDay } from '@/lib/schedule';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
-import { Log } from '@/types';
 import CreateTopicRoomScreen from './create-room';
 
 type TopicRoom = {
@@ -38,6 +37,23 @@ type TopicRoom = {
   latest_image_url?: string | null;
 };
 
+type TodayClip = {
+  id: string;
+  room_id: string;
+  user_id: string;
+  caption: string | null;
+  notes: string | null;
+  media_urls: string[];
+  video_url: string | null;
+  time_str: string | null;
+  date_str: string | null;
+  caption_align: 'left' | 'center' | 'right' | null;
+  text_size: 'small' | 'medium' | 'large' | null;
+  background_color: 'cream' | 'black' | null;
+  created_at: string;
+  room_name: string | null;
+};
+
 function formatActivity(value?: string | null) {
   if (!value) return '未有活動';
   const diff = Date.now() - new Date(value).getTime();
@@ -52,19 +68,21 @@ function EmptyTodayLog({ onPress }: { onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.emptyLogCard, pressed && styles.pressed]}>
       <Text style={styles.emptyLogText}>🎬 記錄今日創作</Text>
+      <Text style={styles.emptyLogSubtext}>拍片記錄你今日做咗咩</Text>
     </Pressable>
   );
 }
 
-function formatLogTime(value: string) {
-  return new Intl.DateTimeFormat('zh-HK', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
-}
-
-function MiniTodayLogCard({ log }: { log: Log }) {
+function TodayClipThumb({ clip }: { clip: TodayClip }) {
   return (
-    <Pressable onPress={() => router.push(`/log/${log.id}`)} style={({ pressed }) => [styles.miniLogCard, pressed && styles.pressed]}>
-      <Text numberOfLines={4} style={styles.miniLogTitle}>{log.title || log.body || 'Untitled Log'}</Text>
-      <Text style={styles.miniLogTime}>{formatLogTime(log.created_at)}</Text>
+    <Pressable
+      onPress={() => router.push(`/(app)/log/clip/${clip.id}`)}
+      style={({ pressed }) => [styles.todayClipThumb, pressed && styles.pressed]}
+    >
+      <ClipPlayer clip={clip} width={100} height={160} thumbnail />
+      <View style={styles.todayClipRoomOverlay}>
+        <Text numberOfLines={1} style={styles.todayClipRoomText}>{clip.room_name || 'Topic Room'}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -137,7 +155,7 @@ function RoomVideoPreview({ url }: { url: string }) {
 export default function StudioLogScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const [todayLogs, setTodayLogs] = useState<Log[]>([]);
+  const [todayClips, setTodayClips] = useState<TodayClip[]>([]);
   const [rooms, setRooms] = useState<TopicRoom[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
@@ -236,19 +254,27 @@ export default function StudioLogScreen() {
 
   const loadData = useCallback(async () => {
     if (!user) return;
-    const now = new Date();
-    const { data: logs, error: logsError } = await supabase
-      .from('logs')
-      .select('*')
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { data: clips, error: clipsError } = await supabase
+      .from('topic_clips')
+      .select('*, topic_rooms(name)')
       .eq('user_id', user.id)
-      .gte('created_at', startOfDay(now).toISOString())
-      .lte('created_at', endOfDay(now).toISOString())
+      .gte('created_at', today.toISOString())
       .order('created_at', { ascending: false });
 
-    if (logsError) {
-      setTodayLogs([]);
+    if (clipsError) {
+      setTodayClips([]);
     } else {
-      setTodayLogs((logs ?? []) as Log[]);
+      const clipRows = (clips ?? []).map((clip) => {
+        const room = Array.isArray(clip.topic_rooms) ? clip.topic_rooms[0] : clip.topic_rooms;
+        return {
+          ...clip,
+          room_name: room?.name ?? null
+        };
+      }) as TodayClip[];
+      setTodayClips(clipRows);
     }
 
     await loadRooms();
@@ -304,7 +330,7 @@ export default function StudioLogScreen() {
 
   const openCameraForSelectedRoom = () => {
     if (!selectedRoomId) {
-      Alert.alert('請先選擇 Topic Room', '請撳入一個 Topic Room 先開始拍攝');
+      Alert.alert('請先建立 Topic Room');
       return;
     }
 
@@ -332,14 +358,22 @@ export default function StudioLogScreen() {
             </Pressable>
           </View>
 
-          {todayLogs.length === 0 ? (
+          {todayClips.length === 0 ? (
             <EmptyTodayLog onPress={openCameraForSelectedRoom} />
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.todayStrip}>
-              {todayLogs.map((log) => (
-                <MiniTodayLogCard key={log.id} log={log} />
-              ))}
-            </ScrollView>
+            <>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.todayStrip}>
+                {todayClips.map((clip) => (
+                  <TodayClipThumb key={clip.id} clip={clip} />
+                ))}
+              </ScrollView>
+              <View style={styles.todaySummaryRow}>
+                <Text style={styles.todaySummaryText}>{todayClips.length} 個 clips 今日</Text>
+                <Pressable onPress={() => Alert.alert('即將推出', '一鍵合成今日 vlog')}>
+                  <Text style={styles.makeVlogText}>製成今日日誌 →</Text>
+                </Pressable>
+              </View>
+            </>
           )}
 
           <View style={[styles.sectionHeader, styles.roomsHeader]}>
@@ -453,31 +487,54 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 17
   },
+  emptyLogSubtext: {
+    marginTop: 6,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13
+  },
   todayStrip: {
     paddingVertical: 12,
     paddingLeft: 16,
-    paddingRight: 16
+    paddingRight: 8
   },
-  miniLogCard: {
-    width: 160,
-    height: 200,
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: colors.bodyBorder,
-    borderRadius: 16,
-    backgroundColor: colors.bgBodyCard,
-    padding: 14,
+  todayClipThumb: {
+    width: 100,
+    height: 160,
+    marginRight: 8,
+    overflow: 'hidden',
+    borderRadius: 12,
+    backgroundColor: colors.bgHero
+  },
+  todayClipRoomOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 4,
+    paddingVertical: 5,
+    backgroundColor: 'rgba(0,0,0,0.48)'
+  },
+  todayClipRoomText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 10
+  },
+  todaySummaryRow: {
+    marginHorizontal: 16,
+    marginTop: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between'
   },
-  miniLogTitle: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 15,
-    lineHeight: 20
-  },
-  miniLogTime: {
+  todaySummaryText: {
     color: colors.textMuted,
     fontFamily: fonts.bodyMedium,
+    fontSize: 13
+  },
+  makeVlogText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
     fontSize: 13
   },
   roomsHeader: {

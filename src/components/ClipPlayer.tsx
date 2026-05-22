@@ -17,6 +17,7 @@ type ClipPlayerProps = {
   };
   width: number;
   height: number;
+  thumbnail?: boolean;
   onDoubleTap?: () => void;
 };
 
@@ -38,7 +39,7 @@ const alignMap = {
   right: 'flex-end'
 } as const;
 
-export default function ClipPlayer({ clip, width, height, onDoubleTap }: ClipPlayerProps) {
+export default function ClipPlayer({ clip, width, height, thumbnail = false, onDoubleTap }: ClipPlayerProps) {
   const lastTapRef = useRef(0);
   const player = useVideoPlayer(clip.video_url || null, (videoPlayer) => {
     videoPlayer.loop = true;
@@ -116,24 +117,26 @@ export default function ClipPlayer({ clip, width, height, onDoubleTap }: ClipPla
           ) : null}
         </View>
 
-        <Pressable
-          style={[styles.tapLayer, { width, height }]}
-          onPress={() => {
-            const now = Date.now();
-            if (onDoubleTap && now - lastTapRef.current < 320) {
-              lastTapRef.current = 0;
-              onDoubleTap();
-              return;
-            }
+        {!thumbnail ? (
+          <Pressable
+            style={[styles.tapLayer, { width, height }]}
+            onPress={() => {
+              const now = Date.now();
+              if (onDoubleTap && now - lastTapRef.current < 320) {
+                lastTapRef.current = 0;
+                onDoubleTap();
+                return;
+              }
 
-            lastTapRef.current = now;
-            if (player.playing) {
-              player.pause();
-            } else {
-              player.play();
-            }
-          }}
-        />
+              lastTapRef.current = now;
+              if (player.playing) {
+                player.pause();
+              } else {
+                player.play();
+              }
+            }}
+          />
+        ) : null}
       </View>
     );
   }
