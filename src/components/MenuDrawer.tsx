@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row'
   },
   drawer: {
-    backgroundColor: colors.bgHero,
+    backgroundColor: colors.bgBody,
     paddingHorizontal: 20
   },
   overlay: {
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)'
   },
   kicker: {
-    color: colors.textOnDarkMuted,
+    color: colors.textMuted,
     fontFamily: fonts.bodyBold,
     fontSize: 12,
     letterSpacing: 1,
@@ -168,12 +168,12 @@ const styles = StyleSheet.create({
     flex: 1
   },
   displayName: {
-    color: colors.textOnDark,
+    color: colors.text,
     fontFamily: fonts.bodyBold,
     fontSize: 16
   },
   email: {
-    color: colors.textOnDarkMuted,
+    color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 13,
     marginTop: 2
@@ -182,8 +182,8 @@ const styles = StyleSheet.create({
     marginTop: 24,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.heroBorder,
-    backgroundColor: colors.bgBodyCard,
+    borderColor: colors.bodyBorder,
+    backgroundColor: colors.bgBodyMuted,
     padding: 16
   },
   creditLabel: {
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     fontSize: 20
   },
   itemLabel: {
-    color: 'rgba(255,255,255,0.7)',
+    color: colors.text,
     fontFamily: fonts.bodyMedium,
     fontSize: 16
   },
@@ -240,6 +240,6 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)'
+    backgroundColor: colors.bodyBorder
   }
 });
