@@ -63,9 +63,9 @@ export default function AppTabs() {
       <Tabs.Screen name="create" options={{ href: null }} />
       <Tabs.Screen name="profile/index" options={{ href: null }} />
       <Tabs.Screen name="profile/[username]" options={{ href: null }} />
-      <Tabs.Screen name="log/[id]" options={{ href: null }} />
       <Tabs.Screen name="log/create-room" options={{ href: null }} />
       <Tabs.Screen name="log/room/[id]" options={{ href: null }} />
+      <Tabs.Screen name="log/[id]" options={{ href: null }} />
       <Tabs.Screen name="work/create" options={{ href: null }} />
       <Tabs.Screen name="work/[id]" options={{ href: null }} />
       <Tabs.Screen name="schedule/index" options={{ href: null }} />

@@ -20,6 +20,7 @@ import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 import { Comment, Log, Profile } from '@/types';
+import CreateTopicRoomScreen from './create-room';
 
 type LogWithAuthor = Log & {
   profile?: Profile | null;
@@ -58,6 +59,15 @@ function Avatar({ profile, size }: { profile?: Pick<Profile, 'username' | 'displ
 export default function LogDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const logId = Array.isArray(id) ? id[0] : id;
+
+  if (logId === 'create-room') {
+    return <CreateTopicRoomScreen />;
+  }
+
+  return <LogDetailContent logId={logId} />;
+}
+
+function LogDetailContent({ logId }: { logId?: string }) {
   const { user } = useAuth();
   const [log, setLog] = useState<LogWithAuthor | null>(null);
   const [comments, setComments] = useState<CommentWithAuthor[]>([]);
