@@ -150,7 +150,7 @@ export default function TrendDetailScreen() {
         .single(),
       supabase
         .from('trend_discussions')
-        .select('*, profiles(username, avatar_url, display_name)')
+        .select('*, profiles!trend_discussions_author_id_fkey(username, avatar_url, display_name)')
         .eq('trend_id', trendId)
         .order('created_at', { ascending: false })
     ]);
@@ -158,7 +158,7 @@ export default function TrendDetailScreen() {
     setTrend((trendData ?? null) as Trend | null);
 
     if (discussionError) {
-      console.warn('Trend discussions fetch error:', JSON.stringify(discussionError));
+      console.log('Trend discussions fetch error:', JSON.stringify(discussionError));
       setDiscussions([]);
       setLoading(false);
       return;
@@ -253,7 +253,7 @@ export default function TrendDetailScreen() {
     const { data, error } = await supabase
       .from('trend_discussions')
       .insert({ trend_id: trendId, author_id: user.id, body })
-      .select('*, profiles(username, avatar_url, display_name)')
+      .select('*, profiles!trend_discussions_author_id_fkey(username, avatar_url, display_name)')
       .single();
 
     if (error) {
