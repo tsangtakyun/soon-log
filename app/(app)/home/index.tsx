@@ -753,7 +753,7 @@ const styles = StyleSheet.create({
   },
   sectionBannerImage: {
     width: '100%',
-    height: 62,
+    height: 31,
     resizeMode: 'cover'
   },
   openStudiosStrip: {
