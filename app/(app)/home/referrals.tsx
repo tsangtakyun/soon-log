@@ -1,4 +1,3 @@
-import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import {
   Alert,
@@ -39,8 +38,7 @@ export default function ReferralsScreen() {
   const referralMessage = '我喺用 SOON 整內容超好用，呢個係我嘅邀請連結，你註冊咗我哋兩個都會有免費 AI Credits 用：';
 
   const copyLink = async () => {
-    await Clipboard.setStringAsync(referralUrl);
-    Alert.alert('已複製連結！');
+    await Share.share({ message: referralUrl });
   };
 
   const shareLink = async () => {
