@@ -63,6 +63,7 @@ function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
 }
 
 function IdeaCard({ item }: { item: Idea }) {
+  const router = useRouter();
   const potential = getPotential(item.viral_potential) ?? { label: '中潛力', color: colors.gold };
   const platform = getPlatform(item.platform);
   const tags = Array.isArray(item.tags) ? item.tags : [];
@@ -81,6 +82,15 @@ function IdeaCard({ item }: { item: Idea }) {
 
   return (
     <Pressable onPress={openSource} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+      <Pressable
+        style={styles.scriptQuickButton}
+        onPress={(event) => {
+          event.stopPropagation();
+          router.push(`/idea/${item.id}`);
+        }}
+      >
+        <Text style={styles.scriptQuickText}>🎬</Text>
+      </Pressable>
       <View style={styles.metaRow}>
         {viralScore > 0 ? (
           <View style={styles.scoreBadge}>
@@ -329,6 +339,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22
   },
   card: {
+    position: 'relative',
     borderRadius: 16,
     backgroundColor: colors.bgCard,
     borderWidth: 1,
@@ -340,6 +351,23 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 2,
     gap: 10
+  },
+  scriptQuickButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    zIndex: 2,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FBF4EE',
+    borderWidth: 1,
+    borderColor: '#e5e7eb'
+  },
+  scriptQuickText: {
+    fontSize: 16
   },
   metaRow: {
     flexDirection: 'row',
