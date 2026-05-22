@@ -8,6 +8,13 @@ import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 import { Log } from '@/types';
 
+const REGION_FLAG: Record<string, string> = {
+  HK: '🇭🇰',
+  TW: '🇹🇼',
+  SG: '🇸🇬',
+  OTHER: '🌐'
+};
+
 function timeAgo(value: string) {
   const diff = Date.now() - new Date(value).getTime();
   const minutes = Math.max(1, Math.floor(diff / 60000));
@@ -27,6 +34,7 @@ export function LogCard({ log, onPress }: { log: Log; onPress?: () => void }) {
   const profile = log.profile;
   const username = profile?.username ?? 'soon';
   const displayName = profile?.display_name || username;
+  const region = profile?.region;
   const cover = log.media_urls?.[0];
   const hasCover = Boolean(cover);
 
@@ -146,6 +154,7 @@ export function LogCard({ log, onPress }: { log: Log; onPress?: () => void }) {
               <Pressable onPress={openProfile} hitSlop={8}>
                 <Text style={styles.overlayName}>@{username}</Text>
               </Pressable>
+              {region ? <Text style={styles.regionBadge}>{REGION_FLAG[region] || '🌐'}</Text> : null}
               {followButton}
             </View>
           </LinearGradient>
@@ -156,6 +165,7 @@ export function LogCard({ log, onPress }: { log: Log; onPress?: () => void }) {
             <Pressable onPress={openProfile} hitSlop={8}>
               <Text style={styles.username}>@{username}</Text>
             </Pressable>
+            {region ? <Text style={styles.regionBadge}>{REGION_FLAG[region] || '🌐'}</Text> : null}
             {followButton}
           </View>
         </View>
@@ -271,6 +281,10 @@ const styles = StyleSheet.create({
   },
   followingText: {
     color: colors.textMuted
+  },
+  regionBadge: {
+    marginLeft: 4,
+    fontSize: 12
   },
   content: {
     padding: 16,

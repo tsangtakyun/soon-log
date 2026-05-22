@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MenuDrawer } from '@/components/MenuDrawer';
 import { LogCard } from '@/components/LogCard';
+import { RegionFilter } from '@/components/RegionFilter';
 import { SavedSheet } from '@/components/SavedSheet';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -203,6 +204,7 @@ export default function HomeScreen() {
   const [openStudios, setOpenStudios] = useState<OpenStudio[]>([]);
   const [followingLogs, setFollowingLogs] = useState<Log[]>([]);
   const [allLogs, setAllLogs] = useState<Log[]>([]);
+  const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [followingCount, setFollowingCount] = useState(0);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
   const [loadingAll, setLoadingAll] = useState(false);
@@ -303,10 +305,13 @@ export default function HomeScreen() {
     if (error) {
       setAllLogs([]);
     } else {
-      setAllLogs(await enrichLogs((data ?? []) as Log[], user?.id));
+      const logs = ((data ?? []) as Log[]).filter((log) =>
+        regionFilter ? log.profile?.region === regionFilter : true
+      );
+      setAllLogs(await enrichLogs(logs, user?.id));
     }
     setLoadingAll(false);
-  }, [user?.id]);
+  }, [regionFilter, user?.id]);
 
   const loadOpenStudios = useCallback(async () => {
     const { data: rooms, error: roomsError } = await supabase
@@ -474,11 +479,16 @@ export default function HomeScreen() {
           />
         ) : null}
         {activeTab === 'All' ? (
-          <FeedList
-            logs={allLogs}
-            loading={loadingAll}
-            empty={<Text style={styles.noTrends}>暫時未有公開紀錄</Text>}
-          />
+          <View>
+            <View style={styles.regionFilterWrap}>
+              <RegionFilter selected={regionFilter} onChange={setRegionFilter} />
+            </View>
+            <FeedList
+              logs={allLogs}
+              loading={loadingAll}
+              empty={<Text style={styles.noTrends}>暫時未有公開紀錄</Text>}
+            />
+          </View>
         ) : null}
         {activeTab === 'IG' ? <EmptySocialState buttonLabel="Connect Instagram" /> : null}
         {activeTab === 'Trends' ? (
@@ -780,6 +790,10 @@ const styles = StyleSheet.create({
   },
   feedWrap: {
     paddingTop: 8
+  },
+  regionFilterWrap: {
+    marginTop: 12,
+    paddingHorizontal: 16
   },
   trendsWrap: {
     paddingHorizontal: 16,

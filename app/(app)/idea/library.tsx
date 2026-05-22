@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 import MapView, { Callout, Marker } from 'react-native-maps';
+import { RegionFilter } from '@/components/RegionFilter';
 import { EmptyState, Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -116,6 +117,7 @@ export default function IdeasLibraryScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -133,8 +135,11 @@ export default function IdeasLibraryScreen() {
       return;
     }
 
-    setIdeas((data ?? []) as Idea[]);
-  }, [user]);
+    const filtered = regionFilter
+      ? (data ?? []).filter((idea) => idea.country === regionFilter || idea.region === regionFilter)
+      : data ?? [];
+    setIdeas(filtered as Idea[]);
+  }, [regionFilter, user]);
 
   useEffect(() => {
     loadIdeas();
@@ -191,6 +196,10 @@ export default function IdeasLibraryScreen() {
             <Text style={styles.addText}>＋</Text>
           </Pressable>
         </View>
+      </View>
+
+      <View style={styles.regionFilterWrap}>
+        <RegionFilter selected={regionFilter} onChange={setRegionFilter} />
       </View>
 
       {viewMode === 'list' ? (
@@ -304,6 +313,10 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontFamily: fonts.bodyBold,
     fontSize: 24
+  },
+  regionFilterWrap: {
+    paddingHorizontal: 18,
+    paddingBottom: 12
   },
   list: {
     paddingHorizontal: 18,
