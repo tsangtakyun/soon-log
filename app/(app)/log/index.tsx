@@ -11,7 +11,6 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LogCard } from '@/components/LogCard';
 import { useAuth } from '@/hooks/useAuth';
 import { endOfDay, startOfDay } from '@/lib/schedule';
 import { supabase } from '@/lib/supabase';
@@ -46,6 +45,19 @@ function EmptyTodayLog() {
   return (
     <Pressable onPress={() => router.push('/create')} style={({ pressed }) => [styles.emptyLogCard, pressed && styles.pressed]}>
       <Text style={styles.emptyLogText}>🎬 記錄今日創作</Text>
+    </Pressable>
+  );
+}
+
+function formatLogTime(value: string) {
+  return new Intl.DateTimeFormat('zh-HK', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+}
+
+function MiniTodayLogCard({ log }: { log: Log }) {
+  return (
+    <Pressable onPress={() => router.push(`/log/${log.id}`)} style={({ pressed }) => [styles.miniLogCard, pressed && styles.pressed]}>
+      <Text numberOfLines={4} style={styles.miniLogTitle}>{log.title || log.body || 'Untitled Log'}</Text>
+      <Text style={styles.miniLogTime}>{formatLogTime(log.created_at)}</Text>
     </Pressable>
   );
 }
@@ -147,7 +159,7 @@ export default function StudioLogScreen() {
     const now = new Date();
     const { data: logs, error: logsError } = await supabase
       .from('logs')
-      .select('*, profile:profiles!logs_user_id_fkey(*)')
+      .select('*')
       .eq('user_id', user.id)
       .gte('created_at', startOfDay(now).toISOString())
       .lte('created_at', endOfDay(now).toISOString())
@@ -234,9 +246,7 @@ export default function StudioLogScreen() {
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.todayStrip}>
               {todayLogs.map((log) => (
-                <View key={log.id} style={styles.logCardWrap}>
-                  <LogCard log={log} />
-                </View>
+                <MiniTodayLogCard key={log.id} log={log} />
               ))}
             </ScrollView>
           )}
@@ -344,11 +354,31 @@ const styles = StyleSheet.create({
     fontSize: 17
   },
   todayStrip: {
-    paddingVertical: 8,
+    paddingVertical: 12,
+    paddingLeft: 16,
     paddingRight: 16
   },
-  logCardWrap: {
-    width: 280
+  miniLogCard: {
+    width: 160,
+    height: 200,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    borderRadius: 16,
+    backgroundColor: colors.bgBodyCard,
+    padding: 14,
+    justifyContent: 'space-between'
+  },
+  miniLogTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15,
+    lineHeight: 20
+  },
+  miniLogTime: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13
   },
   roomsHeader: {
     marginTop: 26

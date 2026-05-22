@@ -30,6 +30,15 @@ type Trend = {
   heat_score: number | null;
   angles: TrendAngle[];
 };
+type OpenStudio = {
+  id: string;
+  name: string;
+  topic: string;
+  created_at: string;
+  member_count: number;
+  clip_count: number;
+  last_clip_at: string | null;
+};
 
 const starColors = ['#ef4444', '#3b82f6', '#eab308', '#22c55e', '#a855f7'];
 const tabs: ContentTab[] = ['All', 'Trends', 'YouTube', 'IG'];
@@ -101,6 +110,35 @@ function TrendCard({ trend }: { trend: Trend }) {
   );
 }
 
+function OpenStudiosSection({ studios }: { studios: OpenStudio[] }) {
+  if (studios.length === 0) return null;
+
+  return (
+    <View style={styles.openStudiosSection}>
+      <Text style={styles.openStudiosTitle}>🌐 Open Studios</Text>
+      <Text style={styles.openStudiosSubtitle}>創作者嘅製作過程</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.openStudiosStrip}>
+        {studios.map((studio) => (
+          <Pressable
+            key={studio.id}
+            onPress={() => router.push(`/log/room/${studio.id}`)}
+            style={({ pressed }) => [styles.openStudioCard, pressed && styles.pressed]}
+          >
+            <Text style={styles.openStudioBadge}>🌐</Text>
+            <View style={styles.openStudioText}>
+              <Text numberOfLines={2} style={styles.openStudioName}>{studio.name}</Text>
+              <Text numberOfLines={1} style={styles.openStudioTopic}>{studio.topic}</Text>
+              <Text numberOfLines={1} style={styles.openStudioMeta}>
+                {studio.member_count} 位成員 · {studio.clip_count} clips
+              </Text>
+            </View>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
@@ -109,6 +147,7 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<ContentTab>('All');
   const [task, setTask] = useState<WorkItem | null>(null);
   const [trends, setTrends] = useState<Trend[]>([]);
+  const [openStudios, setOpenStudios] = useState<OpenStudio[]>([]);
   const [loadingTrends, setLoadingTrends] = useState(false);
   const [credits, setCredits] = useState(30);
   const heroHeight = Math.round(Dimensions.get('window').height * 0.45);
@@ -154,10 +193,73 @@ export default function HomeScreen() {
     setLoadingTrends(false);
   }, []);
 
+  const loadOpenStudios = useCallback(async () => {
+    const { data: rooms, error: roomsError } = await supabase
+      .from('topic_rooms')
+      .select('*')
+      .eq('privacy', 'open');
+
+    if (roomsError) {
+      console.log('Open studios fetch error:', JSON.stringify(roomsError));
+      setOpenStudios([]);
+      return;
+    }
+
+    const roomRows = rooms ?? [];
+    const roomIds = roomRows.map((room) => room.id);
+    if (roomIds.length === 0) {
+      setOpenStudios([]);
+      return;
+    }
+
+    const [{ data: members }, { data: clips }] = await Promise.all([
+      supabase.from('topic_room_members').select('room_id, user_id').in('room_id', roomIds),
+      supabase.from('topic_clips').select('id, room_id, created_at').in('room_id', roomIds)
+    ]);
+
+    const memberSets = new Map<string, Set<string>>();
+    (members ?? []).forEach((member) => {
+      const set = memberSets.get(member.room_id) ?? new Set<string>();
+      set.add(member.user_id);
+      memberSets.set(member.room_id, set);
+    });
+
+    const clipCounts = new Map<string, number>();
+    const lastClips = new Map<string, string>();
+    (clips ?? []).forEach((clip) => {
+      clipCounts.set(clip.room_id, (clipCounts.get(clip.room_id) ?? 0) + 1);
+      const current = lastClips.get(clip.room_id);
+      if (!current || new Date(clip.created_at).getTime() > new Date(current).getTime()) {
+        lastClips.set(clip.room_id, clip.created_at);
+      }
+    });
+
+    const studios = roomRows
+      .map((room) => ({
+        id: room.id,
+        name: room.name,
+        topic: room.topic,
+        created_at: room.created_at,
+        member_count: memberSets.get(room.id)?.size ?? 0,
+        clip_count: clipCounts.get(room.id) ?? 0,
+        last_clip_at: lastClips.get(room.id) ?? null
+      }))
+      .sort((a, b) => {
+        const aTime = a.last_clip_at ? new Date(a.last_clip_at).getTime() : -1;
+        const bTime = b.last_clip_at ? new Date(b.last_clip_at).getTime() : -1;
+        if (aTime !== bTime) return bTime - aTime;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      })
+      .slice(0, 5);
+
+    setOpenStudios(studios);
+  }, []);
+
   useEffect(() => {
     loadNudge();
     loadTrends();
-  }, [loadNudge, loadTrends]);
+    loadOpenStudios();
+  }, [loadNudge, loadOpenStudios, loadTrends]);
 
   const nudgeMessage = task
     ? `今日要完成：${task.title}${task.due_date ? `，截止 ${formatDueDate(task.due_date)}` : ''}`
@@ -210,6 +312,8 @@ export default function HomeScreen() {
             <Text style={styles.arrowText}>→</Text>
           </Pressable>
         </View>
+
+        <OpenStudiosSection studios={openStudios} />
 
         <Text style={styles.sectionTitle}>Content</Text>
         <View style={styles.contentTabs}>
@@ -393,6 +497,60 @@ const styles = StyleSheet.create({
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 22
+  },
+  openStudiosSection: {
+    marginTop: 22
+  },
+  openStudiosTitle: {
+    marginHorizontal: 16,
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 20
+  },
+  openStudiosSubtitle: {
+    marginTop: 4,
+    marginHorizontal: 16,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13
+  },
+  openStudiosStrip: {
+    paddingLeft: 16,
+    paddingRight: 4,
+    paddingTop: 12
+  },
+  openStudioCard: {
+    width: 200,
+    height: 140,
+    marginRight: 12,
+    borderRadius: 16,
+    backgroundColor: colors.bgHero,
+    padding: 16
+  },
+  openStudioBadge: {
+    alignSelf: 'flex-end',
+    fontSize: 12
+  },
+  openStudioText: {
+    marginTop: 'auto'
+  },
+  openStudioName: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    lineHeight: 20
+  },
+  openStudioTopic: {
+    marginTop: 5,
+    color: colors.textOnDarkMuted,
+    fontFamily: fonts.body,
+    fontSize: 13
+  },
+  openStudioMeta: {
+    marginTop: 8,
+    color: 'rgba(255,255,255,0.5)',
+    fontFamily: fonts.body,
+    fontSize: 12
   },
   sectionTitle: {
     marginTop: 24,

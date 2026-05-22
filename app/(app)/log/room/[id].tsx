@@ -120,10 +120,12 @@ export default function TopicRoomScreen() {
   const [room, setRoom] = useState<Room | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [clips, setClips] = useState<Clip[]>([]);
+  const [membershipRole, setMembershipRole] = useState<'owner' | 'member' | null>(null);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const memberAngles = useMemo(() => new Map(members.map((member) => [member.user_id, member.angle])), [members]);
-  const isOwner = Boolean(user && room?.owner_id === user.id);
+  const isMember = Boolean(membershipRole);
+  const isOwner = membershipRole === 'owner';
 
   const loadRoom = useCallback(async () => {
     if (!id) return;
@@ -160,8 +162,20 @@ export default function TopicRoomScreen() {
     setRoom(roomData ? { ...(roomData as Room), member_count: memberRows.length } : null);
     setMembers(memberRows);
     setClips(clipRows);
+
+    if (user) {
+      const { data: membership } = await supabase
+        .from('topic_room_members')
+        .select('id, role')
+        .eq('room_id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      setMembershipRole((membership?.role as 'owner' | 'member' | undefined) ?? null);
+    } else {
+      setMembershipRole(null);
+    }
     setLoading(false);
-  }, [id]);
+  }, [id, user]);
 
   useEffect(() => {
     loadRoom();
@@ -179,6 +193,23 @@ export default function TopicRoomScreen() {
 
   const copyInviteCode = () => {
     Alert.alert('邀請碼', room?.invite_code ?? '');
+  };
+
+  const joinStudio = async () => {
+    if (!user || !room) return;
+    setMembershipRole('member');
+    const { error } = await supabase
+      .from('topic_room_members')
+      .insert({ room_id: room.id, user_id: user.id, role: 'member' });
+
+    if (error) {
+      setMembershipRole(null);
+      Alert.alert('加入失敗', error.message);
+      return;
+    }
+
+    Alert.alert('已加入 Studio！');
+    loadRoom();
   };
 
   if (loading) {
@@ -229,9 +260,11 @@ export default function TopicRoomScreen() {
                 <Text numberOfLines={2} style={styles.memberAngle}>{member.angle || '未設定角度'}</Text>
               </View>
             ))}
-            <Pressable onPress={() => Alert.alert('邀請隊友', `邀請碼：${room.invite_code ?? ''}`)} style={styles.addMember}>
-              <Text style={styles.addMemberText}>＋</Text>
-            </Pressable>
+            {isMember ? (
+              <Pressable onPress={() => Alert.alert('邀請隊友', `邀請碼：${room.invite_code ?? ''}`)} style={styles.addMember}>
+                <Text style={styles.addMemberText}>＋</Text>
+              </Pressable>
+            ) : null}
           </ScrollView>
 
           {isOwner ? (
@@ -241,6 +274,12 @@ export default function TopicRoomScreen() {
                 <Text style={styles.copyText}>Copy</Text>
               </Pressable>
             </View>
+          ) : null}
+
+          {!isMember && room.privacy === 'open' ? (
+            <Pressable onPress={joinStudio} style={({ pressed }) => [styles.joinButton, pressed && styles.pressed]}>
+              <Text style={styles.joinButtonText}>+ 加入 Studio</Text>
+            </Pressable>
           ) : null}
         </View>
 
@@ -258,18 +297,22 @@ export default function TopicRoomScreen() {
         </View>
       </ScrollView>
 
-      <Pressable onPress={() => setSheetOpen(true)} style={({ pressed }) => [styles.fab, { bottom: insets.bottom + 22 }, pressed && styles.pressed]}>
-        <Text style={styles.fabText}>+ 新增 Clip</Text>
-      </Pressable>
-      <AddClipSheet
-        roomId={room.id}
-        visible={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        onSaved={() => {
-          setSheetOpen(false);
-          loadRoom();
-        }}
-      />
+      {isMember ? (
+        <>
+          <Pressable onPress={() => setSheetOpen(true)} style={({ pressed }) => [styles.fab, { bottom: insets.bottom + 22 }, pressed && styles.pressed]}>
+            <Text style={styles.fabText}>+ 新增 Clip</Text>
+          </Pressable>
+          <AddClipSheet
+            roomId={room.id}
+            visible={sheetOpen}
+            onClose={() => setSheetOpen(false)}
+            onSaved={() => {
+              setSheetOpen(false);
+              loadRoom();
+            }}
+          />
+        </>
+      ) : null}
     </View>
   );
 }
@@ -545,6 +588,19 @@ const styles = StyleSheet.create({
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 13
+  },
+  joinButton: {
+    alignSelf: 'flex-start',
+    marginTop: 16,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 18,
+    paddingVertical: 12
+  },
+  joinButtonText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14
   },
   body: {
     padding: 16
