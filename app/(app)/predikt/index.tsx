@@ -68,8 +68,8 @@ export default function PrediktScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.title}>預言書</Text>
-        <Text style={styles.subtitle}>🔥 Predikt · 創作者社群熱話</Text>
+        <Text style={styles.title}>討論區</Text>
+        <Text style={styles.subtitle}>🔥 創作者社群熱話</Text>
       </View>
       <FlatList
         data={trends}

@@ -110,7 +110,7 @@ export default function AppTabs() {
       <Tabs.Screen
         name="predikt/index"
         options={{
-          title: '預言書',
+          title: '討論區',
           tabBarIcon: ({ color }) => <Feather name="trending-up" size={22} color={color} />
         }}
       />
