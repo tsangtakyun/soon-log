@@ -1,11 +1,5 @@
 export { colors } from '@/theme/colors';
-
-export const fonts = {
-  heading: 'DMSerifDisplay_400Regular',
-  body: 'DMSans_400Regular',
-  bodyMedium: 'DMSans_500Medium',
-  bodyBold: 'DMSans_700Bold'
-};
+export { fonts } from '@/theme/fonts';
 
 export const spacing = {
   xs: 6,

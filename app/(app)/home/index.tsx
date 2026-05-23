@@ -15,14 +15,14 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ClipPlayer from '@/components/ClipPlayer';
 import { MenuDrawer } from '@/components/MenuDrawer';
-import { SavedSheet } from '@/components/SavedSheet';
+import { SocialLinksSheet } from '@/components/SocialLinksSheet';
+import { SubscriberStrip } from '@/components/SubscriberStrip';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
-import { WorkItem } from '@/types';
+import { Log } from '@/types';
 
 type TrendAngle = { emoji: string; name: string; percentage: number };
 type Trend = {
@@ -32,30 +32,17 @@ type Trend = {
   heat_score: number | null;
   angles: TrendAngle[];
 };
-type OpenStudio = {
-  id: string;
-  name: string;
-  topic: string;
-  created_at: string;
-  member_count: number;
-  clip_count: number;
-  last_clip_at: string | null;
-  latest_clip: {
-    id: string;
-    video_url: string | null;
-    media_urls: string[];
-    caption: string | null;
-    time_str: string | null;
-    date_str: string | null;
-    caption_align: 'left' | 'center' | 'right' | null;
-    text_size: 'small' | 'medium' | 'large' | null;
-    background_color: 'cream' | 'black' | null;
-  } | null;
-};
 type HomeProfile = {
   avatar_url: string | null;
   username: string | null;
   display_name: string | null;
+};
+type HomeLog = Log & {
+  profile?: {
+    username: string | null;
+    avatar_url: string | null;
+    display_name: string | null;
+  } | null;
 };
 type StarProps = {
   x: number;
@@ -64,13 +51,6 @@ type StarProps = {
   color: string;
   delay: number;
 };
-
-const nudgeMessages = [
-  '今日想記錄咩？撳 EGGS 開始拍片 🎬',
-  '有新題材？去 Ideas 儲低靈感 💡',
-  '睇下其他 creator 嘅熱話 👀',
-  '今日無任務，係時候創作！✨',
-];
 
 function AnimatedStar({ x, y, size, color, delay }: StarProps) {
   const opacity = useRef(new Animated.Value(0.3)).current;
@@ -176,126 +156,87 @@ function TrendCard({ trend }: { trend: Trend }) {
   );
 }
 
-function BlackBoxSection({ studios }: { studios: OpenStudio[] }) {
-  if (studios.length === 0) return null;
+function MiniLogCard({ log, compact = false }: { log: HomeLog; compact?: boolean }) {
+  const cover = log.media_urls?.[0] || log.video_url;
+  const username = log.profile?.username || 'soon';
+  const avatar = log.profile?.avatar_url;
 
   return (
-    <View style={styles.openStudiosSection}>
-      <View style={styles.sectionBannerCard}>
-        <Image source={require('../../../assets/home-black-box-banner.png')} style={styles.sectionBannerImage} />
+    <Pressable
+      onPress={() => router.push(`/(app)/log/${log.id}`)}
+      style={({ pressed }) => [styles.miniLogCard, compact && styles.ownMiniLogCard, pressed && styles.pressed]}
+    >
+      {cover ? (
+        <Image source={{ uri: cover }} style={styles.miniLogImage} />
+      ) : (
+        <View style={styles.miniLogFallback}>
+          <Text numberOfLines={3} style={styles.miniLogFallbackText}>{log.title || log.body || '日記'}</Text>
+        </View>
+      )}
+      <View style={styles.miniLogOverlay}>
+        <View style={styles.miniLogUserRow}>
+          {avatar ? <Image source={{ uri: avatar }} style={styles.miniLogAvatar} /> : null}
+          <Text numberOfLines={1} style={styles.miniLogUsername}>@{username}</Text>
+        </View>
+        <Text numberOfLines={1} style={styles.miniLogTitle}>{log.title || log.body || '未命名日記'}</Text>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.openStudiosStrip}>
-        {studios.map((studio) => (
-          <Pressable
-            key={studio.id}
-            onPress={() => router.push(`/(app)/log/room/${studio.id}`)}
-            style={({ pressed }) => [
-              studio.latest_clip?.video_url ? styles.blackBoxVideoCard : styles.openStudioCard,
-              pressed && styles.pressed
-            ]}
-          >
-            {studio.latest_clip?.video_url ? (
-              <>
-                <View style={styles.blackBoxPlayer}>
-                  <ClipPlayer clip={studio.latest_clip} width={200} height={140} thumbnail />
-                </View>
-                <View style={styles.blackBoxInfo}>
-                  <Text numberOfLines={1} style={styles.blackBoxName}>{studio.name}</Text>
-                  <Text numberOfLines={1} style={styles.blackBoxMeta}>{studio.member_count} 位成員 · {studio.clip_count} clips</Text>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={styles.openStudioBadge}>⬛</Text>
-                <View style={styles.openStudioText}>
-                  <Text numberOfLines={2} style={styles.openStudioName}>{studio.name}</Text>
-                  <Text numberOfLines={1} style={styles.openStudioTopic}>{studio.topic}</Text>
-                  <Text numberOfLines={1} style={styles.openStudioMeta}>
-                    {studio.member_count} 位成員 · {studio.clip_count} clips
-                  </Text>
-                </View>
-              </>
-            )}
-          </Pressable>
-        ))}
-      </ScrollView>
+    </Pressable>
+  );
+}
+
+function FollowingDiarySection({ logs, hasFollowing }: { logs: HomeLog[]; hasFollowing: boolean }) {
+  return (
+    <View style={styles.diarySection}>
+      <View style={styles.sectionHeaderRow}>
+        <View>
+          <Text style={styles.sectionHeading}>追蹤日記</Text>
+          <Text style={styles.sectionSubheading}>追蹤中創作者的最新日記</Text>
+        </View>
+      </View>
+      {logs.length > 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.diaryStrip}>
+          {logs.map((log) => <MiniLogCard key={log.id} log={log} />)}
+        </ScrollView>
+      ) : (
+        <View style={styles.followingEmpty}>
+          <Text style={styles.followingEmptyTitle}>
+            {hasFollowing ? '暫時未有新日記' : '追蹤創作者後睇佢哋嘅日記更新'}
+          </Text>
+          {!hasFollowing ? (
+            <Pressable onPress={() => router.push('/(app)/home/discover')} style={styles.discoverButton}>
+              <Text style={styles.discoverText}>去發掘</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      )}
     </View>
   );
 }
 
-function getTaskUrgency(task: WorkItem | null) {
-  if (!task?.due_date) return null;
-  const dueDate = new Date(`${task.due_date}T23:59:59`);
-  const hoursLeft = Math.floor((dueDate.getTime() - Date.now()) / 3600000);
-  const daysLeft = Math.max(1, Math.ceil(hoursLeft / 24));
-
-  if (hoursLeft < 3) {
-    return {
-      hoursLeft,
-      badge: `⏰ ${Math.max(0, hoursLeft)}小時後截止`,
-      badgeStyle: styles.deadlineBadgeUrgent,
-      badgeTextStyle: styles.deadlineBadgeTextUrgent,
-      cardStyle: styles.nudgeCardUrgent,
-    };
-  }
-
-  if (hoursLeft < 24) {
-    return {
-      hoursLeft,
-      badge: '⏰ 今日截止',
-      badgeStyle: styles.deadlineBadgeToday,
-      badgeTextStyle: styles.deadlineBadgeTextToday,
-      cardStyle: styles.nudgeCardNormal,
-    };
-  }
-
-  return {
-    hoursLeft,
-    badge: `📅 ${daysLeft}日後截止`,
-    badgeStyle: styles.deadlineBadgeLater,
-    badgeTextStyle: styles.deadlineBadgeTextLater,
-    cardStyle: styles.nudgeCardNormal,
-  };
-}
-
-function NudgeCard({ task }: { task: WorkItem | null }) {
-  const urgency = getTaskUrgency(task);
-  const fallbackMessage = useMemo(() => nudgeMessages[Math.floor(Math.random() * nudgeMessages.length)], []);
-
-  if (task?.due_date && urgency) {
-    return (
-      <View style={[styles.nudgeCard, urgency.cardStyle]}>
-        <View style={styles.nudgeTopRow}>
-          <View style={[styles.deadlineBadge, urgency.badgeStyle]}>
-            <Text style={[styles.deadlineBadgeText, urgency.badgeTextStyle]}>{urgency.badge}</Text>
-          </View>
-          <Pressable onPress={() => router.push('/(app)/work')} style={({ pressed }) => [styles.nudgeArrowCircle, pressed && styles.pressed]}>
-            <Text style={styles.nudgeArrowText}>→</Text>
-          </Pressable>
+function OwnDiarySection({ logs }: { logs: HomeLog[] }) {
+  return (
+    <View style={styles.diarySection}>
+      <View style={styles.sectionHeaderRow}>
+        <View>
+          <Text style={styles.sectionHeading}>🥚 我的日記</Text>
+          <Text style={styles.sectionSubheading}>我最近嘅記錄</Text>
         </View>
-        <Text style={styles.nudgeTaskTitle}>{task.title}</Text>
-        <Text style={styles.nudgeHint}>撳入睇詳情 →</Text>
-      </View>
-    );
-  }
-
-  if (task) {
-    return (
-      <View style={[styles.nudgeCard, styles.nudgeCardNormal, styles.nudgeSimpleCard]}>
-        <Text style={styles.nudgeSimpleText}>📋 今日待辦：{task.title}</Text>
-        <Pressable onPress={() => router.push('/(app)/work')} style={({ pressed }) => [styles.nudgeArrowCircle, pressed && styles.pressed]}>
-          <Text style={styles.nudgeArrowText}>→</Text>
+        <Pressable onPress={() => router.push('/(app)/profile')} hitSlop={8}>
+          <Text style={styles.viewAll}>睇全部</Text>
         </Pressable>
       </View>
-    );
-  }
-
-  return (
-    <View style={[styles.nudgeCard, styles.nudgeCardMotivational, styles.nudgeSimpleCard]}>
-      <Text style={styles.nudgeMotivationText}>{fallbackMessage}</Text>
-      <Pressable onPress={() => router.push('/(app)/log')} style={({ pressed }) => [styles.nudgeArrowCircle, pressed && styles.pressed]}>
-        <Text style={styles.nudgeArrowText}>→</Text>
-      </Pressable>
+      {logs.length > 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.diaryStrip}>
+          {logs.map((log) => <MiniLogCard key={log.id} log={log} compact />)}
+        </ScrollView>
+      ) : (
+        <View style={styles.followingEmpty}>
+          <Text style={styles.followingEmptyTitle}>仲未有日記</Text>
+          <Pressable onPress={() => router.push('/(app)/log')} style={styles.discoverButton}>
+            <Text style={styles.discoverText}>開始記錄</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
@@ -304,11 +245,12 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user, profile: authProfile } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [savedOpen, setSavedOpen] = useState(false);
+  const [socialLinksOpen, setSocialLinksOpen] = useState(false);
   const [homeProfile, setHomeProfile] = useState<HomeProfile | null>(null);
-  const [task, setTask] = useState<WorkItem | null>(null);
   const [trends, setTrends] = useState<Trend[]>([]);
-  const [openStudios, setOpenStudios] = useState<OpenStudio[]>([]);
+  const [followingLogs, setFollowingLogs] = useState<HomeLog[]>([]);
+  const [ownLogs, setOwnLogs] = useState<HomeLog[]>([]);
+  const [hasFollowing, setHasFollowing] = useState(false);
   const [loadingTrends, setLoadingTrends] = useState(false);
   const [credits, setCredits] = useState(30);
   const screenWidth = Dimensions.get('window').width;
@@ -322,17 +264,9 @@ export default function HomeScreen() {
   const avatar = homeProfile?.avatar_url;
   const initial = (homeProfile?.username || authProfile?.username || user?.email || 'S').slice(0, 1).toUpperCase();
 
-  const loadNudge = useCallback(async () => {
+  const loadProfileSummary = useCallback(async () => {
     if (!user) return;
-    const [{ data: taskData }, { data: creditData }, { data: profileData }] = await Promise.all([
-      supabase
-        .from('work_items')
-        .select('*')
-        .eq('user_id', user.id)
-        .neq('status', 'done')
-        .order('due_date', { ascending: true, nullsFirst: false })
-        .limit(1)
-        .maybeSingle(),
+    const [{ data: creditData }, { data: profileData }] = await Promise.all([
       supabase
         .from('user_credits')
         .select('balance')
@@ -344,7 +278,6 @@ export default function HomeScreen() {
         .eq('id', user.id)
         .maybeSingle()
     ]);
-    setTask((taskData ?? null) as WorkItem | null);
     if (creditData?.balance !== undefined) setCredits(creditData.balance as number);
     if (profileData) setHomeProfile(profileData as HomeProfile);
   }, [user]);
@@ -365,87 +298,43 @@ export default function HomeScreen() {
     setLoadingTrends(false);
   }, []);
 
-  const loadOpenStudios = useCallback(async () => {
-    const { data: rooms, error: roomsError } = await supabase
-      .from('topic_rooms')
-      .select('*')
-      .eq('privacy', 'open');
+  const loadDiaries = useCallback(async () => {
+    if (!user) return;
+    const { data: following } = await supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', user.id);
 
-    if (roomsError) {
-      setOpenStudios([]);
-      return;
-    }
+    const followingIds = (following ?? []).map((row) => row.following_id).filter(Boolean);
+    setHasFollowing(followingIds.length > 0);
 
-    const roomRows = rooms ?? [];
-    const roomIds = roomRows.map((room) => room.id);
-    if (roomIds.length === 0) {
-      setOpenStudios([]);
-      return;
-    }
+    const ownQuery = supabase
+      .from('logs')
+      .select('*, profile:profiles!logs_user_id_fkey(username, avatar_url, display_name)')
+      .eq('user_id', user.id)
+      .eq('is_published', true)
+      .order('created_at', { ascending: false })
+      .limit(3);
 
-    const [{ data: members }, { data: clips }] = await Promise.all([
-      supabase.from('topic_room_members').select('room_id, user_id').in('room_id', roomIds),
-      supabase
-        .from('topic_clips')
-        .select('id, room_id, created_at, video_url, media_urls, caption, time_str, date_str, caption_align, text_size, background_color')
-        .in('room_id', roomIds)
-    ]);
+    const followingQuery = followingIds.length > 0
+      ? supabase
+        .from('logs')
+        .select('*, profile:profiles!logs_user_id_fkey(username, avatar_url, display_name)')
+        .in('user_id', followingIds)
+        .eq('is_published', true)
+        .order('created_at', { ascending: false })
+        .limit(5)
+      : Promise.resolve({ data: [], error: null });
 
-    const memberSets = new Map<string, Set<string>>();
-    (members ?? []).forEach((member) => {
-      const set = memberSets.get(member.room_id) ?? new Set<string>();
-      set.add(member.user_id);
-      memberSets.set(member.room_id, set);
-    });
-
-    const clipCounts = new Map<string, number>();
-    const lastClips = new Map<string, string>();
-    const latestClips = new Map<string, OpenStudio['latest_clip']>();
-    (clips ?? []).forEach((clip) => {
-      clipCounts.set(clip.room_id, (clipCounts.get(clip.room_id) ?? 0) + 1);
-      const current = lastClips.get(clip.room_id);
-      if (!current || new Date(clip.created_at).getTime() > new Date(current).getTime()) {
-        lastClips.set(clip.room_id, clip.created_at);
-        latestClips.set(clip.room_id, {
-          id: clip.id,
-          video_url: clip.video_url ?? null,
-          media_urls: Array.isArray(clip.media_urls) ? clip.media_urls : [],
-          caption: clip.caption ?? null,
-          time_str: clip.time_str ?? null,
-          date_str: clip.date_str ?? null,
-          caption_align: clip.caption_align ?? null,
-          text_size: clip.text_size ?? null,
-          background_color: clip.background_color ?? null,
-        });
-      }
-    });
-
-    const studios = roomRows
-      .map((room) => ({
-        id: room.id,
-        name: room.name,
-        topic: room.topic,
-        created_at: room.created_at,
-        member_count: memberSets.get(room.id)?.size ?? 0,
-        clip_count: clipCounts.get(room.id) ?? 0,
-        last_clip_at: lastClips.get(room.id) ?? null,
-        latest_clip: latestClips.get(room.id) ?? null
-      }))
-      .sort((a, b) => {
-        const aTime = a.last_clip_at ? new Date(a.last_clip_at).getTime() : -1;
-        const bTime = b.last_clip_at ? new Date(b.last_clip_at).getTime() : -1;
-        if (aTime !== bTime) return bTime - aTime;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      })
-      .slice(0, 5);
-
-    setOpenStudios(studios);
-  }, []);
+    const [{ data: ownData }, { data: followingData }] = await Promise.all([ownQuery, followingQuery]);
+    setOwnLogs((ownData ?? []) as HomeLog[]);
+    setFollowingLogs((followingData ?? []) as HomeLog[]);
+  }, [user]);
 
   useEffect(() => {
-    loadNudge();
+    loadProfileSummary();
     loadTrends();
-  }, [loadNudge, loadTrends]);
+  }, [loadProfileSummary, loadTrends]);
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -471,8 +360,8 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadOpenStudios();
-    }, [loadOpenStudios])
+      loadDiaries();
+    }, [loadDiaries])
   );
 
   return (
@@ -482,19 +371,19 @@ export default function HomeScreen() {
         <View style={[styles.topBar, { top: insets.top + 14 }]}>
           <View style={styles.topActions}>
             <Pressable onPress={() => setDrawerOpen(true)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
-              <Feather name="menu" size={20} color={colors.text} />
+              <Feather name="menu" size={20} color="#ffffff" />
             </Pressable>
             <Pressable onPress={() => Alert.alert('AI Credits', `你今日仲有 ${credits} credits`)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
-              <Feather name="circle" size={20} color={colors.text} />
+              <Image source={require('../../../assets/coin.png')} style={styles.topIcon} />
               <Text style={styles.creditTiny}>{credits}</Text>
             </Pressable>
           </View>
           <View style={styles.topActions}>
             <Pressable onPress={() => router.push('/(app)/home/referrals')} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
-              <Feather name="gift" size={20} color={colors.text} />
+              <Image source={require('../../../assets/gift.png')} style={styles.topIcon} />
             </Pressable>
-            <Pressable onPress={() => setSavedOpen(true)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
-              <Feather name="bookmark" size={20} color={colors.text} />
+            <Pressable onPress={() => setSocialLinksOpen(true)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
+              <Image source={require('../../../assets/save.png')} style={styles.topIcon} />
             </Pressable>
           </View>
         </View>
@@ -522,9 +411,11 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
-        <NudgeCard task={task} />
+        <SubscriberStrip />
 
-        <BlackBoxSection studios={openStudios} />
+        <FollowingDiarySection logs={followingLogs} hasFollowing={hasFollowing} />
+
+        <OwnDiarySection logs={ownLogs} />
 
         <View style={styles.prediktSection}>
           <View style={styles.sectionBannerCard}>
@@ -543,7 +434,7 @@ export default function HomeScreen() {
       </ScrollView>
 
       <MenuDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
-      <SavedSheet visible={savedOpen} onClose={() => setSavedOpen(false)} />
+      <SocialLinksSheet visible={socialLinksOpen} onClose={() => setSocialLinksOpen(false)} />
     </View>
   );
 }
@@ -578,6 +469,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.5)',
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  topIcon: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain'
   },
   creditTiny: {
     position: 'absolute',
@@ -645,104 +541,7 @@ const styles = StyleSheet.create({
   bodyContent: {
     paddingBottom: 110
   },
-  nudgeCard: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16
-  },
-  nudgeCardUrgent: {
-    borderColor: '#E8614A',
-    backgroundColor: '#FFF0EE'
-  },
-  nudgeCardNormal: {
-    borderColor: colors.bodyBorder,
-    backgroundColor: colors.bgBodyCard
-  },
-  nudgeCardMotivational: {
-    borderColor: colors.bodyBorder,
-    backgroundColor: colors.bgBodyMuted
-  },
-  nudgeSimpleCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12
-  },
-  nudgeTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12
-  },
-  deadlineBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5
-  },
-  deadlineBadgeUrgent: {
-    backgroundColor: '#E8614A'
-  },
-  deadlineBadgeToday: {
-    backgroundColor: '#FFF0EE'
-  },
-  deadlineBadgeLater: {
-    backgroundColor: colors.bgBodyMuted
-  },
-  deadlineBadgeText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 12
-  },
-  deadlineBadgeTextUrgent: {
-    color: colors.textOnDark
-  },
-  deadlineBadgeTextToday: {
-    color: '#E8614A'
-  },
-  deadlineBadgeTextLater: {
-    color: colors.textMuted
-  },
-  nudgeArrowCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  nudgeArrowText: {
-    color: colors.textOnDark,
-    fontFamily: fonts.bodyBold,
-    fontSize: 18
-  },
-  nudgeTaskTitle: {
-    marginTop: 8,
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 16,
-    lineHeight: 22
-  },
-  nudgeHint: {
-    marginTop: 4,
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 12
-  },
-  nudgeSimpleText: {
-    flex: 1,
-    color: colors.text,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 15,
-    lineHeight: 21
-  },
-  nudgeMotivationText: {
-    flex: 1,
-    color: '#3A3A3A',
-    fontFamily: fonts.bodyMedium,
-    fontSize: 15,
-    lineHeight: 21
-  },
-  openStudiosSection: {
+  diarySection: {
     marginTop: 22
   },
   sectionBannerCard: {
@@ -757,74 +556,118 @@ const styles = StyleSheet.create({
     height: 62,
     resizeMode: 'contain'
   },
-  openStudiosStrip: {
+  diaryStrip: {
     paddingLeft: 16,
     paddingRight: 4,
     paddingTop: 12
   },
-  openStudioCard: {
-    width: 200,
-    height: 140,
+  miniLogCard: {
+    width: 160,
+    height: 200,
     marginRight: 12,
     borderRadius: 16,
-    backgroundColor: colors.bgHero,
-    padding: 16
-  },
-  blackBoxVideoCard: {
-    width: 200,
-    height: 196,
-    marginRight: 12,
-    borderRadius: 16,
-    backgroundColor: colors.bgHero,
-    overflow: 'hidden'
-  },
-  blackBoxPlayer: {
-    width: 200,
-    height: 140,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
     overflow: 'hidden',
     backgroundColor: colors.bgHero
   },
-  blackBoxInfo: {
-    paddingHorizontal: 12,
-    paddingVertical: 10
+  ownMiniLogCard: {
+    height: 190
   },
-  blackBoxName: {
+  miniLogImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover'
+  },
+  miniLogFallback: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 14
+  },
+  miniLogFallbackText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    lineHeight: 22
+  },
+  miniLogOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.58)'
+  },
+  miniLogUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  miniLogAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.bgHeroSurface
+  },
+  miniLogUsername: {
+    flex: 1,
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
+  },
+  miniLogTitle: {
+    marginTop: 7,
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 14
   },
-  blackBoxMeta: {
-    marginTop: 4,
-    color: colors.textOnDarkMuted,
-    fontFamily: fonts.body,
-    fontSize: 12
+  followingEmpty: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    backgroundColor: colors.bgBodyMuted,
+    padding: 16
   },
-  openStudioBadge: {
-    alignSelf: 'flex-end',
-    fontSize: 12
-  },
-  openStudioText: {
-    marginTop: 'auto'
-  },
-  openStudioName: {
-    color: colors.textOnDark,
-    fontFamily: fonts.bodyBold,
-    fontSize: 16,
+  followingEmptyTitle: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
     lineHeight: 20
   },
-  openStudioTopic: {
-    marginTop: 5,
-    color: colors.textOnDarkMuted,
+  discoverButton: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8
+  },
+  discoverText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13
+  },
+  sectionHeaderRow: {
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end'
+  },
+  sectionHeading: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 20
+  },
+  sectionSubheading: {
+    marginTop: 3,
+    color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 13
   },
-  openStudioMeta: {
-    marginTop: 8,
-    color: 'rgba(255,255,255,0.5)',
-    fontFamily: fonts.body,
-    fontSize: 12
+  viewAll: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13
   },
   prediktSection: {
     marginTop: 24

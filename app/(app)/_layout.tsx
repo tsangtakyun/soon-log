@@ -63,7 +63,7 @@ export default function AppTabs() {
       <Tabs.Screen
         name="home/index"
         options={{
-          title: 'Home',
+          title: '首頁',
           tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />
         }}
       />
@@ -108,19 +108,21 @@ export default function AppTabs() {
         }}
       />
       <Tabs.Screen
-        name="idea/library"
+        name="predikt/index"
         options={{
-          title: 'Ideas',
-          tabBarIcon: ({ color }) => <Feather name="bookmark" size={22} color={color} />
+          title: '預言書',
+          tabBarIcon: ({ color }) => <Feather name="trending-up" size={22} color={color} />
         }}
       />
       <Tabs.Screen
-        name="work/index"
+        name="tools/index"
         options={{
-          title: 'Work',
-          tabBarIcon: ({ color }) => <Feather name="check-square" size={22} color={color} />
+          title: '工具',
+          tabBarIcon: ({ color }) => <Feather name="tool" size={22} color={color} />
         }}
       />
+      <Tabs.Screen name="idea/library" options={{ href: null }} />
+      <Tabs.Screen name="work/index" options={{ href: null }} />
       <Tabs.Screen name="mayan/index" options={{ href: null }} />
       <Tabs.Screen name="reply-centre" options={{ href: null }} />
       <Tabs.Screen name="feed/index" options={{ href: null }} />

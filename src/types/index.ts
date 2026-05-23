@@ -10,6 +10,8 @@ export type Profile = {
   region: Region | null;
   role: Role;
   expo_push_token: string | null;
+  social_links?: Record<string, string> | null;
+  social_stats?: Record<string, number> | null;
   created_at: string;
   last_seen_at: string | null;
 };
