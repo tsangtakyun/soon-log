@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -29,8 +29,6 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function TopicClipCameraScreen() {
   const insets = useSafeAreaInsets();
-  const { room_id } = useLocalSearchParams<{ room_id: string }>();
-  const roomId = Array.isArray(room_id) ? room_id[0] : room_id;
   const { hasPermission, requestPermission } = useCameraPermission();
   const {
     hasPermission: hasMicrophonePermission,
@@ -69,13 +67,6 @@ export default function TopicClipCameraScreen() {
   }, []);
 
   useEffect(() => {
-    if (!roomId) {
-      Alert.alert('找不到 Topic Room', '請由 Topic Room 重新開始拍攝。');
-      router.back();
-    }
-  }, [roomId]);
-
-  useEffect(() => {
     const requestPermissions = async () => {
       const cameraGranted = hasPermission || await requestPermission();
       const microphoneGranted = !audio || hasMicrophonePermission || await requestMicrophonePermission();
@@ -108,7 +99,7 @@ export default function TopicClipCameraScreen() {
   }, []);
 
   const startRecordingNow = useCallback(async () => {
-    if (!cameraRef.current || isRecording || !roomId) return;
+    if (!cameraRef.current || isRecording) return;
     const maxDuration = Number(duration);
     setIsRecording(true);
     setRecordingProgress(0);
@@ -135,8 +126,7 @@ export default function TopicClipCameraScreen() {
           params: {
             uri: video.path,
             timeStr: formatTime(now),
-            dateStr: formatDate(now),
-            room_id: roomId
+            dateStr: formatDate(now)
           }
         });
         },
@@ -154,7 +144,7 @@ export default function TopicClipCameraScreen() {
       const message = err instanceof Error ? err.message : '錄影失敗';
       Alert.alert('錄影失敗', message);
     }
-  }, [clearRecordingTimers, duration, flash, isRecording, roomId, stopRecording]);
+  }, [clearRecordingTimers, duration, flash, isRecording, stopRecording]);
 
   const startRecording = useCallback(async () => {
     if (isRecording || countdown !== null) return;

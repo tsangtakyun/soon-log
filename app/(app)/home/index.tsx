@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MenuDrawer } from '@/components/MenuDrawer';
 import { SocialLinksSheet } from '@/components/SocialLinksSheet';
 import { SubscriberStrip } from '@/components/SubscriberStrip';
+import ClipPlayer from '@/components/ClipPlayer';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
@@ -158,6 +159,7 @@ function TrendCard({ trend }: { trend: Trend }) {
 
 function MiniLogCard({ log, compact = false }: { log: HomeLog; compact?: boolean }) {
   const cover = log.media_urls?.[0] || log.video_url;
+  const isVideo = !!cover && (cover.endsWith('.mp4') || cover.includes('video'));
   const username = log.profile?.username || 'soon';
   const avatar = log.profile?.avatar_url;
 
@@ -167,7 +169,16 @@ function MiniLogCard({ log, compact = false }: { log: HomeLog; compact?: boolean
       style={({ pressed }) => [styles.miniLogCard, compact && styles.ownMiniLogCard, pressed && styles.pressed]}
     >
       {cover ? (
-        <Image source={{ uri: cover }} style={styles.miniLogImage} />
+        <ClipPlayer
+          clip={{
+            id: log.id,
+            video_url: isVideo ? cover : null,
+            media_urls: log.media_urls || (isVideo ? [] : [cover]),
+          }}
+          width={160}
+          height={compact ? 190 : 200}
+          thumbnail
+        />
       ) : (
         <View style={[styles.miniLogFallback, compact && styles.ownMiniLogFallback]}>
           <Text numberOfLines={3} style={[styles.miniLogFallbackText, compact && styles.ownMiniLogFallbackText]}>
@@ -215,14 +226,14 @@ function FollowingDiarySection({ logs }: { logs: HomeLog[]; hasFollowing: boolea
 function OwnDiarySection({ logs }: { logs: HomeLog[] }) {
   return (
     <View style={styles.diarySection}>
-      <View style={styles.diaryBannerRow}>
-        <View style={styles.sectionBannerCardInline}>
+      <Pressable
+        onPress={() => router.push('/(app)/profile')}
+        style={({ pressed }) => [styles.ownDiaryBannerButton, pressed && styles.pressed]}
+      >
+        <View style={styles.sectionBannerCard}>
           <Image source={require('../../../assets/home-diary-banner.png')} style={styles.sectionBannerImage} />
         </View>
-        <Pressable onPress={() => router.push('/(app)/profile')} hitSlop={8}>
-          <Text style={styles.viewAll}>睇全部</Text>
-        </Pressable>
-      </View>
+      </Pressable>
       {logs.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.diaryStrip}>
           {logs.map((log) => <MiniLogCard key={log.id} log={log} compact />)}
@@ -230,7 +241,7 @@ function OwnDiarySection({ logs }: { logs: HomeLog[] }) {
       ) : (
         <View style={styles.followingEmpty}>
           <Text style={styles.followingEmptyTitle}>仲未有日記</Text>
-          <Pressable onPress={() => router.push('/(app)/log')} style={styles.discoverButton}>
+          <Pressable onPress={() => router.push('/(app)/log/camera')} style={styles.discoverButton}>
             <Text style={styles.discoverText}>開始記錄</Text>
           </Pressable>
         </View>
@@ -397,7 +408,7 @@ export default function HomeScreen() {
             )}
             <Text style={styles.username}>{displayUsername}</Text>
           </Pressable>
-          <Pressable onPress={() => router.push('/(app)/log')} style={({ pressed }) => pressed && styles.pressed}>
+          <Pressable onPress={() => router.push('/(app)/log/camera')} style={({ pressed }) => pressed && styles.pressed}>
             <View style={styles.eggImageButton}>
               <Animated.Image
                 source={require('../../../assets/soon-egg.png')}
@@ -549,18 +560,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     alignItems: 'center'
   },
-  diaryBannerRow: {
-    marginHorizontal: 16,
-    flexDirection: 'row',
+  ownDiaryBannerButton: {
     alignItems: 'center',
-    justifyContent: 'space-between'
-  },
-  sectionBannerCardInline: {
-    flex: 1,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: 'transparent',
-    alignItems: 'flex-start'
+    marginBottom: 12
   },
   sectionBannerImage: {
     width: '50%',

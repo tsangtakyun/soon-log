@@ -11,6 +11,7 @@ import {
   Alert,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -28,6 +29,11 @@ import { colors } from '@/theme/colors';
 type CaptionAlign = 'left' | 'center' | 'right';
 type TextSize = 'small' | 'medium' | 'large';
 type OverlayVertical = 'top' | 'middle' | 'bottom';
+type TopicRoom = {
+  id: string;
+  name: string;
+  topic: string | null;
+};
 
 const TEXT_SIZES: Record<TextSize, number> = {
   small: 14,
@@ -48,7 +54,7 @@ function fixedFileUri(uri: string) {
 export default function TopicClipPreviewScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const params = useLocalSearchParams<{ uri: string; timeStr: string; dateStr: string; room_id: string }>();
+  const params = useLocalSearchParams<{ uri: string; timeStr: string; dateStr: string; room_id?: string }>();
   const uri = Array.isArray(params.uri) ? params.uri[0] : params.uri;
   const timeStr = Array.isArray(params.timeStr) ? params.timeStr[0] : params.timeStr;
   const dateStr = Array.isArray(params.dateStr) ? params.dateStr[0] : params.dateStr;
@@ -58,6 +64,9 @@ export default function TopicClipPreviewScreen() {
   const [overlayVertical, setOverlayVertical] = useState<OverlayVertical>('middle');
   const [textSize, setTextSize] = useState<TextSize>('medium');
   const [uploading, setUploading] = useState(false);
+  const [showRoomPicker, setShowRoomPicker] = useState(false);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(roomId || null);
+  const [rooms, setRooms] = useState<TopicRoom[]>([]);
   const [captionEditing, setCaptionEditing] = useState(false);
   const captionInputRef = useRef<TextInput>(null);
   const lastPreviewTapRef = useRef(0);
@@ -82,6 +91,33 @@ export default function TopicClipPreviewScreen() {
     fontSize: captionFontSize,
     lineHeight: captionLineHeight
   } as const;
+  const selectedRoomName = rooms.find((room) => room.id === selectedRoomId)?.name;
+
+  useEffect(() => {
+    async function fetchRooms() {
+      if (!user?.id) return;
+      const { data, error } = await supabase
+        .from('topic_room_members')
+        .select('topic_rooms(id, name, topic)')
+        .eq('user_id', user.id);
+
+      if (error) return;
+
+      const nextRooms = (data ?? []).flatMap((row) => {
+        const room = (row as { topic_rooms?: TopicRoom | TopicRoom[] | null }).topic_rooms;
+        if (!room) return [];
+        return Array.isArray(room) ? room : [room];
+      });
+      const uniqueRooms = Array.from(new Map(nextRooms.map((room) => [room.id, room])).values());
+      setRooms(uniqueRooms);
+
+      if (!roomId && uniqueRooms.length === 1) {
+        setSelectedRoomId(uniqueRooms[0].id);
+      }
+    }
+
+    fetchRooms();
+  }, [roomId, user?.id]);
 
   useEffect(() => {
     if (!fileUri) return;
@@ -137,11 +173,16 @@ export default function TopicClipPreviewScreen() {
   }
 
   async function uploadAndPublish() {
-    if (!user?.id || !roomId || !fileUri || uploading) return;
+    if (!user?.id || !fileUri || uploading) return;
+    const targetRoomId = selectedRoomId;
+    if (!targetRoomId) {
+      Alert.alert('請先選擇 Topic Room');
+      return;
+    }
     setUploading(true);
 
     try {
-      const filename = `topic-clips/${roomId}/${user.id}_${Date.now()}.mp4`;
+      const filename = `topic-clips/${targetRoomId}/${user.id}_${Date.now()}.mp4`;
       const fileContent = await FileSystem.readAsStringAsync(fileUri, {
         encoding: FileSystem.EncodingType.Base64
       });
@@ -159,7 +200,7 @@ export default function TopicClipPreviewScreen() {
       const { error: insertError } = await supabase
         .from('topic_clips')
         .insert({
-          room_id: roomId,
+          room_id: targetRoomId,
           user_id: user.id,
           caption: caption.trim() || null,
           video_url: publicUrl,
@@ -173,7 +214,7 @@ export default function TopicClipPreviewScreen() {
       if (insertError) throw insertError;
 
       Alert.alert('上載成功', '已分享到 Topic Room');
-      router.replace(`/(app)/log/room/${roomId}`);
+      router.replace(`/(app)/log/room/${targetRoomId}`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '上載失敗';
       Alert.alert('上載失敗', message);
@@ -182,7 +223,16 @@ export default function TopicClipPreviewScreen() {
     }
   }
 
-  if (!fileUri || !roomId) {
+  function handleUploadPress() {
+    if (!selectedRoomId) {
+      setShowRoomPicker(true);
+      return;
+    }
+
+    uploadAndPublish();
+  }
+
+  if (!fileUri) {
     return (
       <View style={styles.emptyScreen}>
         <Text style={styles.emptyText}>找不到影片</Text>
@@ -310,13 +360,64 @@ export default function TopicClipPreviewScreen() {
               <Text style={styles.actionIcon}>💾</Text>
               <Text style={styles.actionText}>儲存</Text>
             </Pressable>
-            <Pressable onPress={uploadAndPublish} disabled={uploading} style={({ pressed }) => [styles.uploadButton, (pressed || uploading) && styles.pressed]}>
-              <Text style={styles.uploadIcon}>📤</Text>
-              <Text style={styles.uploadText}>{uploading ? '上載中' : '上載'}</Text>
+            <Pressable onPress={handleUploadPress} disabled={uploading} style={({ pressed }) => [styles.uploadButton, (pressed || uploading) && styles.pressed]}>
+              {uploading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.uploadIcon}>📤</Text>
+                  <Text style={styles.uploadText}>
+                    {selectedRoomId ? `上載到 ${selectedRoomName || 'Topic Room'}` : '選擇房間上載'}
+                  </Text>
+                </>
+              )}
             </Pressable>
           </View>
         </View>
       </ScrollView>
+
+      <Modal visible={showRoomPicker} transparent animationType="slide" onRequestClose={() => setShowRoomPicker(false)}>
+        <View style={styles.pickerOverlay}>
+          <View style={[styles.pickerSheet, { paddingBottom: insets.bottom + 28 }]}>
+            <Text style={styles.pickerTitle}>選擇 Topic Room</Text>
+
+            {rooms.map((room) => (
+              <Pressable
+                key={room.id}
+                style={[styles.roomRow, selectedRoomId === room.id && styles.roomRowSelected]}
+                onPress={() => {
+                  setSelectedRoomId(room.id);
+                  setShowRoomPicker(false);
+                }}
+              >
+                <View>
+                  <Text style={styles.roomName}>{room.name}</Text>
+                  <Text style={styles.roomTopic}>{room.topic || 'Topic Room'}</Text>
+                </View>
+                {selectedRoomId === room.id ? <Text style={styles.roomSelectedCheck}>✓</Text> : null}
+              </Pressable>
+            ))}
+
+            {rooms.length === 0 ? (
+              <View style={styles.noRooms}>
+                <Text style={styles.noRoomsText}>未有 Topic Room</Text>
+                <Pressable
+                  onPress={() => {
+                    setShowRoomPicker(false);
+                    router.push('/(app)/log/create-room');
+                  }}
+                >
+                  <Text style={styles.createRoomLink}>+ 建立 Topic Room</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            <Pressable style={styles.cancelBtn} onPress={() => setShowRoomPicker(false)}>
+              <Text style={styles.cancelText}>取消</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       {uploading ? (
         <View style={styles.uploadingOverlay}>
@@ -535,6 +636,80 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontFamily: fonts.bodyBold,
     fontSize: 16
+  },
+  pickerOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)'
+  },
+  pickerSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: colors.bgBody,
+    padding: 20
+  },
+  pickerTitle: {
+    marginBottom: 16,
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 18,
+    fontWeight: '700'
+  },
+  roomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 14
+  },
+  roomRowSelected: {
+    backgroundColor: colors.primaryLight
+  },
+  roomName: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  roomTopic: {
+    marginTop: 2,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13
+  },
+  roomSelectedCheck: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 18
+  },
+  noRooms: {
+    alignItems: 'center',
+    paddingVertical: 24
+  },
+  noRoomsText: {
+    color: '#888',
+    fontFamily: fonts.body,
+    fontSize: 15
+  },
+  createRoomLink: {
+    marginTop: 8,
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    fontWeight: '600'
+  },
+  cancelBtn: {
+    marginTop: 16,
+    alignItems: 'center',
+    paddingVertical: 12
+  },
+  cancelText: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 15
   },
   emptyScreen: {
     flex: 1,
