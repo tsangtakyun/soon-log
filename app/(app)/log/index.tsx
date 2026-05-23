@@ -1,445 +1,373 @@
-import { useEventListener } from 'expo';
+import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  Image,
-  Modal,
+  FlatList,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ClipPlayer from '@/components/ClipPlayer';
 import { OnboardingBanner } from '@/components/OnboardingBanner';
+import { TopicRoomCard, TopicRoomCardRoom } from '@/components/TopicRoomCard';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
-import CreateTopicRoomScreen from './create-room';
 
-type TopicRoom = {
+type ActiveTab = 'personal' | 'following' | 'explore';
+
+type TopicClipRow = {
+  id: string;
+  video_url?: string | null;
+  media_urls?: string[] | null;
+  time_str?: string | null;
+  date_str?: string | null;
+  user_id: string;
+  created_at?: string;
+};
+
+type TopicMemberRow = {
+  user_id: string;
+  profiles?: {
+    username: string;
+    avatar_url?: string | null;
+    display_name?: string | null;
+  } | null;
+};
+
+type TopicRoomRow = {
   id: string;
   name: string;
   topic: string;
-  privacy: 'private' | 'open';
-  created_at: string;
+  privacy: string;
+  owner_id: string;
+  created_at?: string;
   updated_at?: string | null;
-  invite_code?: string | null;
-  member_count?: number | null;
-  last_clip_at?: string | null;
-  clip_count?: number | null;
-  latest_caption?: string | null;
-  latest_video_url?: string | null;
-  latest_image_url?: string | null;
+  topic_room_members?: TopicMemberRow[] | null;
+  topic_clips?: TopicClipRow[] | null;
 };
 
-type TodayClip = {
-  id: string;
-  room_id: string;
-  user_id: string;
-  caption: string | null;
-  notes: string | null;
-  media_urls: string[];
-  video_url: string | null;
-  time_str: string | null;
-  date_str: string | null;
-  caption_align: 'left' | 'center' | 'right' | null;
-  text_size: 'small' | 'medium' | 'large' | null;
-  background_color: 'cream' | 'black' | null;
-  created_at: string;
-  room_name: string | null;
-};
+const tabs: Array<{ key: ActiveTab; label: string }> = [
+  { key: 'personal', label: '個人' },
+  { key: 'following', label: '追蹤' },
+  { key: 'explore', label: '探索' }
+];
 
-function formatActivity(value?: string | null) {
-  if (!value) return '未有活動';
-  const diff = Date.now() - new Date(value).getTime();
-  const minutes = Math.max(1, Math.floor(diff / 60000));
-  if (minutes < 60) return `${minutes} 分鐘前`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} 小時前`;
-  return `${Math.floor(hours / 24)} 日前`;
+function normaliseRoom(row: TopicRoomRow): TopicRoomCardRoom {
+  const clips = [...(row.topic_clips ?? [])].sort((a, b) => {
+    return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+  });
+  const latest = clips[0];
+
+  return {
+    id: row.id,
+    name: row.name,
+    topic: row.topic,
+    privacy: row.privacy,
+    owner_id: row.owner_id,
+    created_at: row.created_at,
+    updated_at: latest?.created_at ?? row.updated_at ?? row.created_at ?? new Date().toISOString(),
+    members: row.topic_room_members ?? [],
+    member_count: row.topic_room_members?.length ?? 0,
+    clip_count: clips.length,
+    latest_clips: clips.slice(0, 3)
+  };
 }
 
-function EmptyTodayLog({ onPress }: { onPress: () => void }) {
+function EmptyState({
+  icon,
+  title,
+  body,
+  actionLabel,
+  onAction
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  title: string;
+  body: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.emptyLogCard, pressed && styles.pressed]}>
-      <Text style={styles.emptyLogText}>🎬 記錄今日創作</Text>
-      <Text style={styles.emptyLogSubtext}>拍片記錄你今日做咗咩</Text>
-    </Pressable>
-  );
-}
-
-function TodayClipThumb({ clip }: { clip: TodayClip }) {
-  return (
-    <Pressable
-      onPress={() => router.push(`/(app)/log/clip/${clip.id}`)}
-      style={({ pressed }) => [styles.todayClipThumb, pressed && styles.pressed]}
-    >
-      <ClipPlayer clip={clip} width={100} height={160} thumbnail />
-      <View style={styles.todayClipRoomOverlay}>
-        <Text numberOfLines={1} style={styles.todayClipRoomText}>{clip.room_name || 'Topic Room'}</Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function RoomCard({ room, onPress }: { room: TopicRoom; onPress: () => void }) {
-  const hasLatestClip = Boolean(room.clip_count);
-
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.roomCard, pressed && styles.pressed]}>
-      <View style={styles.roomHeader}>
-        <Text style={styles.privacyBadge}>{room.privacy === 'open' ? '🌐 Open Studio' : '🔒 私密'}</Text>
-        {hasLatestClip ? <Text style={styles.clipCountBadge}>🎬 {room.clip_count} clips</Text> : null}
-      </View>
-      <Text numberOfLines={1} style={styles.roomName}>{room.name}</Text>
-      <Text numberOfLines={2} style={styles.roomTopic}>{room.topic}</Text>
-      {hasLatestClip ? (
-        <View style={styles.roomPreview}>
-          {room.latest_video_url ? (
-            <RoomVideoPreview url={room.latest_video_url} />
-          ) : room.latest_image_url ? (
-            <Image source={{ uri: room.latest_image_url }} style={styles.roomPreviewImage} />
-          ) : (
-            <View style={styles.roomPreviewFallback}>
-              <Text style={styles.roomPreviewIcon}>🎬</Text>
-            </View>
-          )}
-          <View style={styles.roomPreviewMeta}>
-            <Text style={styles.roomPreviewLabel}>最新 Clip</Text>
-            <Text numberOfLines={2} style={styles.roomPreviewCaption}>{room.latest_caption || '有新製作進度'}</Text>
-          </View>
-        </View>
+    <View style={styles.emptyState}>
+      <Feather name={icon} size={40} color="#d1d5db" />
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptyBody}>{body}</Text>
+      {actionLabel && onAction ? (
+        <Pressable onPress={onAction} style={({ pressed }) => [styles.emptyAction, pressed && styles.pressed]}>
+          <Text style={styles.emptyActionText}>{actionLabel}</Text>
+        </Pressable>
       ) : null}
-      <View style={styles.roomMeta}>
-        <Text style={styles.memberCount}>{room.member_count ?? 0} 位成員</Text>
-        <Text style={styles.lastActivity}>{formatActivity(room.last_clip_at ?? room.updated_at ?? room.created_at)}</Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function RoomVideoPreview({ url }: { url: string }) {
-  const player = useVideoPlayer(url, (videoPlayer) => {
-    videoPlayer.loop = true;
-    videoPlayer.muted = true;
-    videoPlayer.play();
-  });
-
-  useEventListener(player, 'statusChange', ({ status }) => {
-    if (status === 'readyToPlay') {
-      player.play();
-    }
-  });
-
-  useEventListener(player, 'playToEnd', () => {
-    player.replay();
-  });
-
-  return (
-    <VideoView
-      player={player}
-      style={styles.roomPreviewVideo}
-      contentFit="cover"
-      nativeControls={false}
-      allowsVideoFrameAnalysis={false}
-      onFirstFrameRender={() => player.play()}
-    />
+    </View>
   );
 }
 
 export default function StudioLogScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const [todayClips, setTodayClips] = useState<TodayClip[]>([]);
-  const [rooms, setRooms] = useState<TopicRoom[]>([]);
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
-  const [createRoomOpen, setCreateRoomOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('explore');
+  const [personalRooms, setPersonalRooms] = useState<TopicRoomCardRoom[]>([]);
+  const [followingRooms, setFollowingRooms] = useState<TopicRoomCardRoom[]>([]);
+  const [exploreRooms, setExploreRooms] = useState<TopicRoomCardRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadRooms = useCallback(async () => {
-    if (!user) return;
-    const { data: memberships, error: membershipError } = await supabase
+  const fetchRoomsByIds = useCallback(async (roomIds: string[]) => {
+    const uniqueIds = [...new Set(roomIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from('topic_rooms')
+      .select(`
+        *,
+        topic_room_members(
+          user_id,
+          profiles(username, avatar_url, display_name)
+        ),
+        topic_clips(
+          id, video_url, media_urls, time_str, date_str,
+          user_id, created_at
+        )
+      `)
+      .in('id', uniqueIds);
+
+    if (error) throw error;
+    return ((data ?? []) as unknown as TopicRoomRow[])
+      .map(normaliseRoom)
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  }, []);
+
+  const fetchPersonalRooms = useCallback(async () => {
+    if (!user) {
+      setPersonalRooms([]);
+      return;
+    }
+
+    const { data: memberships, error } = await supabase
       .from('topic_room_members')
       .select('room_id')
       .eq('user_id', user.id);
 
-    if (membershipError) {
-      setRooms([]);
+    if (error) throw error;
+    const roomIds = (memberships ?? []).map((membership) => membership.room_id);
+    const rooms = await fetchRoomsByIds(roomIds);
+    setPersonalRooms(rooms);
+  }, [fetchRoomsByIds, user]);
+
+  const fetchExploreRooms = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('topic_rooms')
+      .select(`
+        *,
+        topic_room_members(
+          user_id,
+          profiles(username, avatar_url, display_name)
+        ),
+        topic_clips(
+          id, video_url, media_urls, time_str, date_str,
+          user_id, created_at
+        )
+      `)
+      .eq('privacy', 'open')
+      .order('updated_at', { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+    setExploreRooms(((data ?? []) as unknown as TopicRoomRow[]).map(normaliseRoom));
+  }, []);
+
+  const fetchFollowingRooms = useCallback(async () => {
+    if (!user) {
+      setFollowingRooms([]);
       return;
     }
 
-    const roomIds = [...new Set((memberships ?? []).map((row) => row.room_id).filter(Boolean))];
-    if (roomIds.length === 0) {
-      setRooms([]);
+    const { data: following, error: followingError } = await supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', user.id);
+
+    if (followingError) throw followingError;
+    const followingIds = (following ?? []).map((row) => row.following_id);
+    if (followingIds.length === 0) {
+      setFollowingRooms([]);
       return;
     }
 
-    const [{ data: roomData, error: roomsError }, { data: members }, { data: clips }] = await Promise.all([
-      supabase
-        .from('topic_rooms')
-        .select('*')
-        .in('id', roomIds),
-      supabase
-        .from('topic_room_members')
-        .select('room_id')
-        .in('room_id', roomIds),
-      supabase
-        .from('topic_clips')
-        .select('room_id, created_at, caption, media_urls, video_url')
-        .in('room_id', roomIds)
-    ]);
+    const { data, error } = await supabase
+      .from('topic_rooms')
+      .select(`
+        *,
+        topic_room_members(
+          user_id,
+          profiles(username, avatar_url, display_name)
+        ),
+        topic_clips(
+          id, video_url, media_urls, time_str, date_str,
+          user_id, created_at
+        )
+      `)
+      .eq('privacy', 'open')
+      .order('updated_at', { ascending: false })
+      .limit(50);
 
-    if (roomsError) {
-      setRooms([]);
-      return;
-    }
+    if (error) throw error;
+    const followingSet = new Set(followingIds);
+    const rooms = ((data ?? []) as unknown as TopicRoomRow[])
+      .filter((room) => followingSet.has(room.owner_id) || (room.topic_room_members ?? []).some((member) => followingSet.has(member.user_id)))
+      .map(normaliseRoom)
+      .slice(0, 20);
 
-    const roomRows = (roomData ?? []) as TopicRoom[];
-    const memberCounts = new Map<string, number>();
-    (members ?? []).forEach((member) => {
-      memberCounts.set(member.room_id, (memberCounts.get(member.room_id) ?? 0) + 1);
-    });
-    const lastClips = new Map<string, string>();
-    const clipCounts = new Map<string, number>();
-    const latestClipByRoom = new Map<string, {
-      created_at: string;
-      caption: string | null;
-      media_urls: string[] | null;
-      video_url: string | null;
-    }>();
-    (clips ?? []).forEach((clip) => {
-      clipCounts.set(clip.room_id, (clipCounts.get(clip.room_id) ?? 0) + 1);
-      const current = lastClips.get(clip.room_id);
-      if (!current || new Date(clip.created_at).getTime() > new Date(current).getTime()) {
-        lastClips.set(clip.room_id, clip.created_at);
-        latestClipByRoom.set(clip.room_id, {
-          created_at: clip.created_at,
-          caption: clip.caption ?? null,
-          media_urls: Array.isArray(clip.media_urls) ? clip.media_urls : null,
-          video_url: clip.video_url ?? null
-        });
-      }
-    });
-
-    const enriched = roomRows
-      .map((room) => {
-        const latestClip = latestClipByRoom.get(room.id);
-        return {
-          ...room,
-          member_count: memberCounts.get(room.id) ?? 0,
-          clip_count: clipCounts.get(room.id) ?? 0,
-          last_clip_at: lastClips.get(room.id) ?? null,
-          latest_caption: latestClip?.caption ?? null,
-          latest_video_url: latestClip?.video_url ?? null,
-          latest_image_url: latestClip?.media_urls?.[0] ?? null
-        };
-      })
-      .sort((a, b) => {
-        const aTime = new Date(a.last_clip_at ?? a.created_at).getTime();
-        const bTime = new Date(b.last_clip_at ?? b.created_at).getTime();
-        return bTime - aTime;
-      });
-
-    setRooms(enriched);
-    setSelectedRoomId((current) => {
-      if (current && enriched.some((room) => room.id === current)) return current;
-      return enriched[0]?.id ?? null;
-    });
+    setFollowingRooms(rooms);
   }, [user]);
 
-  const loadData = useCallback(async () => {
-    if (!user) return;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const { data: clips, error: clipsError } = await supabase
-      .from('topic_clips')
-      .select('*, topic_rooms(name)')
-      .eq('user_id', user.id)
-      .gte('created_at', today.toISOString())
-      .order('created_at', { ascending: false });
-
-    if (clipsError) {
-      setTodayClips([]);
-    } else {
-      const clipRows = (clips ?? []).map((clip) => {
-        const room = Array.isArray(clip.topic_rooms) ? clip.topic_rooms[0] : clip.topic_rooms;
-        return {
-          ...clip,
-          room_name: room?.name ?? null
-        };
-      }) as TodayClip[];
-      setTodayClips(clipRows);
+  const loadAll = useCallback(async () => {
+    if (!user) {
+      setPersonalRooms([]);
+      setFollowingRooms([]);
+      await fetchExploreRooms();
+      setLoading(false);
+      return;
     }
 
-    await loadRooms();
+    await Promise.all([
+      fetchPersonalRooms(),
+      fetchFollowingRooms(),
+      fetchExploreRooms()
+    ]);
     setLoading(false);
-  }, [loadRooms, user]);
+  }, [fetchExploreRooms, fetchFollowingRooms, fetchPersonalRooms, user]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await loadData();
+      await loadAll();
     } finally {
       setRefreshing(false);
     }
-  }, [loadData]);
+  }, [loadAll]);
 
   useEffect(() => {
-    loadData();
-    const roomsChannel = supabase
-      .channel('studio-topic-rooms')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_rooms' }, () => loadRooms())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_room_members' }, () => loadRooms())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_clips' }, () => loadRooms())
+    loadAll().catch(() => setLoading(false));
+    const channel = supabase
+      .channel('eggs-topic-room-feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_rooms' }, () => loadAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_room_members' }, () => loadAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_clips' }, () => loadAll())
       .subscribe();
 
     return () => {
-      supabase.removeChannel(roomsChannel);
+      supabase.removeChannel(channel);
     };
-  }, [loadData, loadRooms]);
+  }, [loadAll]);
 
-  const joinByInviteCode = () => {
-    if (!user) return;
-    Alert.prompt(
-      '輸入邀請碼',
-      '貼上隊友分享俾你嘅 Topic Room 邀請碼',
-      async (value) => {
-        const inviteCode = value.trim();
-        if (!inviteCode) return;
-        const { data: room, error: roomError } = await supabase
-          .from('topic_rooms')
-          .select('id')
-          .eq('invite_code', inviteCode)
-          .maybeSingle();
+  const currentRooms = useMemo(() => {
+    if (activeTab === 'personal') return personalRooms;
+    if (activeTab === 'following') return followingRooms;
+    return exploreRooms;
+  }, [activeTab, exploreRooms, followingRooms, personalRooms]);
 
-        if (roomError || !room) {
-          Alert.alert('找不到房間', '請確認邀請碼是否正確');
-          return;
-        }
-
-        const { error: joinError } = await supabase
-          .from('topic_room_members')
-          .upsert({ room_id: room.id, user_id: user.id, role: 'member' }, { onConflict: 'room_id,user_id' });
-
-        if (joinError) {
-          Alert.alert('加入失敗', joinError.message);
-          return;
-        }
-        router.push(`/log/room/${room.id}`);
-      },
-      'plain-text'
-    );
-  };
-
-  const openCameraForSelectedRoom = () => {
-    if (!selectedRoomId) {
-      Alert.alert('請先建立 Topic Room');
-      return;
+  const renderEmpty = () => {
+    if (activeTab === 'personal') {
+      return (
+        <View>
+          <OnboardingBanner
+            userId={user?.id}
+            onCreateRoom={() => router.push('/(app)/log/create-room')}
+            onStartCamera={() => router.push('/(app)/log/camera')}
+          />
+          <EmptyState
+            icon="video"
+            title="你仲未有 Topic Room"
+            body="建立一個製作項目，記錄由構思到完成嘅過程。"
+            actionLabel="+ 新建 Topic Room"
+            onAction={() => router.push('/(app)/log/create-room')}
+          />
+        </View>
+      );
     }
 
-    router.push({
-      pathname: '/(app)/log/camera',
-      params: { room_id: selectedRoomId }
-    });
+    if (activeTab === 'following') {
+      return (
+        <EmptyState
+          icon="users"
+          title="仲未追蹤任何 creator"
+          body="追蹤創作者之後，呢度會見到佢哋公開嘅製作過程。"
+          actionLabel="去發掘 →"
+          onAction={() => router.push('/(app)/home/discover')}
+        />
+      );
+    }
+
+    return (
+      <EmptyState
+        icon="compass"
+        title="仲未有公開嘅製作中"
+        body="成為第一個分享製作過程嘅 creator！"
+        actionLabel="+ 新建 Topic Room"
+        onAction={() => router.push('/(app)/log/create-room')}
+      />
+    );
   };
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.hero, { paddingTop: insets.top + 22 }]}>
-        <Text style={styles.heroTitle}>Their. Studio</Text>
-        <Text style={styles.heroSubtitle}>創作者嘅工作間</Text>
+      <View style={styles.heroZone}>
+        <View style={{ paddingTop: insets.top + 20 }}>
+          <Text style={styles.heroTitle}>EGGS</Text>
+          <Text style={styles.heroSubtitle}>創作者嘅製作過程</Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.cameraBtn, { top: insets.top + 20 }]}
+          onPress={() => router.push('/(app)/log/camera')}
+        >
+          <Feather name="video" size={20} color="white" />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.tabSwitcher}>
+        {tabs.map((tab) => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+            onPress={() => setActiveTab(tab.key)}
+          >
+            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {loading ? (
-        <View style={styles.loading}><ActivityIndicator color={colors.primary} /></View>
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
       ) : (
-        <ScrollView
-          style={styles.body}
-          contentContainerStyle={[styles.bodyContent, { paddingBottom: insets.bottom + 118 }]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#5C2A22" />}
-        >
-          <OnboardingBanner
-            userId={user?.id}
-            onCreateRoom={() => setCreateRoomOpen(true)}
-            onStartCamera={openCameraForSelectedRoom}
-          />
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>今日 Log</Text>
-            <Pressable onPress={() => router.push('/create')} hitSlop={8}>
-              <Text style={styles.addButton}>+ 新增</Text>
+        <FlatList
+          data={currentRooms}
+          keyExtractor={(item) => item.id}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 104 }]}
+          ListHeaderComponent={activeTab === 'personal' && currentRooms.length > 0 ? (
+            <Pressable onPress={() => router.push('/(app)/log/create-room')} style={({ pressed }) => [styles.createRoomTop, pressed && styles.pressed]}>
+              <Feather name="plus" size={16} color={colors.primary} />
+              <Text style={styles.createRoomTopText}>新建 Topic Room</Text>
             </Pressable>
-          </View>
-
-          {todayClips.length === 0 ? (
-            <EmptyTodayLog onPress={openCameraForSelectedRoom} />
-          ) : (
-            <>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.todayStrip}>
-                {todayClips.map((clip) => (
-                  <TodayClipThumb key={clip.id} clip={clip} />
-                ))}
-              </ScrollView>
-              <View style={styles.todaySummaryRow}>
-                <Text style={styles.todaySummaryText}>{todayClips.length} 個 clips 今日</Text>
-                <Pressable onPress={() => Alert.alert('即將推出', '一鍵合成今日 vlog')}>
-                  <Text style={styles.makeVlogText}>製成今日日誌 →</Text>
-                </Pressable>
-              </View>
-            </>
+          ) : null}
+          ListEmptyComponent={renderEmpty}
+          renderItem={({ item }) => (
+            <TopicRoomCard
+              room={item}
+              onPress={() => router.push(`/(app)/log/room/${item.id}`)}
+            />
           )}
-
-          <View style={[styles.sectionHeader, styles.roomsHeader]}>
-            <Text style={styles.sectionTitle}>Topic Rooms</Text>
-            <Pressable onPress={() => setCreateRoomOpen(true)} hitSlop={8}>
-              <Text style={styles.addButton}>+ 新建</Text>
-            </Pressable>
-          </View>
-          <Pressable onPress={joinByInviteCode} hitSlop={8} style={styles.inviteButton}>
-            <Text style={styles.inviteButtonText}>輸入邀請碼</Text>
-          </Pressable>
-
-          {rooms.length === 0 ? (
-            <View style={styles.emptyRooms}>
-              <Text style={styles.emptyRoomsTitle}>你仲未有 Topic Room</Text>
-              <Text style={styles.emptyRoomsBody}>建立一個同隊友一齊記錄創作過程</Text>
-              <Pressable onPress={() => setCreateRoomOpen(true)} style={({ pressed }) => [styles.createRoomButton, pressed && styles.pressed]}>
-                <Text style={styles.createRoomText}>+ 建立 Topic Room</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={styles.roomList}>
-              {rooms.map((room) => (
-                <RoomCard
-                  key={room.id}
-                  room={room}
-                  onPress={() => {
-                    setSelectedRoomId(room.id);
-                    router.push(`/log/room/${room.id}`);
-                  }}
-                />
-              ))}
-            </View>
-          )}
-        </ScrollView>
+        />
       )}
-
-      <Pressable onPress={openCameraForSelectedRoom} style={({ pressed }) => [styles.fab, { bottom: insets.bottom + 94 }, pressed && styles.pressed]}>
-        <Text style={styles.fabText}>🎬</Text>
-      </Pressable>
-
-      <Modal animationType="slide" presentationStyle="fullScreen" visible={createRoomOpen} onRequestClose={() => setCreateRoomOpen(false)}>
-        <CreateTopicRoomScreen onClose={() => setCreateRoomOpen(false)} />
-      </Modal>
     </View>
   );
 }
@@ -449,291 +377,122 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bgBody
   },
-  hero: {
+  heroZone: {
+    position: 'relative',
     backgroundColor: colors.bgHero,
-    paddingHorizontal: 16,
-    paddingBottom: 28
+    paddingHorizontal: 20,
+    paddingBottom: 24
   },
   heroTitle: {
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
-    fontSize: 28
+    fontSize: 32,
+    fontWeight: '800'
   },
   heroSubtitle: {
-    marginTop: 6,
-    color: colors.textOnDarkMuted,
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.5)',
     fontFamily: fonts.body,
-    fontSize: 14
+    fontSize: 13
+  },
+  cameraBtn: {
+    position: 'absolute',
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  tabSwitcher: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: colors.bgBody
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12
+  },
+  tabActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primary
+  },
+  tabText: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 15
+  },
+  tabTextActive: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontWeight: '600'
   },
   loading: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center'
   },
-  body: {
-    flex: 1
+  listContent: {
+    paddingTop: 14
   },
-  bodyContent: {
-    paddingTop: 20
-  },
-  sectionHeader: {
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between'
-  },
-  sectionTitle: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 20
-  },
-  addButton: {
-    color: colors.primary,
-    fontFamily: fonts.bodyBold,
-    fontSize: 15
-  },
-  emptyLogCard: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    minHeight: 126,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.bodyBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgBodyCard
-  },
-  emptyLogText: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 17
-  },
-  emptyLogSubtext: {
-    marginTop: 6,
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 13
-  },
-  todayStrip: {
-    paddingVertical: 12,
-    paddingLeft: 16,
-    paddingRight: 8
-  },
-  todayClipThumb: {
-    width: 100,
-    height: 160,
-    marginRight: 8,
-    overflow: 'hidden',
-    borderRadius: 12,
-    backgroundColor: colors.bgHero
-  },
-  todayClipRoomOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 4,
-    paddingVertical: 5,
-    backgroundColor: 'rgba(0,0,0,0.48)'
-  },
-  todayClipRoomText: {
-    color: colors.textOnDark,
-    fontFamily: fonts.bodyBold,
-    fontSize: 10
-  },
-  todaySummaryRow: {
-    marginHorizontal: 16,
-    marginTop: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between'
-  },
-  todaySummaryText: {
-    color: colors.textMuted,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 13
-  },
-  makeVlogText: {
-    color: colors.primary,
-    fontFamily: fonts.bodyBold,
-    fontSize: 13
-  },
-  roomsHeader: {
-    marginTop: 26
-  },
-  inviteButton: {
+  createRoomTop: {
     alignSelf: 'flex-end',
     marginRight: 16,
-    marginTop: 8,
-    minHeight: 28,
-    justifyContent: 'center'
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: colors.bgBodyCard
   },
-  inviteButtonText: {
+  createRoomTopText: {
     color: colors.primary,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 14
+    fontFamily: fonts.bodyBold,
+    fontSize: 13
   },
-  emptyRooms: {
+  emptyState: {
     marginHorizontal: 16,
-    marginTop: 12,
+    marginTop: 28,
+    padding: 24,
     borderRadius: 16,
-    backgroundColor: colors.bgBodyMuted,
-    padding: 22,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    backgroundColor: colors.bgBodyCard,
     alignItems: 'center'
   },
-  emptyRoomsTitle: {
+  emptyTitle: {
+    marginTop: 12,
     color: colors.text,
     fontFamily: fonts.bodyBold,
-    fontSize: 18
+    fontSize: 17,
+    textAlign: 'center'
   },
-  emptyRoomsBody: {
+  emptyBody: {
     marginTop: 6,
     color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center'
   },
-  createRoomButton: {
+  emptyAction: {
     marginTop: 16,
     borderRadius: 999,
     backgroundColor: colors.primary,
-    paddingHorizontal: 18,
-    paddingVertical: 12
+    paddingHorizontal: 16,
+    paddingVertical: 10
   },
-  createRoomText: {
+  emptyActionText: {
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 14
-  },
-  roomList: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 12
-  },
-  roomCard: {
-    borderRadius: 16,
-    backgroundColor: colors.bgBodyMuted,
-    padding: 16,
-    gap: 8
-  },
-  roomHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10
-  },
-  roomName: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 18
-  },
-  privacyBadge: {
-    overflow: 'hidden',
-    borderRadius: 999,
-    backgroundColor: colors.bgBodyCard,
-    color: colors.primary,
-    fontFamily: fonts.bodyBold,
-    fontSize: 12
-  },
-  clipCountBadge: {
-    overflow: 'hidden',
-    borderRadius: 999,
-    backgroundColor: colors.primary,
-    color: colors.textOnDark,
-    fontFamily: fonts.bodyBold,
-    fontSize: 12,
-    paddingHorizontal: 9,
-    paddingVertical: 4
-  },
-  roomTopic: {
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    lineHeight: 20
-  },
-  roomPreview: {
-    marginTop: 4,
-    minHeight: 92,
-    overflow: 'hidden',
-    borderRadius: 14,
-    backgroundColor: colors.bgBodyCard,
-    flexDirection: 'row',
-    alignItems: 'stretch'
-  },
-  roomPreviewVideo: {
-    width: 72,
-    height: 128,
-    backgroundColor: colors.bgHero
-  },
-  roomPreviewImage: {
-    width: 72,
-    height: 128,
-    backgroundColor: colors.bgHero
-  },
-  roomPreviewFallback: {
-    width: 72,
-    height: 128,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgHero
-  },
-  roomPreviewIcon: {
-    fontSize: 24
-  },
-  roomPreviewMeta: {
-    flex: 1,
-    padding: 12,
-    justifyContent: 'center'
-  },
-  roomPreviewLabel: {
-    color: colors.primary,
-    fontFamily: fonts.bodyBold,
-    fontSize: 12
-  },
-  roomPreviewCaption: {
-    marginTop: 4,
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 15,
-    lineHeight: 20
-  },
-  roomMeta: {
-    marginTop: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10
-  },
-  memberCount: {
-    color: colors.textMuted,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 13
-  },
-  lastActivity: {
-    marginTop: 10,
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 13
-  },
-  fab: {
-    position: 'absolute',
-    right: 18,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 4
-  },
-  fabText: {
-    color: colors.textOnDark,
-    fontSize: 24
   },
   pressed: {
     opacity: 0.72
