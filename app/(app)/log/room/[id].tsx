@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -12,6 +13,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Switch,
   Text,
@@ -233,6 +235,13 @@ export default function TopicRoomScreen() {
     Alert.alert('邀請碼', room?.invite_code ?? '');
   };
 
+  const shareInviteCode = () => {
+    if (!room?.invite_code) return;
+    Share.share({
+      message: '加入我嘅 Topic Room！\n邀請碼：' + room.invite_code + '\n\n喺 SOON-LOG app 入面，去 EGGS → 輸入邀請碼，輸入：' + room.invite_code
+    });
+  };
+
   const joinStudio = async () => {
     if (!user || !room) return;
     setMembershipRole('member');
@@ -313,12 +322,18 @@ export default function TopicRoomScreen() {
           </ScrollView>
 
           {isOwner ? (
-            <View style={styles.invitePill}>
-              <Text style={styles.inviteText}>邀請碼：{room.invite_code}</Text>
-              <Pressable onPress={copyInviteCode} hitSlop={8}>
-                <Text style={styles.copyText}>Copy</Text>
+            <>
+              <View style={styles.invitePill}>
+                <Text style={styles.inviteText}>邀請碼：{room.invite_code}</Text>
+                <Pressable onPress={copyInviteCode} hitSlop={8}>
+                  <Text style={styles.copyText}>Copy</Text>
+                </Pressable>
+              </View>
+              <Pressable onPress={shareInviteCode} style={({ pressed }) => [styles.shareInviteBtn, pressed && styles.pressed]}>
+                <Feather name="share-2" size={16} color={colors.primary} />
+                <Text style={styles.shareInviteText}>分享邀請碼</Text>
               </Pressable>
-            </View>
+            </>
           ) : null}
 
           {!isMember && room.privacy === 'open' ? (
@@ -809,6 +824,21 @@ const styles = StyleSheet.create({
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 13
+  },
+  shareInviteBtn: {
+    marginTop: 8,
+    borderRadius: 10,
+    backgroundColor: colors.primaryLight,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  shareInviteText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    fontWeight: '600'
   },
   joinButton: {
     alignSelf: 'flex-start',

@@ -3,14 +3,17 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   Easing,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -227,6 +230,9 @@ export default function StudioLogScreen() {
   const [exploreRooms, setExploreRooms] = useState<TopicRoomCardRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [joiningRoom, setJoiningRoom] = useState(false);
 
   const fetchRoomsByIds = useCallback(async (roomIds: string[]) => {
     const uniqueIds = [...new Set(roomIds.filter(Boolean))];
@@ -363,6 +369,65 @@ export default function StudioLogScreen() {
     }
   }, [loadAll]);
 
+  const joinByCode = useCallback(async () => {
+    const code = inviteCode.trim().toLowerCase();
+    if (!code || joiningRoom) return;
+    if (!user) {
+      Alert.alert('未登入', '請重新登入後再試。');
+      return;
+    }
+
+    setJoiningRoom(true);
+
+    try {
+      const { data: room, error } = await supabase
+        .from('topic_rooms')
+        .select('id, name')
+        .eq('invite_code', code)
+        .maybeSingle();
+
+      if (error || !room) {
+        Alert.alert('找不到 Room', '邀請碼無效，請確認後重試');
+        return;
+      }
+
+      const { data: existing } = await supabase
+        .from('topic_room_members')
+        .select('id')
+        .eq('room_id', room.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existing) {
+        Alert.alert('已經係成員', '你已經係呢個 Room 嘅成員');
+        setShowInviteModal(false);
+        setInviteCode('');
+        router.push('/(app)/log/room/' + room.id);
+        return;
+      }
+
+      const { error: joinError } = await supabase
+        .from('topic_room_members')
+        .insert({
+          room_id: room.id,
+          user_id: user.id,
+          role: 'member'
+        });
+
+      if (joinError) throw joinError;
+
+      setShowInviteModal(false);
+      setInviteCode('');
+      Alert.alert('成功加入！', '你已加入「' + room.name + '」');
+      await loadAll();
+      router.push('/(app)/log/room/' + room.id);
+    } catch {
+      Alert.alert('加入失敗', '請稍後再試');
+    } finally {
+      setJoiningRoom(false);
+    }
+  }, [inviteCode, joiningRoom, loadAll, user]);
+
   useEffect(() => {
     loadAll().catch(() => setLoading(false));
     const channel = supabase
@@ -466,11 +531,20 @@ export default function StudioLogScreen() {
           keyExtractor={(item) => item.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 104 }]}
-          ListHeaderComponent={activeTab === 'personal' && currentRooms.length > 0 ? (
-            <Pressable onPress={() => router.push('/(app)/log/create-room')} style={({ pressed }) => [styles.createRoomTop, pressed && styles.pressed]}>
-              <Feather name="plus" size={16} color={colors.primary} />
-              <Text style={styles.createRoomTopText}>新建 Topic Room</Text>
-            </Pressable>
+          ListHeaderComponent={activeTab === 'personal' ? (
+            <View style={styles.personalActions}>
+              <Pressable onPress={() => router.push('/(app)/log/create-room')} style={({ pressed }) => [styles.createRoomTop, pressed && styles.pressed]}>
+                <Feather name="plus" size={16} color={colors.primary} />
+                <Text style={styles.createRoomTopText}>新建 Topic Room</Text>
+              </Pressable>
+              <TouchableOpacity
+                style={styles.inviteCodeBtn}
+                onPress={() => setShowInviteModal(true)}
+              >
+                <Feather name="hash" size={14} color={colors.primary} />
+                <Text style={styles.inviteCodeText}>輸入邀請碼加入 Room</Text>
+              </TouchableOpacity>
+            </View>
           ) : null}
           ListEmptyComponent={renderEmpty}
           renderItem={({ item }) => (
@@ -481,6 +555,44 @@ export default function StudioLogScreen() {
           )}
         />
       )}
+
+      <Modal visible={showInviteModal} transparent animationType="slide" onRequestClose={() => setShowInviteModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 24 }]}>
+            <Text style={styles.modalTitle}>輸入邀請碼</Text>
+            <Text style={styles.modalSubtitle}>輸入 8 位邀請碼加入 Topic Room</Text>
+
+            <TextInput
+              style={styles.codeInput}
+              value={inviteCode}
+              onChangeText={setInviteCode}
+              placeholder="例如：0fd13fab"
+              placeholderTextColor="#9ca3af"
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={8}
+            />
+
+            <TouchableOpacity
+              style={[styles.joinBtn, (!inviteCode.trim() || joiningRoom) && styles.joinBtnDisabled]}
+              onPress={joinByCode}
+              disabled={!inviteCode.trim() || joiningRoom}
+            >
+              {joiningRoom ? <ActivityIndicator color="white" /> : <Text style={styles.joinBtnText}>加入 Room</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => {
+                setShowInviteModal(false);
+                setInviteCode('');
+              }}
+            >
+              <Text style={styles.cancelText}>取消</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -555,10 +667,14 @@ const styles = StyleSheet.create({
   listContent: {
     paddingTop: 14
   },
-  createRoomTop: {
-    alignSelf: 'flex-end',
+  personalActions: {
+    alignItems: 'flex-end',
     marginRight: 16,
     marginBottom: 12,
+    gap: 8
+  },
+  createRoomTop: {
+    alignSelf: 'flex-end',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -573,6 +689,86 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontFamily: fonts.bodyBold,
     fontSize: 13
+  },
+  inviteCodeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    alignSelf: 'flex-end'
+  },
+  inviteCodeText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    fontWeight: '600'
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)'
+  },
+  modalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: colors.bgBody,
+    padding: 24
+  },
+  modalTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 20,
+    fontWeight: '700'
+  },
+  modalSubtitle: {
+    marginTop: 4,
+    marginBottom: 20,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 14
+  },
+  codeInput: {
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    backgroundColor: colors.bgBodyMuted,
+    padding: 14,
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: 4,
+    textAlign: 'center'
+  },
+  joinBtn: {
+    marginBottom: 8,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    padding: 14,
+    alignItems: 'center'
+  },
+  joinBtnDisabled: {
+    opacity: 0.5
+  },
+  joinBtnText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  cancelBtn: {
+    alignItems: 'center',
+    padding: 12
+  },
+  cancelText: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 15
   },
   emptyState: {
     marginHorizontal: 16,
