@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Alert, Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { BackHeader } from '@/components/BackHeader';
 
 type ScriptSection = {
   label: string;
@@ -44,14 +45,8 @@ export default function IdeaScriptScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← 返回</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>🎬 Reel 劇本</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+    <View style={styles.safeArea}>
+      <BackHeader title="🎬 Reel 劇本" />
 
       <ScrollView
         style={styles.scroll}
@@ -85,7 +80,7 @@ export default function IdeaScriptScreen() {
           <Text style={styles.filmButtonText}>🎬 開始拍攝</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -93,34 +88,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#ffffff',
-  },
-  header: {
-    minHeight: 54,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backButton: {
-    flex: 1,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  backText: {
-    color: '#5C2A22',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  headerTitle: {
-    flex: 1,
-    color: '#0a0a0a',
-    fontSize: 17,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    flex: 1,
   },
   scroll: {
     flex: 1,
