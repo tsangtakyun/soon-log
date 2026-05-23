@@ -193,11 +193,8 @@ function MiniLogCard({ log, compact = false }: { log: HomeLog; compact?: boolean
 function FollowingDiarySection({ logs }: { logs: HomeLog[]; hasFollowing: boolean }) {
   return (
     <View style={styles.diarySection}>
-      <View style={styles.sectionHeaderRow}>
-        <View>
-          <Text style={styles.sectionHeading}>追蹤日記</Text>
-          <Text style={styles.sectionSubheading}>追蹤中創作者的最新日記</Text>
-        </View>
+      <View style={styles.sectionBannerCard}>
+        <Image source={require('../../../assets/home-black-box-banner.png')} style={styles.sectionBannerImage} />
       </View>
       {logs.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.diaryStrip}>
@@ -218,10 +215,9 @@ function FollowingDiarySection({ logs }: { logs: HomeLog[]; hasFollowing: boolea
 function OwnDiarySection({ logs }: { logs: HomeLog[] }) {
   return (
     <View style={styles.diarySection}>
-      <View style={styles.sectionHeaderRow}>
-        <View>
-          <Text style={styles.sectionHeading}>🥚 我的日記</Text>
-          <Text style={styles.sectionSubheading}>我最近嘅記錄</Text>
+      <View style={styles.diaryBannerRow}>
+        <View style={styles.sectionBannerCardInline}>
+          <Image source={require('../../../assets/home-diary-banner.png')} style={styles.sectionBannerImage} />
         </View>
         <Pressable onPress={() => router.push('/(app)/profile')} hitSlop={8}>
           <Text style={styles.viewAll}>睇全部</Text>
@@ -552,6 +548,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: 'transparent',
     alignItems: 'center'
+  },
+  diaryBannerRow: {
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  sectionBannerCardInline: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
+    alignItems: 'flex-start'
   },
   sectionBannerImage: {
     width: '50%',
