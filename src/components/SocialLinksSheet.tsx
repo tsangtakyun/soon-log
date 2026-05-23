@@ -15,6 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
+import { PlatformLogo, type Platform as PlatformKey } from './PlatformLogo';
 
 type Links = {
   instagram: string;
@@ -32,12 +33,12 @@ const emptyLinks: Links = {
   threads: '',
 };
 
-const platforms: { key: keyof Links; label: string; icon: string }[] = [
-  { key: 'instagram', label: 'Instagram', icon: '📸' },
-  { key: 'youtube', label: 'YouTube', icon: '▶️' },
-  { key: 'tiktok', label: 'TikTok', icon: '🎵' },
-  { key: 'xiaohongshu', label: '小紅書', icon: '📕' },
-  { key: 'threads', label: 'Threads', icon: '@' },
+const platforms: { key: PlatformKey; label: string }[] = [
+  { key: 'instagram', label: 'Instagram' },
+  { key: 'youtube', label: 'YouTube' },
+  { key: 'tiktok', label: 'TikTok' },
+  { key: 'xiaohongshu', label: '小紅書' },
+  { key: 'threads', label: 'Threads' },
 ];
 
 function buildShareText(links: Links) {
@@ -117,9 +118,10 @@ export function SocialLinksSheet({ visible, onClose }: { visible: boolean; onClo
               const value = links[platform.key];
               return (
                 <View key={platform.key} style={styles.row}>
-                  <Text style={styles.icon}>{platform.icon}</Text>
+                  <View style={styles.logoWrap}>
+                    <PlatformLogo platform={platform.key} size={24} showLabel />
+                  </View>
                   <View style={styles.rowBody}>
-                    <Text style={styles.platform}>{platform.label}</Text>
                     {editing ? (
                       <TextInput
                         value={value}
@@ -209,21 +211,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0'
   },
-  icon: {
-    width: 28,
-    fontSize: 20,
-    textAlign: 'center'
+  logoWrap: {
+    width: 116
   },
   rowBody: {
     flex: 1
   },
-  platform: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 13
-  },
   linkText: {
-    marginTop: 2,
     color: colors.text,
     fontFamily: fonts.body,
     fontSize: 15

@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
+import { PlatformLogo, type Platform as PlatformKey } from './PlatformLogo';
 
 type SocialStats = {
   instagram: number;
@@ -24,7 +25,7 @@ type SocialStats = {
 };
 
 type Platform = {
-  key: keyof SocialStats;
+  key: PlatformKey;
   name: string;
   count: number;
   color: string;
@@ -133,7 +134,12 @@ export function SubscriberStrip() {
       <Pressable onPress={() => setEditOpen(true)} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
         <Animated.View style={[styles.inner, { opacity: fadeAnim }]}>
           <View style={styles.platformInfo}>
-            <Text style={[styles.platformName, { color: active.color }]}>{active.name}</Text>
+            <PlatformLogo
+              platform={active.key}
+              size={28}
+              showLabel
+              labelStyle={styles.platformName}
+            />
           </View>
           <View style={styles.countWrap}>
             <Text style={styles.count}>{formatCount(displayCount)}</Text>
@@ -154,7 +160,12 @@ export function SubscriberStrip() {
             <Text style={styles.sheetTitle}>更新追蹤者數字</Text>
             {platforms.map((platform) => (
               <View key={platform.key} style={styles.inputRow}>
-                <Text style={[styles.inputLabel, { color: platform.color }]}>{platform.name}</Text>
+                <PlatformLogo
+                  platform={platform.key}
+                  size={24}
+                  showLabel
+                  labelStyle={[styles.inputLabel, { color: platform.color }]}
+                />
                 <TextInput
                   value={String(draft[platform.key] || '')}
                   onChangeText={(text) => {
@@ -192,14 +203,14 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   platformInfo: {
-    width: 88,
+    width: 122,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6
   },
   platformName: {
     fontFamily: fonts.bodyMedium,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700'
   },
   countWrap: {
