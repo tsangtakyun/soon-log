@@ -204,7 +204,7 @@ function MiniLogCard({ log, compact = false }: { log: HomeLog; compact?: boolean
 function FollowingDiarySection({ logs }: { logs: HomeLog[]; hasFollowing: boolean }) {
   return (
     <View style={styles.diarySection}>
-      <View style={styles.sectionBannerCard}>
+      <View style={styles.sectionBannerWrap}>
         <Image source={require('../../../assets/home-black-box-banner.png')} style={styles.sectionBannerImage} />
       </View>
       {logs.length > 0 ? (
@@ -228,11 +228,9 @@ function OwnDiarySection({ logs }: { logs: HomeLog[] }) {
     <View style={styles.diarySection}>
       <Pressable
         onPress={() => router.push('/(app)/profile')}
-        style={({ pressed }) => [styles.ownDiaryBannerButton, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.sectionBannerWrap, pressed && styles.pressed]}
       >
-        <View style={styles.sectionBannerCard}>
-          <Image source={require('../../../assets/home-diary-banner.png')} style={styles.sectionBannerImage} />
-        </View>
+        <Image source={require('../../../assets/home-diary-banner.png')} style={styles.sectionBannerImage} />
       </Pressable>
       {logs.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.diaryStrip}>
@@ -427,7 +425,7 @@ export default function HomeScreen() {
         <OwnDiarySection logs={ownLogs} />
 
         <View style={styles.prediktSection}>
-          <View style={styles.sectionBannerCard}>
+          <View style={styles.sectionBannerWrap}>
             <Image source={require('../../../assets/home-predikt-banner.png')} style={styles.sectionBannerImage} />
           </View>
           <View style={styles.trendsWrap}>
@@ -553,17 +551,14 @@ const styles = StyleSheet.create({
   diarySection: {
     marginTop: 22
   },
-  sectionBannerCard: {
+  sectionBannerWrap: {
     width: '100%',
-    marginHorizontal: 16,
+    height: 62,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: 'transparent',
-    alignItems: 'center'
-  },
-  ownDiaryBannerButton: {
-    width: '100%',
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 12
   },
   sectionBannerImage: {
