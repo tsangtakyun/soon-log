@@ -554,6 +554,7 @@ const styles = StyleSheet.create({
     marginTop: 22
   },
   sectionBannerCard: {
+    width: '100%',
     marginHorizontal: 16,
     borderRadius: 16,
     overflow: 'hidden',
@@ -561,6 +562,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   ownDiaryBannerButton: {
+    width: '100%',
     alignItems: 'center',
     marginBottom: 12
   },
