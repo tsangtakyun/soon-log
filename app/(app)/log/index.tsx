@@ -1,8 +1,11 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Dimensions,
+  Easing,
   FlatList,
   Pressable,
   RefreshControl,
@@ -18,8 +21,16 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 type ActiveTab = 'personal' | 'following' | 'explore';
+type StarProps = {
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+  delay: number;
+};
 
 type TopicClipRow = {
   id: string;
@@ -57,6 +68,105 @@ const tabs: Array<{ key: ActiveTab; label: string }> = [
   { key: 'following', label: '追蹤' },
   { key: 'explore', label: '探索' }
 ];
+
+function AnimatedStar({ x, y, size, color, delay }: StarProps) {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 1000 + Math.random() * 1000,
+          delay,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.2,
+          duration: 1000 + Math.random() * 1000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true
+        })
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(translateY, {
+          toValue: -3,
+          duration: 2000 + Math.random() * 2000,
+          delay,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true
+        }),
+        Animated.timing(translateY, {
+          toValue: 3,
+          duration: 2000 + Math.random() * 2000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true
+        })
+      ])
+    ).start();
+  }, [delay, opacity, translateY]);
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: color,
+        opacity,
+        transform: [{ translateY }]
+      }}
+    />
+  );
+}
+
+function StarField({ heroHeight, screenWidth }: { heroHeight: number; screenWidth: number }) {
+  const stars = useMemo(() => Array.from({ length: 40 }, (_, index) => ({
+    id: index,
+    x: Math.random() * screenWidth,
+    y: Math.random() * heroHeight,
+    size: 1 + Math.random() * 3,
+    color: `rgba(255,255,255,${0.3 + Math.random() * 0.7})`,
+    delay: Math.random() * 2000
+  })), [heroHeight, screenWidth]);
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {stars.map(({ id, ...star }) => <AnimatedStar key={id} {...star} />)}
+    </View>
+  );
+}
+
+function EggIcon() {
+  return (
+    <Svg width={40} height={40} viewBox="0 0 100 100">
+      <Path
+        d="M50 8 C65 8, 85 20, 90 38 C95 55, 88 75, 72 85 C58 94, 38 94, 25 85 C10 75, 5 55, 10 38 C15 20, 35 8, 50 8 Z"
+        fill="white"
+        stroke="rgba(255,255,255,0.3)"
+        strokeWidth="2"
+      />
+      <Circle cx="50" cy="52" r="18" fill="#F5A623" />
+      <Circle cx="45" cy="50" r="2" fill="#1A1A1A" />
+      <Circle cx="55" cy="50" r="2" fill="#1A1A1A" />
+      <Path
+        d="M44 56 Q50 62 56 56"
+        stroke="#1A1A1A"
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
 
 function normaliseRoom(row: TopicRoomRow): TopicRoomCardRoom {
   const clips = [...(row.topic_clips ?? [])].sort((a, b) => {
@@ -109,6 +219,8 @@ function EmptyState({
 export default function StudioLogScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const screenWidth = Dimensions.get('window').width;
+  const heroHeight = insets.top + 116;
   const [activeTab, setActiveTab] = useState<ActiveTab>('explore');
   const [personalRooms, setPersonalRooms] = useState<TopicRoomCardRoom[]>([]);
   const [followingRooms, setFollowingRooms] = useState<TopicRoomCardRoom[]>([]);
@@ -316,8 +428,9 @@ export default function StudioLogScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.heroZone}>
-        <View style={{ paddingTop: insets.top + 20 }}>
+      <View style={[styles.heroZone, { minHeight: heroHeight }]}>
+        <StarField heroHeight={heroHeight} screenWidth={screenWidth} />
+        <View style={[styles.heroContent, { paddingTop: insets.top + 20 }]}>
           <Text style={styles.heroTitle}>EGGS</Text>
           <Text style={styles.heroSubtitle}>創作者嘅製作過程</Text>
         </View>
@@ -325,7 +438,7 @@ export default function StudioLogScreen() {
           style={[styles.cameraBtn, { top: insets.top + 20 }]}
           onPress={() => router.push('/(app)/log/camera')}
         >
-          <Feather name="video" size={20} color="white" />
+          <EggIcon />
         </TouchableOpacity>
       </View>
 
@@ -379,9 +492,14 @@ const styles = StyleSheet.create({
   },
   heroZone: {
     position: 'relative',
+    overflow: 'hidden',
     backgroundColor: colors.bgHero,
     paddingHorizontal: 20,
     paddingBottom: 24
+  },
+  heroContent: {
+    position: 'relative',
+    zIndex: 1
   },
   heroTitle: {
     color: colors.textOnDark,
@@ -398,10 +516,9 @@ const styles = StyleSheet.create({
   cameraBtn: {
     position: 'absolute',
     right: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    zIndex: 2,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center'
   },

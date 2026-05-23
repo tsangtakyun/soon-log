@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
+import { useEventListener } from 'expo';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import ClipPlayer from '@/components/ClipPlayer';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 
@@ -80,6 +81,35 @@ function AvatarStack({ members = [] }: { members?: TopicRoomCardRoom['members'] 
   );
 }
 
+function VideoThumbnail({ videoUrl }: { videoUrl: string }) {
+  const player = useVideoPlayer(videoUrl, (videoPlayer) => {
+    videoPlayer.loop = true;
+    videoPlayer.muted = true;
+    videoPlayer.play();
+  });
+
+  useEventListener(player, 'statusChange', ({ status }) => {
+    if (status === 'readyToPlay') {
+      player.play();
+    }
+  });
+
+  useEventListener(player, 'playToEnd', () => {
+    player.replay();
+  });
+
+  return (
+    <VideoView
+      player={player}
+      style={styles.videoThumb}
+      nativeControls={false}
+      contentFit="cover"
+      allowsVideoFrameAnalysis={false}
+      onFirstFrameRender={() => player.play()}
+    />
+  );
+}
+
 function ClipStrip({ clips = [] }: { clips?: TopicRoomCardRoom['latest_clips'] }) {
   const visible = clips.slice(0, 3);
 
@@ -95,18 +125,15 @@ function ClipStrip({ clips = [] }: { clips?: TopicRoomCardRoom['latest_clips'] }
     <View style={styles.clipStrip}>
       {visible.map((clip) => (
         <View key={clip.id} style={styles.clipCell}>
-          <ClipPlayer
-            clip={{
-              id: clip.id,
-              video_url: clip.video_url ?? null,
-              media_urls: Array.isArray(clip.media_urls) ? clip.media_urls : [],
-              time_str: clip.time_str ?? null,
-              date_str: clip.date_str ?? null
-            }}
-            width={clipCellWidth}
-            height={120}
-            thumbnail
-          />
+          {clip.video_url ? (
+            <VideoThumbnail videoUrl={clip.video_url} />
+          ) : Array.isArray(clip.media_urls) && clip.media_urls[0] ? (
+            <Image source={{ uri: clip.media_urls[0] }} style={styles.clipImage} resizeMode="cover" />
+          ) : (
+            <View style={styles.cleanClipFallback}>
+              <Feather name="video" size={24} color="#555" />
+            </View>
+          )}
         </View>
       ))}
       {visible.length < 3
@@ -128,6 +155,17 @@ export function TopicRoomCard({ room, onPress }: TopicRoomCardProps) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       <ClipStrip clips={room.latest_clips} />
+
+      {latestClip?.time_str || latestClip?.date_str ? (
+        <View style={styles.timeBar}>
+          <Feather name="clock" size={12} color={colors.textMuted} />
+          <Text style={styles.timeBarText}>
+            {[latestClip.time_str, latestClip.date_str].filter(Boolean).join('  ')}
+          </Text>
+          <View style={styles.timeBarSpacer} />
+          <Text style={styles.latestLabel}>最新片段</Text>
+        </View>
+      ) : null}
 
       <View style={styles.info}>
         <View style={styles.titleRow}>
@@ -180,6 +218,22 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: colors.bgHero
   },
+  videoThumb: {
+    width: clipCellWidth,
+    height: 120,
+    backgroundColor: colors.bgHero
+  },
+  clipImage: {
+    width: '100%',
+    height: 120,
+    backgroundColor: colors.bgHero
+  },
+  cleanClipFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgHeroCard
+  },
   clipPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -194,6 +248,30 @@ const styles = StyleSheet.create({
   },
   info: {
     padding: 12
+  },
+  timeBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: colors.bgBodyMuted
+  },
+  timeBarText: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    fontWeight: '500'
+  },
+  timeBarSpacer: {
+    flex: 1
+  },
+  latestLabel: {
+    color: '#9ca3af',
+    fontFamily: fonts.body,
+    fontSize: 11
   },
   titleRow: {
     flexDirection: 'row',
