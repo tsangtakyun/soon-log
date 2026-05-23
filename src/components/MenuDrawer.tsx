@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Dimensions,
   Image,
@@ -21,15 +21,21 @@ type CreditRow = {
   daily_limit: number;
 };
 
+type DrawerRoute =
+  | '/(app)/profile'
+  | '/(app)/log'
+  | '/(app)/friends'
+  | '/(app)/subscribers';
+
 export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const { user, profile, signOut } = useAuth();
   const [credits, setCredits] = useState<CreditRow>({ balance: 30, daily_limit: 30 });
   const width = Dimensions.get('window').width * 0.8;
   const displayName = profile?.display_name || profile?.username || user?.email || 'SOON';
-  const email = user?.email ?? '';
+  const username = profile?.username ? `@${profile.username}` : user?.email || '@soon';
   const initial = displayName.slice(0, 1).toUpperCase();
-  const progress = Math.max(0, Math.min(100, (credits.balance / Math.max(credits.daily_limit, 1)) * 100));
+  const progress = Math.max(0, Math.min(100, (credits.balance / Math.max(credits.daily_limit || 30, 1)) * 100));
 
   const loadCredits = useCallback(async () => {
     if (!user) return;
@@ -46,33 +52,21 @@ export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: ()
     if (visible) loadCredits();
   }, [loadCredits, visible]);
 
+  const navigate = (path: DrawerRoute) => {
+    onClose();
+    router.push(path);
+  };
+
   const handleSignOut = async () => {
     await signOut();
     onClose();
-  };
-
-  const openProfile = () => {
-    onClose();
-    router.push('/profile');
-  };
-
-  const openReplySettings = () => {
-    onClose();
-    router.push('/(app)/settings/reply');
-  };
-
-  const openReplyCentre = () => {
-    onClose();
-    router.push('/(app)/reply-centre');
   };
 
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <View style={styles.modalRoot}>
         <View style={[styles.drawer, { width, paddingTop: insets.top + 22 }]}>
-          <Text style={styles.kicker}>我嘅帳戶</Text>
-
-          <Pressable onPress={openProfile} style={({ pressed }) => [styles.userRow, pressed && styles.pressed]}>
+          <Pressable onPress={() => navigate('/(app)/profile')} style={({ pressed }) => [styles.header, pressed && styles.pressed]}>
             {profile?.avatar_url ? (
               <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
             ) : (
@@ -80,32 +74,36 @@ export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: ()
                 <Text style={styles.avatarInitial}>{initial}</Text>
               </View>
             )}
-            <View style={styles.userText}>
+            <View style={styles.headerText}>
               <Text numberOfLines={1} style={styles.displayName}>{displayName}</Text>
-              <Text numberOfLines={1} style={styles.email}>{email}</Text>
+              <Text numberOfLines={1} style={styles.username}>{username}</Text>
             </View>
           </Pressable>
 
-          <View style={styles.creditCard}>
-            <Text style={styles.creditLabel}>🪙 AI Credit Balance</Text>
-            <Text style={styles.creditBalance}>{credits.balance}</Text>
-            <Text style={styles.creditSubtitle}>daily credits</Text>
+          <View style={styles.coinsCard}>
+            <View style={styles.coinsRow}>
+              <View style={styles.coinsLabelRow}>
+                <Image source={require('../../assets/coin.png')} style={styles.coinIcon} />
+                <Text style={styles.coinsLabel}>Coins</Text>
+              </View>
+              <Text style={styles.coinBalance}>{credits.balance}</Text>
+            </View>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${progress}%` }]} />
             </View>
+            <Text style={styles.coinCaption}>{credits.balance} / 30 今日剩餘</Text>
           </View>
 
           <View style={styles.menu}>
-            <DrawerItem icon="⚙️" label="設定" onPress={openProfile} />
-            <DrawerItem icon="🧠" label="AI 設定" onPress={openReplySettings} />
-            <DrawerItem iconName="message-circle" label="回覆中心" onPress={openReplyCentre} />
+            <Text style={styles.groupLabel}>我的空間</Text>
+            <DrawerItem icon="video" label="我的房間" onPress={() => navigate('/(app)/log')} />
+            <DrawerItem icon="user-check" label="好友" onPress={() => navigate('/(app)/friends')} />
+            <DrawerItem icon="users" label="訂閱者" onPress={() => navigate('/(app)/subscribers')} />
             <Divider />
-            <DrawerItem icon="👤" label="邀請管理" />
+            <Text style={styles.groupLabel}>帳戶</Text>
+            <DrawerItem icon="settings" label="設定" onPress={() => navigate('/(app)/profile')} />
             <Divider />
-            <DrawerItem icon="💬" label="客戶支援" />
-            <DrawerItem icon="🎓" label="創作者學院" />
-            <Divider />
-            <DrawerItem icon="⬅" label="登出" danger onPress={handleSignOut} />
+            <DrawerItem icon="log-out" label="登出" danger onPress={handleSignOut} />
           </View>
         </View>
         <Pressable style={styles.overlay} onPress={onClose} />
@@ -116,22 +114,20 @@ export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: ()
 
 function DrawerItem({
   icon,
-  iconName,
   label,
   danger = false,
   onPress
 }: {
-  icon?: string;
-  iconName?: keyof typeof Feather.glyphMap;
+  icon: keyof typeof Feather.glyphMap;
   label: string;
   danger?: boolean;
   onPress?: () => void;
 }) {
+  const color = danger ? colors.error : '#3A3A3A';
+
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.item, pressed && styles.pressed]}>
-      <View style={styles.itemIcon}>
-        {iconName ? <Feather name={iconName} size={20} color={danger ? colors.error : colors.text} /> : <Text style={styles.itemEmoji}>{icon}</Text>}
-      </View>
+      <Feather name={icon} size={20} color={color} style={styles.itemIcon} />
       <Text style={[styles.itemLabel, danger && styles.danger]}>{label}</Text>
     </Pressable>
   );
@@ -147,36 +143,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row'
   },
   drawer: {
-    backgroundColor: colors.bgBody,
-    paddingHorizontal: 20
+    backgroundColor: colors.bgBody
   },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)'
   },
-  kicker: {
-    color: colors.textMuted,
-    fontFamily: fonts.bodyBold,
-    fontSize: 12,
-    letterSpacing: 1,
-    textTransform: 'uppercase'
-  },
-  userRow: {
-    marginTop: 18,
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 18,
     gap: 12
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.bgHeroSurface
   },
   avatarFallback: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary
@@ -184,9 +173,9 @@ const styles = StyleSheet.create({
   avatarInitial: {
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
-    fontSize: 16
+    fontSize: 18
   },
-  userText: {
+  headerText: {
     flex: 1
   },
   displayName: {
@@ -194,77 +183,96 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 16
   },
-  email: {
+  username: {
+    marginTop: 2,
     color: colors.textMuted,
     fontFamily: fonts.body,
-    fontSize: 13,
-    marginTop: 2
-  },
-  creditCard: {
-    marginTop: 24,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.bodyBorder,
-    backgroundColor: colors.bgBodyMuted,
-    padding: 16
-  },
-  creditLabel: {
-    color: colors.textMuted,
-    fontFamily: fonts.bodyMedium,
     fontSize: 13
   },
-  creditBalance: {
+  coinsCard: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+    backgroundColor: colors.bgBodyMuted,
+    padding: 14
+  },
+  coinsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  coinsLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  coinIcon: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain'
+  },
+  coinsLabel: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14
+  },
+  coinBalance: {
     color: colors.text,
     fontFamily: fonts.bodyBold,
-    fontSize: 32,
-    marginTop: 8
-  },
-  creditSubtitle: {
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 13
+    fontSize: 20
   },
   progressTrack: {
-    height: 6,
-    borderRadius: 999,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: colors.bodyBorder,
-    marginTop: 12,
+    marginTop: 8,
     overflow: 'hidden'
   },
   progressFill: {
     height: '100%',
-    borderRadius: 999,
+    borderRadius: 2,
     backgroundColor: colors.primary
   },
+  coinCaption: {
+    marginTop: 4,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 11
+  },
   menu: {
-    marginTop: 24
+    paddingTop: 8
+  },
+  groupLabel: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 6,
+    color: colors.textMuted,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
   },
   item: {
-    height: 56,
+    height: 52,
+    paddingHorizontal: 20,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12
-  },
-  pressed: {
-    opacity: 0.68
+    alignItems: 'center'
   },
   itemIcon: {
-    width: 28,
-    alignItems: 'flex-start'
-  },
-  itemEmoji: {
-    fontSize: 20
+    marginRight: 14
   },
   itemLabel: {
-    color: colors.text,
+    color: '#1A1A1A',
     fontFamily: fonts.bodyMedium,
-    fontSize: 16
+    fontSize: 15
   },
   danger: {
     color: colors.error
   },
   divider: {
     height: 1,
-    backgroundColor: colors.bodyBorder
+    backgroundColor: '#f0f0f0',
+    marginVertical: 8
+  },
+  pressed: {
+    opacity: 0.68
   }
 });

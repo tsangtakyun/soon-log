@@ -129,6 +129,8 @@ export default function AppTabs() {
       <Tabs.Screen name="create" options={{ href: null }} />
       <Tabs.Screen name="profile/index" options={{ href: null }} />
       <Tabs.Screen name="profile/[username]" options={{ href: null }} />
+      <Tabs.Screen name="friends/index" options={{ href: null }} />
+      <Tabs.Screen name="subscribers/index" options={{ href: null }} />
       <Tabs.Screen name="log/create-room" options={{ href: null }} />
       <Tabs.Screen name="log/camera" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       <Tabs.Screen name="log/preview" options={{ href: null, tabBarStyle: { display: 'none' } }} />
