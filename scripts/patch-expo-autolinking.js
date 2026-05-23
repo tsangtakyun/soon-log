@@ -185,6 +185,57 @@ function patchExpoDevMenuAppInfo() {
   console.log('Patched expo-dev-menu app info Swift header dependency');
 }
 
+function patchExpoIosBinaryPath() {
+  const xcodeBuild = path.join(
+    __dirname,
+    '..',
+    'node_modules',
+    '@expo',
+    'cli',
+    'build',
+    'src',
+    'run',
+    'ios',
+    'XcodeBuild.js'
+  );
+
+  if (!fs.existsSync(xcodeBuild)) {
+    return;
+  }
+
+  const source = fs.readFileSync(xcodeBuild, 'utf8');
+
+  if (source.includes('SOON-LOG ShareExtension binary path fix')) {
+    return;
+  }
+
+  const original = `        const binaryPath = _path().default.join(// Use the shortest defined env variable (usually there's just one).
+        CONFIGURATION_BUILD_DIR[0], // Use the last defined env variable.
+        UNLOCALIZED_RESOURCES_FOLDER_PATH[UNLOCALIZED_RESOURCES_FOLDER_PATH.length - 1]);
+        // If the app has a space in the name it'll fail because it isn't escaped properly by Xcode.
+        return getEscapedPath(binaryPath);`;
+
+  const patched = `        // SOON-LOG ShareExtension binary path fix:
+        // Expo CLI can pick a share extension resource folder (ShareExtension.app)
+        // from xcodebuild environment output even though the real extension product
+        // is an .appex. Prefer an existing .app product so simulator launch targets
+        // SOONLOG.app instead of a non-existent ShareExtension.app.
+        const appResourceFolders = UNLOCALIZED_RESOURCES_FOLDER_PATH.filter((folder)=>folder.endsWith('.app'));
+        const resourceFolders = appResourceFolders.length ? appResourceFolders : UNLOCALIZED_RESOURCES_FOLDER_PATH;
+        const binaryPath = resourceFolders.flatMap((folder)=>CONFIGURATION_BUILD_DIR.map((dir)=>_path().default.join(dir, folder))).find((candidate)=>_fs().default.existsSync(candidate)) || _path().default.join(CONFIGURATION_BUILD_DIR[0], resourceFolders[resourceFolders.length - 1]);
+        // If the app has a space in the name it'll fail because it isn't escaped properly by Xcode.
+        return getEscapedPath(binaryPath);`;
+
+  if (!source.includes(original)) {
+    console.warn('expo iOS binary path patch skipped: expected source not found');
+    return;
+  }
+
+  fs.writeFileSync(xcodeBuild, source.replace(original, patched));
+  console.log('Patched Expo CLI iOS app binary path selection');
+}
+
 patchExpoAutolinking();
 patchExpoDevMenuSwiftImport();
 patchExpoDevMenuAppInfo();
+patchExpoIosBinaryPath();
