@@ -19,17 +19,24 @@ type SocialStats = {
   instagram: number;
   youtube: number;
   tiktok: number;
+  xiaohongshu: number;
+  threads: number;
 };
 
 type Platform = {
   key: keyof SocialStats;
   name: string;
-  icon: string;
   count: number;
   color: string;
 };
 
-const emptyStats: SocialStats = { instagram: 0, youtube: 0, tiktok: 0 };
+const emptyStats: SocialStats = {
+  instagram: 0,
+  youtube: 0,
+  tiktok: 0,
+  xiaohongshu: 0,
+  threads: 0,
+};
 
 function formatCount(value: number) {
   return Math.round(value).toLocaleString('en-US');
@@ -47,9 +54,11 @@ export function SubscriberStrip() {
   const insets = useSafeAreaInsets();
 
   const platforms: Platform[] = [
-    { key: 'instagram', name: 'Instagram', icon: '📸', count: stats.instagram, color: '#E1306C' },
-    { key: 'youtube', name: 'YouTube', icon: '▶️', count: stats.youtube, color: '#FF0000' },
-    { key: 'tiktok', name: 'TikTok', icon: '🎵', count: stats.tiktok, color: '#0a0a0a' },
+    { key: 'instagram', name: 'Instagram', count: stats.instagram, color: '#E1306C' },
+    { key: 'youtube', name: 'YouTube', count: stats.youtube, color: '#FF0000' },
+    { key: 'tiktok', name: 'TikTok', count: stats.tiktok, color: '#000000' },
+    { key: 'xiaohongshu', name: '小紅書', count: stats.xiaohongshu, color: '#FF2442' },
+    { key: 'threads', name: 'Threads', count: stats.threads, color: '#000000' },
   ];
   const active = platforms[currentIndex] ?? platforms[0];
 
@@ -124,8 +133,7 @@ export function SubscriberStrip() {
       <Pressable onPress={() => setEditOpen(true)} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
         <Animated.View style={[styles.inner, { opacity: fadeAnim }]}>
           <View style={styles.platformInfo}>
-            <Text style={styles.platformIcon}>{active.icon}</Text>
-            <Text style={styles.platformName}>{active.name}</Text>
+            <Text style={[styles.platformName, { color: active.color }]}>{active.name}</Text>
           </View>
           <View style={styles.countWrap}>
             <Text style={styles.count}>{formatCount(displayCount)}</Text>
@@ -146,7 +154,7 @@ export function SubscriberStrip() {
             <Text style={styles.sheetTitle}>更新追蹤者數字</Text>
             {platforms.map((platform) => (
               <View key={platform.key} style={styles.inputRow}>
-                <Text style={styles.inputLabel}>{platform.icon} {platform.name}</Text>
+                <Text style={[styles.inputLabel, { color: platform.color }]}>{platform.name}</Text>
                 <TextInput
                   value={String(draft[platform.key] || '')}
                   onChangeText={(text) => {
@@ -189,13 +197,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6
   },
-  platformIcon: {
-    fontSize: 24
-  },
   platformName: {
-    color: colors.textMuted,
     fontFamily: fonts.bodyMedium,
-    fontSize: 13
+    fontSize: 13,
+    fontWeight: '700'
   },
   countWrap: {
     flex: 1,

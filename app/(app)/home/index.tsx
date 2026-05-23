@@ -169,22 +169,28 @@ function MiniLogCard({ log, compact = false }: { log: HomeLog; compact?: boolean
       {cover ? (
         <Image source={{ uri: cover }} style={styles.miniLogImage} />
       ) : (
-        <View style={styles.miniLogFallback}>
-          <Text numberOfLines={3} style={styles.miniLogFallbackText}>{log.title || log.body || '日記'}</Text>
+        <View style={[styles.miniLogFallback, compact && styles.ownMiniLogFallback]}>
+          <Text numberOfLines={3} style={[styles.miniLogFallbackText, compact && styles.ownMiniLogFallbackText]}>
+            {log.title || log.body || '日記'}
+          </Text>
         </View>
       )}
-      <View style={styles.miniLogOverlay}>
+      <View style={[styles.miniLogOverlay, compact && !cover && styles.ownMiniLogOverlay]}>
         <View style={styles.miniLogUserRow}>
           {avatar ? <Image source={{ uri: avatar }} style={styles.miniLogAvatar} /> : null}
-          <Text numberOfLines={1} style={styles.miniLogUsername}>@{username}</Text>
+          <Text numberOfLines={1} style={[styles.miniLogUsername, compact && !cover && styles.ownMiniLogText]}>
+            @{username}
+          </Text>
         </View>
-        <Text numberOfLines={1} style={styles.miniLogTitle}>{log.title || log.body || '未命名日記'}</Text>
+        <Text numberOfLines={1} style={[styles.miniLogTitle, compact && !cover && styles.ownMiniLogText]}>
+          {log.title || log.body || '未命名日記'}
+        </Text>
       </View>
     </Pressable>
   );
 }
 
-function FollowingDiarySection({ logs, hasFollowing }: { logs: HomeLog[]; hasFollowing: boolean }) {
+function FollowingDiarySection({ logs }: { logs: HomeLog[]; hasFollowing: boolean }) {
   return (
     <View style={styles.diarySection}>
       <View style={styles.sectionHeaderRow}>
@@ -199,14 +205,10 @@ function FollowingDiarySection({ logs, hasFollowing }: { logs: HomeLog[]; hasFol
         </ScrollView>
       ) : (
         <View style={styles.followingEmpty}>
-          <Text style={styles.followingEmptyTitle}>
-            {hasFollowing ? '暫時未有新日記' : '追蹤創作者後睇佢哋嘅日記更新'}
-          </Text>
-          {!hasFollowing ? (
-            <Pressable onPress={() => router.push('/(app)/home/discover')} style={styles.discoverButton}>
-              <Text style={styles.discoverText}>去發掘</Text>
-            </Pressable>
-          ) : null}
+          <Text style={styles.emptyText}>暫時未有新日記</Text>
+          <Pressable onPress={() => router.push('/(app)/home/discover')} style={styles.emptyCTA}>
+            <Text style={styles.emptyCTAText}>去發掘創作者 →</Text>
+          </Pressable>
         </View>
       )}
     </View>
@@ -582,11 +584,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 14
   },
+  ownMiniLogFallback: {
+    backgroundColor: '#F5F2ED'
+  },
   miniLogFallbackText: {
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 16,
     lineHeight: 22
+  },
+  ownMiniLogFallbackText: {
+    color: '#1A1A1A'
   },
   miniLogOverlay: {
     position: 'absolute',
@@ -619,6 +627,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 14
   },
+  ownMiniLogOverlay: {
+    backgroundColor: 'rgba(245,242,237,0.9)'
+  },
+  ownMiniLogText: {
+    color: '#1A1A1A'
+  },
   followingEmpty: {
     marginHorizontal: 16,
     marginTop: 12,
@@ -633,6 +647,15 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     fontSize: 14,
     lineHeight: 20
+  },
+  emptyCTA: {
+    marginTop: 8
+  },
+  emptyCTAText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    fontWeight: '600'
   },
   discoverButton: {
     alignSelf: 'flex-start',
@@ -683,8 +706,9 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 15
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    lineHeight: 20
   },
   trendCard: {
     marginBottom: 12,

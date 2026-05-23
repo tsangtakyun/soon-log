@@ -1,7 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { BackHeader } from '@/components/BackHeader';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 
@@ -17,7 +16,10 @@ const tools: { name: string; icon: keyof typeof Feather.glyphMap; route: string;
 export default function ToolsScreen() {
   return (
     <View style={styles.screen}>
-      <BackHeader title="工具箱" />
+      <View style={styles.header}>
+        <Text style={styles.title}>工具箱</Text>
+        <Text style={styles.subtitle}>所有創作工具</Text>
+      </View>
       <ScrollView contentContainerStyle={styles.grid}>
         {tools.map((tool) => (
           <Pressable
@@ -39,6 +41,23 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bgBody
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 16
+  },
+  title: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 28,
+    fontWeight: '700'
+  },
+  subtitle: {
+    marginTop: 4,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13
   },
   grid: {
     padding: 16,
