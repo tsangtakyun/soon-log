@@ -5,7 +5,8 @@ const config = getDefaultConfig(__dirname);
 const escapedRoot = __dirname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 config.resolver.blockList = exclusionList([
-  new RegExp(`${escapedRoot}/node_modules\\.broken\\.[^/]+/.*`)
+  new RegExp(`${escapedRoot}/node_modules\\.(broken|bad)\\.[^/]+/.*`),
+  new RegExp(`${escapedRoot}/ios/build/.*`)
 ]);
 
 module.exports = config;
