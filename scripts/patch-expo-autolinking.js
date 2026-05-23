@@ -235,7 +235,74 @@ function patchExpoIosBinaryPath() {
   console.log('Patched Expo CLI iOS app binary path selection');
 }
 
+function patchExpoIosEstimatedBinaryPath() {
+  const xcodeBuild = path.join(
+    __dirname,
+    '..',
+    'node_modules',
+    '@expo',
+    'cli',
+    'build',
+    'src',
+    'run',
+    'ios',
+    'XcodeBuild.js'
+  );
+
+  if (!fs.existsSync(xcodeBuild)) {
+    return;
+  }
+
+  const source = fs.readFileSync(xcodeBuild, 'utf8');
+
+  if (source.includes('SOON-LOG ShareExtension estimated path fix')) {
+    return;
+  }
+
+  const original = `function matchEstimatedBinaryPath(buildOutput) {
+    // Match the full path that contains \`/(.*)/Developer/Xcode/DerivedData/(.*)/Build/Products/(.*)/(.*).app\`
+    const appBinaryPathMatch = buildOutput.match(/(\\/(?:\\\\\\s|[^ ])+\\/Developer\\/Xcode\\/DerivedData\\/(?:\\\\\\s|[^ ])+\\/Build\\/Products\\/(?:Debug|Release)-(?:[^\\s/]+)\\/(?:\\\\\\s|[^ ])+\\.app)/);
+    if (!(appBinaryPathMatch == null ? void 0 : appBinaryPathMatch.length)) {
+        throw new _errors.CommandError('XCODE_BUILD', \`Malformed xcodebuild results: app binary path was not generated in build output. Report this issue and run your project with Xcode instead.\`);
+    } else {
+        // Sort for the shortest
+        const shortestPath = appBinaryPathMatch.filter((a)=>typeof a === 'string' && a).sort((a, b)=>a.length - b.length)[0].trim();
+        _log.debug(\`Found app binary path: \${shortestPath}\`);
+        return shortestPath;
+    }
+}`;
+
+  const patched = `function matchEstimatedBinaryPath(buildOutput) {
+    // SOON-LOG ShareExtension estimated path fix:
+    // Avoid matching the ".app" prefix inside ".appex" extension bundles.
+    const appBinaryPathMatch = [
+        ...buildOutput.matchAll(/(\\/(?:\\\\\\s|[^ ])+\\/Developer\\/Xcode\\/DerivedData\\/(?:\\\\\\s|[^ ])+\\/Build\\/Products\\/(?:Debug|Release)-(?:[^\\s/]+)\\/(?:\\\\\\s|[^ ])+\\.app)(?!e)/g)
+    ].map((match)=>match[1]).filter(Boolean);
+    const existingAppPath = appBinaryPathMatch.find((candidate)=>_fs().default.existsSync(candidate));
+    if (existingAppPath) {
+        _log.debug(\`Found existing app binary path: \${existingAppPath}\`);
+        return existingAppPath;
+    }
+    if (!appBinaryPathMatch.length) {
+        throw new _errors.CommandError('XCODE_BUILD', \`Malformed xcodebuild results: app binary path was not generated in build output. Report this issue and run your project with Xcode instead.\`);
+    } else {
+        const shortestPath = appBinaryPathMatch.sort((a, b)=>a.length - b.length)[0].trim();
+        _log.debug(\`Found app binary path: \${shortestPath}\`);
+        return shortestPath;
+    }
+}`;
+
+  if (!source.includes(original)) {
+    console.warn('expo iOS estimated binary path patch skipped: expected source not found');
+    return;
+  }
+
+  fs.writeFileSync(xcodeBuild, source.replace(original, patched));
+  console.log('Patched Expo CLI estimated iOS app binary path selection');
+}
+
 patchExpoAutolinking();
 patchExpoDevMenuSwiftImport();
 patchExpoDevMenuAppInfo();
 patchExpoIosBinaryPath();
+patchExpoIosEstimatedBinaryPath();
