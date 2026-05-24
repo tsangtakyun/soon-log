@@ -68,6 +68,9 @@ export default function TopicClipPreviewScreen() {
   const [textSize, setTextSize] = useState<TextSize>('medium');
   const [uploading, setUploading] = useState(false);
   const [showRoomPicker, setShowRoomPicker] = useState(false);
+  const [showOverlayTools, setShowOverlayTools] = useState(false);
+  const [showTime, setShowTime] = useState(true);
+  const [showDate, setShowDate] = useState(true);
   const [rooms, setRooms] = useState<TopicRoom[]>([]);
   const [captionEditing, setCaptionEditing] = useState(false);
   const captionInputRef = useRef<TextInput>(null);
@@ -199,8 +202,8 @@ export default function TopicClipPreviewScreen() {
           caption: caption.trim() || null,
           video_url: isImage ? null : publicUrl,
           media_urls: isImage ? [publicUrl] : [],
-          time_str: timeStr,
-          date_str: dateStr,
+          time_str: showTime ? timeStr : null,
+          date_str: showDate ? dateStr : null,
           caption_align: captionAlign,
           overlay_vertical: overlayVertical,
           text_size: textSize,
@@ -256,28 +259,33 @@ export default function TopicClipPreviewScreen() {
             />
           )}
           <View pointerEvents="box-none" style={[styles.timeOverlay, overlayVerticalStyle, overlayAlignStyle]}>
-            <Text
-              style={[
-                styles.timeText,
-                {
-                  fontSize: overlayTextSize.time,
-                  lineHeight: Math.round(overlayTextSize.time * 1.08)
-                }
-              ]}
-            >
-              {timeStr}
-            </Text>
-            <Text
-              style={[
-                styles.dateText,
-                {
-                  fontSize: overlayTextSize.date,
-                  lineHeight: Math.round(overlayTextSize.date * 1.2)
-                }
-              ]}
-            >
-              {dateStr}
-            </Text>
+            {showTime ? (
+              <Text
+                style={[
+                  styles.timeText,
+                  {
+                    fontSize: overlayTextSize.time,
+                    lineHeight: Math.round(overlayTextSize.time * 1.08)
+                  }
+                ]}
+              >
+                {timeStr}
+              </Text>
+            ) : null}
+            {showDate ? (
+              <Text
+                style={[
+                  styles.dateText,
+                  {
+                    fontSize: overlayTextSize.date,
+                    lineHeight: Math.round(overlayTextSize.date * 1.2)
+                  },
+                  !showTime && styles.dateWithoutTime
+                ]}
+              >
+                {dateStr}
+              </Text>
+            ) : null}
             {captionEditing ? (
               <TextInput
                 ref={captionInputRef}
@@ -312,6 +320,31 @@ export default function TopicClipPreviewScreen() {
               <Text pointerEvents="none" style={styles.captionHint}>雙擊加入字幕</Text>
             )}
           </View>
+          <Pressable
+            accessibilityLabel="Overlay controls"
+            onPress={() => setShowOverlayTools((visible) => !visible)}
+            style={({ pressed }) => [styles.overlayToolButton, pressed && styles.pressed]}
+          >
+            <Feather name="layers" size={18} color="#fff" />
+          </Pressable>
+          {showOverlayTools ? (
+            <View style={styles.overlayToolPanel}>
+              <Pressable
+                accessibilityLabel={showTime ? 'Hide time' : 'Show time'}
+                onPress={() => setShowTime((visible) => !visible)}
+                style={[styles.overlayToggle, showTime && styles.overlayToggleActive]}
+              >
+                <Feather name="clock" size={16} color={showTime ? '#000' : '#fff'} />
+              </Pressable>
+              <Pressable
+                accessibilityLabel={showDate ? 'Hide date' : 'Show date'}
+                onPress={() => setShowDate((visible) => !visible)}
+                style={[styles.overlayToggle, showDate && styles.overlayToggleActive]}
+              >
+                <Feather name="calendar" size={16} color={showDate ? '#000' : '#fff'} />
+              </Pressable>
+            </View>
+          ) : null}
         </Pressable>
 
         <View style={styles.panel}>
@@ -512,6 +545,44 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.7)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4
+  },
+  dateWithoutTime: {
+    marginTop: 0
+  },
+  overlayToolButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.42)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)'
+  },
+  overlayToolPanel: {
+    position: 'absolute',
+    top: 58,
+    right: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.42)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    padding: 5,
+    gap: 6
+  },
+  overlayToggle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)'
+  },
+  overlayToggleActive: {
+    backgroundColor: '#fff'
   },
   captionOverlay: {
     marginTop: 12,
