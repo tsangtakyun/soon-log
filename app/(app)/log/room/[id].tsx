@@ -292,8 +292,8 @@ export default function TopicRoomScreen() {
             <View style={styles.heroActions}>
               <Text style={styles.heroBadge}>{room.privacy === 'open' ? '🌐 Open Studio' : '🔒 私密'}</Text>
               {isOwner ? (
-                <Pressable onPress={() => setSettingsOpen(true)} hitSlop={10}>
-                  <Text style={styles.settingsGear}>⚙️</Text>
+                <Pressable onPress={() => setSettingsOpen(true)} hitSlop={10} style={styles.settingsButton}>
+                  <Feather name="settings" size={20} color="rgba(255,255,255,0.7)" />
                 </Pressable>
               ) : null}
             </View>
@@ -322,18 +322,17 @@ export default function TopicRoomScreen() {
           </ScrollView>
 
           {isOwner ? (
-            <>
-              <View style={styles.invitePill}>
-                <Text style={styles.inviteText}>邀請碼：{room.invite_code}</Text>
-                <Pressable onPress={copyInviteCode} hitSlop={8}>
+            <View style={styles.invitePill}>
+              <Text numberOfLines={1} style={styles.inviteText}>邀請碼：{room.invite_code}</Text>
+              <View style={styles.inviteActions}>
+                <Pressable onPress={copyInviteCode} hitSlop={8} style={styles.inviteActionButton}>
                   <Text style={styles.copyText}>Copy</Text>
                 </Pressable>
+                <Pressable onPress={shareInviteCode} hitSlop={8} style={styles.inviteActionButton}>
+                  <Feather name="share-2" size={15} color={colors.textOnDark} />
+                </Pressable>
               </View>
-              <Pressable onPress={shareInviteCode} style={({ pressed }) => [styles.shareInviteBtn, pressed && styles.pressed]}>
-                <Feather name="share-2" size={16} color={colors.primary} />
-                <Text style={styles.shareInviteText}>分享邀請碼</Text>
-              </Pressable>
-            </>
+            </View>
           ) : null}
 
           {!isMember && room.privacy === 'open' ? (
@@ -344,7 +343,7 @@ export default function TopicRoomScreen() {
         </View>
 
         <View style={styles.body}>
-          <Text style={styles.sectionTitle}>最新 Clips</Text>
+          <Text style={styles.sectionTitle}>最新影片</Text>
           {clips.length === 0 ? (
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>仲未有 clips</Text>
@@ -366,7 +365,7 @@ export default function TopicRoomScreen() {
             })}
             style={({ pressed }) => [styles.fab, { bottom: insets.bottom + 22 }, pressed && styles.pressed]}
           >
-            <Text style={styles.fabText}>+ 新增 Clip</Text>
+            <Text style={styles.fabText}>+ 新增影片</Text>
           </Pressable>
           <AddClipSheet
             room={room}
@@ -595,22 +594,25 @@ function RoomSettingsSheet({
 }) {
   const insets = useSafeAreaInsets();
   const [name, setName] = useState(room.name);
+  const [topic, setTopic] = useState(room.topic);
   const [isOpen, setIsOpen] = useState(room.privacy === 'open');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
     setName(room.name);
+    setTopic(room.topic);
     setIsOpen(room.privacy === 'open');
-  }, [room.name, room.privacy, visible]);
+  }, [room.name, room.privacy, room.topic, visible]);
 
   const saveSettings = async () => {
     const nextName = name.trim();
+    const nextTopic = topic.trim();
     if (!nextName || saving) return;
     setSaving(true);
     const { error } = await supabase
       .from('topic_rooms')
-      .update({ name: nextName, privacy: isOpen ? 'open' : 'private' })
+      .update({ name: nextName, topic: nextTopic || nextName, privacy: isOpen ? 'open' : 'private' })
       .eq('id', room.id);
 
     setSaving(false);
@@ -653,11 +655,22 @@ function RoomSettingsSheet({
           <Text style={styles.sheetTitle}>房間設定</Text>
 
           <View style={styles.settingsField}>
-            <Text style={styles.settingsLabel}>題材名稱</Text>
+            <Text style={styles.settingsLabel}>房間名稱</Text>
             <TextInput
               value={name}
               onChangeText={setName}
-              placeholder="題材名稱"
+              placeholder="房間名稱"
+              placeholderTextColor={colors.textMuted}
+              style={styles.sheetInput}
+            />
+          </View>
+
+          <View style={styles.settingsField}>
+            <Text style={styles.settingsLabel}>副題</Text>
+            <TextInput
+              value={topic}
+              onChangeText={setTopic}
+              placeholder="副題 / 題材描述"
               placeholderTextColor={colors.textMuted}
               style={styles.sheetInput}
             />
@@ -736,9 +749,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6
   },
-  settingsGear: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 20
+  settingsButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   roomTitle: {
     marginTop: 28,
@@ -816,29 +831,26 @@ const styles = StyleSheet.create({
     gap: 12
   },
   inviteText: {
+    flex: 1,
     color: colors.textOnDark,
     fontFamily: fonts.bodyMedium,
     fontSize: 14
+  },
+  inviteActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  inviteActionButton: {
+    minWidth: 28,
+    minHeight: 28,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   copyText: {
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 13
-  },
-  shareInviteBtn: {
-    marginTop: 8,
-    borderRadius: 10,
-    backgroundColor: colors.primaryLight,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8
-  },
-  shareInviteText: {
-    color: colors.primary,
-    fontFamily: fonts.bodyBold,
-    fontSize: 14,
-    fontWeight: '600'
   },
   joinButton: {
     alignSelf: 'flex-start',
