@@ -2,11 +2,13 @@ import { Feather } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Dimensions,
+  Easing,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -75,6 +77,13 @@ type SelectedImage = {
   previewUri: string;
   base64: string;
 };
+type StarProps = {
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+  delay: number;
+};
 
 type PushMember = {
   profile?: {
@@ -93,6 +102,82 @@ function timeAgo(value: string) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours} 小時前`;
   return `${Math.floor(hours / 24)} 日前`;
+}
+
+function AnimatedStar({ x, y, size, color, delay }: StarProps) {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 1000 + Math.random() * 1000,
+          delay,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.2,
+          duration: 1000 + Math.random() * 1000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true
+        })
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(translateY, {
+          toValue: -3,
+          duration: 2000 + Math.random() * 2000,
+          delay,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true
+        }),
+        Animated.timing(translateY, {
+          toValue: 3,
+          duration: 2000 + Math.random() * 2000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true
+        })
+      ])
+    ).start();
+  }, [delay, opacity, translateY]);
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: color,
+        opacity,
+        transform: [{ translateY }]
+      }}
+    />
+  );
+}
+
+function StarField({ heroHeight, screenWidth }: { heroHeight: number; screenWidth: number }) {
+  const stars = useMemo(() => Array.from({ length: 52 }, (_, index) => ({
+    id: index,
+    x: Math.random() * screenWidth,
+    y: Math.random() * heroHeight,
+    size: 1 + Math.random() * 3,
+    color: `rgba(255,255,255,${0.25 + Math.random() * 0.65})`,
+    delay: Math.random() * 2000
+  })), [heroHeight, screenWidth]);
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {stars.map(({ id, ...star }) => <AnimatedStar key={id} {...star} />)}
+    </View>
+  );
 }
 
 function base64ToArrayBuffer(base64: string) {
@@ -136,6 +221,8 @@ async function uploadImages(clipId: string, selectedImages: SelectedImage[]): Pr
 
 export default function TopicRoomScreen() {
   const insets = useSafeAreaInsets();
+  const screenWidth = Dimensions.get('window').width;
+  const heroHeight = insets.top + 420;
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const [room, setRoom] = useState<Room | null>(null);
@@ -285,61 +372,64 @@ export default function TopicRoomScreen() {
     <View style={styles.screen}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 116 }}>
         <View style={[styles.hero, { paddingTop: insets.top + 14 }]}>
-          <View style={styles.heroTop}>
-            <Pressable onPress={() => router.back()} hitSlop={10}>
-              <Text style={styles.heroBack}>← 返回</Text>
-            </Pressable>
-            <View style={styles.heroActions}>
-              <Text style={styles.heroBadge}>{room.privacy === 'open' ? '🌐 Open Studio' : '🔒 私密'}</Text>
-              {isOwner ? (
-                <Pressable onPress={() => setSettingsOpen(true)} hitSlop={10} style={styles.settingsButton}>
-                  <Feather name="settings" size={20} color="rgba(255,255,255,0.7)" />
+          <StarField heroHeight={heroHeight} screenWidth={screenWidth} />
+          <View style={styles.heroContent}>
+            <View style={styles.heroTop}>
+              <Pressable onPress={() => router.back()} hitSlop={10}>
+                <Text style={styles.heroBack}>← 返回</Text>
+              </Pressable>
+              <View style={styles.heroActions}>
+                <Text style={styles.heroBadge}>{room.privacy === 'open' ? '🌐 Open Studio' : '🔒 私密'}</Text>
+                {isOwner ? (
+                  <Pressable onPress={() => setSettingsOpen(true)} hitSlop={10} style={styles.settingsButton}>
+                    <Feather name="settings" size={20} color="rgba(255,255,255,0.7)" />
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+            <Text style={styles.roomTitle}>{room.name}</Text>
+            <Text style={styles.topicText}>{room.topic}</Text>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.membersRow}>
+              {members.map((member) => (
+                <View key={member.id} style={styles.memberItem}>
+                  {member.avatar_url ? (
+                    <Image source={{ uri: member.avatar_url }} style={styles.memberAvatar} />
+                  ) : (
+                    <View style={styles.memberAvatarFallback}>
+                      <Text style={styles.memberInitial}>{(member.display_name || member.username || 'S').slice(0, 1).toUpperCase()}</Text>
+                    </View>
+                  )}
+                  <Text numberOfLines={2} style={styles.memberAngle}>{member.angle || '未設定角度'}</Text>
+                </View>
+              ))}
+              {isMember ? (
+                <Pressable onPress={() => Alert.alert('邀請隊友', `邀請碼：${room.invite_code ?? ''}`)} style={styles.addMember}>
+                  <Text style={styles.addMemberText}>＋</Text>
                 </Pressable>
               ) : null}
-            </View>
-          </View>
-          <Text style={styles.roomTitle}>{room.name}</Text>
-          <Text style={styles.topicText}>{room.topic}</Text>
+            </ScrollView>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.membersRow}>
-            {members.map((member) => (
-              <View key={member.id} style={styles.memberItem}>
-                {member.avatar_url ? (
-                  <Image source={{ uri: member.avatar_url }} style={styles.memberAvatar} />
-                ) : (
-                  <View style={styles.memberAvatarFallback}>
-                    <Text style={styles.memberInitial}>{(member.display_name || member.username || 'S').slice(0, 1).toUpperCase()}</Text>
-                  </View>
-                )}
-                <Text numberOfLines={2} style={styles.memberAngle}>{member.angle || '未設定角度'}</Text>
+            {isOwner ? (
+              <View style={styles.invitePill}>
+                <Text numberOfLines={1} style={styles.inviteText}>邀請碼：{room.invite_code}</Text>
+                <View style={styles.inviteActions}>
+                  <Pressable onPress={copyInviteCode} hitSlop={8} style={styles.inviteActionButton}>
+                    <Text style={styles.copyText}>Copy</Text>
+                  </Pressable>
+                  <Pressable onPress={shareInviteCode} hitSlop={8} style={styles.inviteActionButton}>
+                    <Feather name="share-2" size={15} color={colors.textOnDark} />
+                  </Pressable>
+                </View>
               </View>
-            ))}
-            {isMember ? (
-              <Pressable onPress={() => Alert.alert('邀請隊友', `邀請碼：${room.invite_code ?? ''}`)} style={styles.addMember}>
-                <Text style={styles.addMemberText}>＋</Text>
+            ) : null}
+
+            {!isMember && room.privacy === 'open' ? (
+              <Pressable onPress={joinStudio} style={({ pressed }) => [styles.joinButton, pressed && styles.pressed]}>
+                <Text style={styles.joinButtonText}>+ 加入 Studio</Text>
               </Pressable>
             ) : null}
-          </ScrollView>
-
-          {isOwner ? (
-            <View style={styles.invitePill}>
-              <Text numberOfLines={1} style={styles.inviteText}>邀請碼：{room.invite_code}</Text>
-              <View style={styles.inviteActions}>
-                <Pressable onPress={copyInviteCode} hitSlop={8} style={styles.inviteActionButton}>
-                  <Text style={styles.copyText}>Copy</Text>
-                </Pressable>
-                <Pressable onPress={shareInviteCode} hitSlop={8} style={styles.inviteActionButton}>
-                  <Feather name="share-2" size={15} color={colors.textOnDark} />
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
-
-          {!isMember && room.privacy === 'open' ? (
-            <Pressable onPress={joinStudio} style={({ pressed }) => [styles.joinButton, pressed && styles.pressed]}>
-              <Text style={styles.joinButtonText}>+ 加入 Studio</Text>
-            </Pressable>
-          ) : null}
+          </View>
         </View>
 
         <View style={styles.body}>
@@ -720,9 +810,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   hero: {
+    position: 'relative',
+    overflow: 'hidden',
     backgroundColor: colors.bgHero,
     paddingHorizontal: 16,
     paddingBottom: 20
+  },
+  heroContent: {
+    position: 'relative',
+    zIndex: 1
   },
   heroTop: {
     flexDirection: 'row',
