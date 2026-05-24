@@ -207,6 +207,7 @@ export default function TopicClipPreviewScreen() {
           time_str: timeStr,
           date_str: dateStr,
           caption_align: captionAlign,
+          overlay_vertical: overlayVertical,
           text_size: textSize,
           background_color: 'black'
         });

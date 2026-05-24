@@ -26,6 +26,7 @@ type ClipDetail = {
   time_str: string | null;
   date_str: string | null;
   caption_align: 'left' | 'center' | 'right' | null;
+  overlay_vertical: 'top' | 'middle' | 'bottom' | null;
   text_size: 'small' | 'medium' | 'large' | null;
   background_color: 'cream' | 'black' | null;
   like_count?: number | null;
@@ -124,7 +125,6 @@ export default function ClipDetailScreen() {
             {clip.angle ? <Text numberOfLines={1} style={styles.angle}>{clip.angle}</Text> : null}
           </View>
         </View>
-        {clip.caption ? <Text style={styles.caption}>{clip.caption}</Text> : null}
         <View style={styles.actionRow}>
           <Text style={[styles.actionText, liked && styles.likedText]}>{liked ? '♥' : '♡'} Like</Text>
           <Text style={styles.actionText}>💬 Comment</Text>

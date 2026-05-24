@@ -12,6 +12,7 @@ type ClipPlayerProps = {
     time_str?: string | null;
     date_str?: string | null;
     caption_align?: 'left' | 'center' | 'right' | null;
+    overlay_vertical?: 'top' | 'middle' | 'bottom' | null;
     text_size?: 'small' | 'medium' | 'large' | null;
     background_color?: 'cream' | 'black' | null;
   };
@@ -28,9 +29,9 @@ const captionSizeMap = {
 };
 
 const timeSizeMap = {
-  small: { time: 28, date: 13 },
-  medium: { time: 34, date: 15 },
-  large: { time: 42, date: 18 }
+  small: { time: 40, date: 17 },
+  medium: { time: 48, date: 20 },
+  large: { time: 58, date: 24 }
 };
 
 const alignMap = {
@@ -47,9 +48,12 @@ export default function ClipPlayer({ clip, width, height, thumbnail = false, onD
     videoPlayer.play();
   });
   const align = clip.caption_align || 'center';
+  const vertical = clip.overlay_vertical || 'middle';
   const size = clip.text_size || 'medium';
   const captionFontSize = captionSizeMap[size];
   const overlayFontSize = timeSizeMap[size];
+  const overlayTop = vertical === 'top' ? '20%' : vertical === 'bottom' ? '68%' : '43%';
+  const overlayAlign = alignMap[align];
 
   useEventListener(player, 'statusChange', ({ status }) => {
     if (status === 'readyToPlay') {
@@ -73,9 +77,10 @@ export default function ClipPlayer({ clip, width, height, thumbnail = false, onD
           onFirstFrameRender={() => player.play()}
         />
 
-        <View pointerEvents="none" style={[styles.overlay, { width, height }]}>
-          {(clip.time_str || clip.date_str) ? (
-            <View style={styles.timestamp}>
+        {!thumbnail ? (
+          <View pointerEvents="none" style={[styles.overlay, { width, height }]}>
+            {(clip.time_str || clip.date_str || clip.caption) ? (
+            <View style={[styles.timestamp, { top: overlayTop, alignItems: overlayAlign }]}>
               {clip.time_str ? (
                 <Text
                   style={[
@@ -96,26 +101,24 @@ export default function ClipPlayer({ clip, width, height, thumbnail = false, onD
                   {clip.date_str}
                 </Text>
               ) : null}
+              {clip.caption ? (
+                <Text
+                  style={[
+                    styles.captionText,
+                    {
+                      fontSize: captionFontSize,
+                      lineHeight: Math.round(captionFontSize * 1.3),
+                      textAlign: align
+                    }
+                  ]}
+                >
+                  {clip.caption}
+                </Text>
+              ) : null}
             </View>
-          ) : null}
-
-          {clip.caption ? (
-            <View style={[styles.captionWrap, { alignItems: alignMap[align] }]}>
-              <Text
-                style={[
-                  styles.captionText,
-                  {
-                    fontSize: captionFontSize,
-                    lineHeight: Math.round(captionFontSize * 1.3),
-                    textAlign: align
-                  }
-                ]}
-              >
-                {clip.caption}
-              </Text>
-            </View>
-          ) : null}
-        </View>
+            ) : null}
+          </View>
+        ) : null}
 
         {!thumbnail ? (
           <Pressable
@@ -170,8 +173,12 @@ const styles = StyleSheet.create({
   },
   timestamp: {
     position: 'absolute',
-    top: 16,
-    left: 16
+    left: '50%',
+    width: 300,
+    minHeight: 132,
+    justifyContent: 'center',
+    flexDirection: 'column',
+    transform: [{ translateX: -150 }, { translateY: -66 }]
   },
   timeText: {
     color: '#fff',
@@ -188,15 +195,9 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4
   },
-  captionWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 24,
-    paddingHorizontal: 16
-  },
   captionText: {
-    maxWidth: '100%',
+    marginTop: 12,
+    width: 220,
     color: '#fff',
     fontWeight: '800',
     textShadowColor: '#000',

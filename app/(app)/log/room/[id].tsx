@@ -65,6 +65,7 @@ type Clip = {
   time_str: string | null;
   date_str: string | null;
   caption_align: 'left' | 'center' | 'right' | null;
+  overlay_vertical: 'top' | 'middle' | 'bottom' | null;
   text_size: 'small' | 'medium' | 'large' | null;
   background_color: 'cream' | 'black' | null;
   like_count: number | null;
@@ -341,7 +342,8 @@ export default function TopicRoomScreen() {
       .channel(`topic-room-${id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_rooms', filter: `id=eq.${id}` }, () => loadRoom())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_room_members', filter: `room_id=eq.${id}` }, () => loadRoom())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_clips', filter: `room_id=eq.${id}` }, () => loadRoom())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'topic_clips', filter: `room_id=eq.${id}` }, () => loadRoom())
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'topic_clips', filter: `room_id=eq.${id}` }, () => loadRoom())
       .subscribe();
 
     return () => {
