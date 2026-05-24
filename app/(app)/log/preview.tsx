@@ -62,14 +62,12 @@ export default function TopicClipPreviewScreen() {
   const isImage = mediaType === 'image';
   const timeStr = Array.isArray(params.timeStr) ? params.timeStr[0] : params.timeStr;
   const dateStr = Array.isArray(params.dateStr) ? params.dateStr[0] : params.dateStr;
-  const roomId = Array.isArray(params.room_id) ? params.room_id[0] : params.room_id;
   const [caption, setCaption] = useState('');
   const [captionAlign, setCaptionAlign] = useState<CaptionAlign>('center');
   const [overlayVertical, setOverlayVertical] = useState<OverlayVertical>('middle');
   const [textSize, setTextSize] = useState<TextSize>('medium');
   const [uploading, setUploading] = useState(false);
   const [showRoomPicker, setShowRoomPicker] = useState(false);
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(roomId || null);
   const [rooms, setRooms] = useState<TopicRoom[]>([]);
   const [captionEditing, setCaptionEditing] = useState(false);
   const captionInputRef = useRef<TextInput>(null);
@@ -95,8 +93,6 @@ export default function TopicClipPreviewScreen() {
     fontSize: captionFontSize,
     lineHeight: captionLineHeight
   } as const;
-  const selectedRoomName = rooms.find((room) => room.id === selectedRoomId)?.name;
-
   useEffect(() => {
     async function fetchRooms() {
       if (!user?.id) return;
@@ -115,13 +111,10 @@ export default function TopicClipPreviewScreen() {
       const uniqueRooms = Array.from(new Map(nextRooms.map((room) => [room.id, room])).values());
       setRooms(uniqueRooms);
 
-      if (!roomId && uniqueRooms.length === 1) {
-        setSelectedRoomId(uniqueRooms[0].id);
-      }
     }
 
     fetchRooms();
-  }, [roomId, user?.id]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!fileUri || isImage) return;
@@ -176,13 +169,8 @@ export default function TopicClipPreviewScreen() {
     }
   }
 
-  async function uploadAndPublish() {
+  async function uploadAndPublish(targetRoomId: string) {
     if (!user?.id || !fileUri || uploading) return;
-    const targetRoomId = selectedRoomId;
-    if (!targetRoomId) {
-      Alert.alert('請先選擇 Topic Room');
-      return;
-    }
     setUploading(true);
 
     try {
@@ -232,12 +220,7 @@ export default function TopicClipPreviewScreen() {
   }
 
   function handleUploadPress() {
-    if (!selectedRoomId) {
-      setShowRoomPicker(true);
-      return;
-    }
-
-    uploadAndPublish();
+    setShowRoomPicker(true);
   }
 
   if (!fileUri) {
@@ -381,9 +364,7 @@ export default function TopicClipPreviewScreen() {
               ) : (
                 <>
                   <Feather name="upload-cloud" size={22} color="#fff" />
-                  <Text style={styles.uploadText}>
-                    {selectedRoomId ? `上載到 ${selectedRoomName || 'Topic Room'}` : '選擇房間上載'}
-                  </Text>
+                  <Text style={styles.uploadText}>選擇房間上載</Text>
                 </>
               )}
             </Pressable>
@@ -399,17 +380,17 @@ export default function TopicClipPreviewScreen() {
             {rooms.map((room) => (
               <Pressable
                 key={room.id}
-                style={[styles.roomRow, selectedRoomId === room.id && styles.roomRowSelected]}
+                style={styles.roomRow}
                 onPress={() => {
-                  setSelectedRoomId(room.id);
                   setShowRoomPicker(false);
+                  uploadAndPublish(room.id);
                 }}
               >
                 <View>
                   <Text style={styles.roomName}>{room.name}</Text>
                   <Text style={styles.roomTopic}>{room.topic || 'Topic Room'}</Text>
                 </View>
-                {selectedRoomId === room.id ? <Text style={styles.roomSelectedCheck}>✓</Text> : null}
+                <Feather name="upload-cloud" size={18} color={colors.primary} />
               </Pressable>
             ))}
 
@@ -461,7 +442,7 @@ function OptionRow({
     <View style={styles.optionRow}>
       <Text style={styles.optionLabel}>{label}</Text>
       <View style={styles.optionButtons}>
-        {options.map(([value, title]) => {
+        {options.map(([value]) => {
           const isActive = active === value;
           return (
             <Pressable key={value} onPress={() => onSelect(value)} style={[styles.optionPill, isActive && styles.optionPillActive]}>
@@ -472,7 +453,6 @@ function OptionRow({
                   color={isActive ? '#000' : '#fff'}
                 />
               ) : null}
-              <Text style={[styles.optionPillText, isActive && styles.optionPillTextActive]}>{title}</Text>
             </Pressable>
           );
         })}
@@ -601,14 +581,6 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
     backgroundColor: '#fff'
   },
-  optionPillText: {
-    color: '#fff',
-    fontFamily: fonts.bodyBold,
-    fontSize: 13
-  },
-  optionPillTextActive: {
-    color: '#000'
-  },
   actions: {
     marginTop: 8,
     flexDirection: 'row',
@@ -686,9 +658,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 14
   },
-  roomRowSelected: {
-    backgroundColor: colors.primaryLight
-  },
   roomName: {
     color: colors.text,
     fontFamily: fonts.bodyBold,
@@ -700,11 +669,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 13
-  },
-  roomSelectedCheck: {
-    color: colors.primary,
-    fontFamily: fonts.bodyBold,
-    fontSize: 18
   },
   noRooms: {
     alignItems: 'center',
