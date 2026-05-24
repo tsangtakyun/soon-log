@@ -17,7 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MenuDrawer } from '@/components/MenuDrawer';
 import { SocialLinksSheet } from '@/components/SocialLinksSheet';
-import { SubscriberStrip } from '@/components/SubscriberStrip';
+import { TrendStrip } from '@/components/TrendStrip';
 import ClipPlayer from '@/components/ClipPlayer';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -446,7 +446,7 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
-        <SubscriberStrip />
+        <TrendStrip />
 
         <FollowingDiarySection logs={followingLogs} hasFollowing={hasFollowing} />
 

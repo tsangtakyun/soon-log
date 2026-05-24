@@ -43,7 +43,7 @@ function formatCount(value: number) {
   return Math.round(value).toLocaleString('en-US');
 }
 
-export function SubscriberStrip() {
+export function SubscriberStrip({ compact = false }: { compact?: boolean }) {
   const { user } = useAuth();
   const [stats, setStats] = useState<SocialStats>(emptyStats);
   const [draft, setDraft] = useState<SocialStats>(emptyStats);
@@ -131,19 +131,19 @@ export function SubscriberStrip() {
 
   return (
     <>
-      <Pressable onPress={() => setEditOpen(true)} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+      <Pressable onPress={() => setEditOpen(true)} style={({ pressed }) => [styles.card, compact && styles.compactCard, pressed && styles.pressed]}>
         <Animated.View style={[styles.inner, { opacity: fadeAnim }]}>
-          <View style={styles.platformInfo}>
+          <View style={[styles.platformInfo, compact && styles.compactPlatformInfo]}>
             <PlatformLogo
               platform={active.key}
-              size={28}
+              size={compact ? 22 : 28}
               showLabel
-              labelStyle={styles.platformName}
+              labelStyle={[styles.platformName, compact && styles.compactPlatformName]}
             />
           </View>
           <View style={styles.countWrap}>
-            <Text style={styles.count}>{formatCount(displayCount)}</Text>
-            <Text style={styles.countLabel}>位追蹤者</Text>
+            <Text style={[styles.count, compact && styles.compactCount]}>{formatCount(displayCount)}</Text>
+            <Text style={[styles.countLabel, compact && styles.compactCountLabel]}>位追蹤者</Text>
           </View>
           <View style={styles.dots}>
             {platforms.map((platform, index) => (
@@ -198,6 +198,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgBodyCard,
     padding: 16
   },
+  compactCard: {
+    marginHorizontal: 0,
+    marginTop: 10,
+    padding: 12
+  },
   inner: {
     flexDirection: 'row',
     alignItems: 'center'
@@ -208,10 +213,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6
   },
+  compactPlatformInfo: {
+    width: 104
+  },
   platformName: {
     fontFamily: fonts.bodyMedium,
     fontSize: 16,
     fontWeight: '700'
+  },
+  compactPlatformName: {
+    fontSize: 13
   },
   countWrap: {
     flex: 1,
@@ -222,10 +233,16 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 28
   },
+  compactCount: {
+    fontSize: 22
+  },
   countLabel: {
     color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 13
+  },
+  compactCountLabel: {
+    fontSize: 11
   },
   dots: {
     width: 34,

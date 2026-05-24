@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 import { PlatformLogo, type Platform as PlatformKey } from './PlatformLogo';
+import { SubscriberStrip } from './SubscriberStrip';
 
 type Links = {
   instagram: string;
@@ -149,6 +150,10 @@ export function SocialLinksSheet({ visible, onClose }: { visible: boolean; onClo
                 <Text style={styles.shareText}>分享全部連結</Text>
               </Pressable>
             ) : null}
+
+            <View style={styles.divider} />
+            <Text style={styles.statsTitle}>平台追蹤者</Text>
+            <SubscriberStrip compact />
           </ScrollView>
         </View>
       </View>
@@ -251,6 +256,17 @@ const styles = StyleSheet.create({
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 15
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    marginTop: 20,
+    marginBottom: 16
+  },
+  statsTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16
   },
   pressed: {
     opacity: 0.72
