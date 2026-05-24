@@ -235,6 +235,9 @@ export default function TopicRoomScreen() {
   const memberAngles = useMemo(() => new Map(members.map((member) => [member.user_id, member.angle])), [members]);
   const isMember = Boolean(membershipRole);
   const isOwner = membershipRole === 'owner';
+  const goBackToEggs = useCallback(() => {
+    router.replace('/(app)/log');
+  }, []);
 
   const loadRoom = useCallback(async () => {
     if (!id) return;
@@ -298,11 +301,11 @@ export default function TopicRoomScreen() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '載入失敗';
       Alert.alert('錯誤', message);
-      router.back();
+      goBackToEggs();
     } finally {
       setLoading(false);
     }
-  }, [id, user]);
+  }, [goBackToEggs, id, user]);
 
   useEffect(() => {
     loadRoom();
@@ -357,7 +360,7 @@ export default function TopicRoomScreen() {
   if (!room) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top + 16 }]}>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
+        <Pressable onPress={goBackToEggs} hitSlop={10}>
           <Text style={styles.back}>← 返回</Text>
         </Pressable>
         <View style={styles.empty}>
@@ -375,7 +378,7 @@ export default function TopicRoomScreen() {
           <StarField heroHeight={heroHeight} screenWidth={screenWidth} />
           <View style={styles.heroContent}>
             <View style={styles.heroTop}>
-              <Pressable onPress={() => router.back()} hitSlop={10}>
+              <Pressable onPress={goBackToEggs} hitSlop={10}>
                 <Text style={styles.heroBack}>← 返回</Text>
               </Pressable>
               <View style={styles.heroActions}>

@@ -29,7 +29,6 @@ export default function CreateTopicRoomScreen({ onClose }: CreateTopicRoomScreen
   const { loading: authLoading, user } = useAuth();
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
-  const [angle, setAngle] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const canSubmit = topic.trim().length > 0 && !authLoading && !saving;
@@ -68,7 +67,6 @@ export default function CreateTopicRoomScreen({ onClose }: CreateTopicRoomScreen
       const { error: memberError } = await supabase.from('topic_room_members').insert({
         room_id: room.id,
         user_id: user.id,
-        angle: angle.trim() || null,
         role: 'owner'
       });
 
@@ -110,12 +108,6 @@ export default function CreateTopicRoomScreen({ onClose }: CreateTopicRoomScreen
           placeholder="呢個 room 係關於咩..."
           multiline
           style={styles.descriptionInput}
-        />
-        <Field
-          label="你的角度"
-          value={angle}
-          onChangeText={setAngle}
-          placeholder="例如：歷史背景、人物故事、數據分析..."
         />
 
         <View style={styles.privacyCard}>
