@@ -32,6 +32,13 @@ export default function CreateTopicRoomScreen({ onClose }: CreateTopicRoomScreen
   const [isOpen, setIsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const canSubmit = topic.trim().length > 0 && !authLoading && !saving;
+  const closeScreen = () => {
+    if (onClose) {
+      onClose();
+      return;
+    }
+    router.replace('/(app)/log');
+  };
 
   const submit = async () => {
     if (saving || authLoading) return;
@@ -87,7 +94,7 @@ export default function CreateTopicRoomScreen({ onClose }: CreateTopicRoomScreen
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Pressable onPress={onClose ?? (() => router.back())} hitSlop={10}>
+        <Pressable onPress={closeScreen} hitSlop={10}>
           <Text style={styles.cancel}>← 取消</Text>
         </Pressable>
         <Text style={styles.title}>建立 Topic Room</Text>
