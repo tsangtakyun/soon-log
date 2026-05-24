@@ -14,8 +14,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -124,16 +126,16 @@ function TrendDetailSection({ trend }: { trend: Trend }) {
         <View style={styles.detailCard}>
           <Text style={styles.detailLabel}>🔗 相關連結</Text>
           {links.map((link, index) => (
-            <Pressable
+            <TouchableOpacity
               key={`${link.url}-${index}`}
               onPress={() => Linking.openURL(link.url)}
-              style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
+              style={styles.linkRow}
             >
-              <Text style={styles.linkIcon}>↗</Text>
+              <Feather name="external-link" size={14} color={colors.primary} />
               <Text style={styles.linkText} numberOfLines={1}>
                 {link.url}
               </Text>
-            </Pressable>
+            </TouchableOpacity>
           ))}
         </View>
       ) : null}
@@ -651,11 +653,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingVertical: 6
-  },
-  linkIcon: {
-    color: colors.primary,
-    fontFamily: fonts.bodyBold,
-    fontSize: 14
   },
   linkText: {
     flex: 1,
