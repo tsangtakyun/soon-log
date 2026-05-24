@@ -11,6 +11,7 @@ import {
   Alert,
   Keyboard,
   KeyboardAvoidingView,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -54,8 +55,10 @@ function fixedFileUri(uri: string) {
 export default function TopicClipPreviewScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const params = useLocalSearchParams<{ uri: string; timeStr: string; dateStr: string; room_id?: string }>();
+  const params = useLocalSearchParams<{ uri: string; mediaType?: string; timeStr: string; dateStr: string; room_id?: string }>();
   const uri = Array.isArray(params.uri) ? params.uri[0] : params.uri;
+  const mediaType = Array.isArray(params.mediaType) ? params.mediaType[0] : params.mediaType;
+  const isImage = mediaType === 'image';
   const timeStr = Array.isArray(params.timeStr) ? params.timeStr[0] : params.timeStr;
   const dateStr = Array.isArray(params.dateStr) ? params.dateStr[0] : params.dateStr;
   const roomId = Array.isArray(params.room_id) ? params.room_id[0] : params.room_id;
@@ -71,7 +74,7 @@ export default function TopicClipPreviewScreen() {
   const captionInputRef = useRef<TextInput>(null);
   const lastPreviewTapRef = useRef(0);
   const fileUri = useMemo(() => uri ? fixedFileUri(uri) : '', [uri]);
-  const player = useVideoPlayer(fileUri || null, (videoPlayer) => {
+  const player = useVideoPlayer(!isImage && fileUri ? fileUri : null, (videoPlayer) => {
     videoPlayer.loop = true;
     videoPlayer.muted = true;
     videoPlayer.play();
@@ -120,13 +123,13 @@ export default function TopicClipPreviewScreen() {
   }, [roomId, user?.id]);
 
   useEffect(() => {
-    if (!fileUri) return;
+    if (!fileUri || isImage) return;
     player.loop = true;
     player.muted = true;
     player.currentTime = 0;
     const playTimeout = setTimeout(() => player.play(), 120);
     return () => clearTimeout(playTimeout);
-  }, [fileUri, player]);
+  }, [fileUri, isImage, player]);
 
   useEventListener(player, 'statusChange', ({ status }) => {
     if (status === 'readyToPlay') {
@@ -144,7 +147,7 @@ export default function TopicClipPreviewScreen() {
   }
 
   function handlePreviewPress() {
-    player.play();
+    if (!isImage) player.play();
     const now = Date.now();
     if (now - lastPreviewTapRef.current < 320) {
       beginCaptionEdit();
@@ -182,7 +185,9 @@ export default function TopicClipPreviewScreen() {
     setUploading(true);
 
     try {
-      const filename = `topic-clips/${targetRoomId}/${user.id}_${Date.now()}.mp4`;
+      const extension = isImage ? 'jpg' : 'mp4';
+      const contentType = isImage ? 'image/jpeg' : 'video/mp4';
+      const filename = `topic-clips/${targetRoomId}/${user.id}_${Date.now()}.${extension}`;
       const fileContent = await FileSystem.readAsStringAsync(fileUri, {
         encoding: FileSystem.EncodingType.Base64
       });
@@ -190,7 +195,7 @@ export default function TopicClipPreviewScreen() {
       const { error: uploadError } = await supabase.storage
         .from('log-media')
         .upload(filename, decode(fileContent), {
-          contentType: 'video/mp4',
+          contentType,
           upsert: false
         });
 
@@ -203,7 +208,8 @@ export default function TopicClipPreviewScreen() {
           room_id: targetRoomId,
           user_id: user.id,
           caption: caption.trim() || null,
-          video_url: publicUrl,
+          video_url: isImage ? null : publicUrl,
+          media_urls: isImage ? [publicUrl] : [],
           time_str: timeStr,
           date_str: dateStr,
           caption_align: captionAlign,
@@ -253,14 +259,18 @@ export default function TopicClipPreviewScreen() {
       >
         <StatusBar hidden />
         <Pressable onPress={handlePreviewPress} style={styles.previewWrap}>
-          <VideoView
-            player={player}
-            style={styles.video}
-            contentFit="cover"
-            nativeControls={false}
-            allowsVideoFrameAnalysis={false}
-            onFirstFrameRender={() => player.play()}
-          />
+          {isImage ? (
+            <Image source={{ uri: fileUri }} style={styles.video} resizeMode="cover" />
+          ) : (
+            <VideoView
+              player={player}
+              style={styles.video}
+              contentFit="cover"
+              nativeControls={false}
+              allowsVideoFrameAnalysis={false}
+              onFirstFrameRender={() => player.play()}
+            />
+          )}
           <View pointerEvents="box-none" style={[styles.timeOverlay, overlayVerticalStyle, overlayAlignStyle]}>
             <Text
               style={[

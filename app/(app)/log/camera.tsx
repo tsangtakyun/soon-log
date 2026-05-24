@@ -1,4 +1,6 @@
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { Feather } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -12,7 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/theme/colors';
 
-type DurationOption = '2' | '5';
+type DurationOption = '2' | '5' | 'inf';
 type CameraFacing = 'front' | 'back';
 
 function formatTime(date: Date) {
@@ -100,16 +102,19 @@ export default function TopicClipCameraScreen() {
 
   const startRecordingNow = useCallback(async () => {
     if (!cameraRef.current || isRecording) return;
-    const maxDuration = Number(duration);
+    const isInfinite = duration === 'inf';
+    const maxDuration = isInfinite ? null : Number(duration);
     setIsRecording(true);
     setRecordingProgress(0);
 
     const startTime = Date.now();
     progressIntervalRef.current = setInterval(() => {
       const elapsed = (Date.now() - startTime) / 1000;
-      setRecordingProgress(Math.min(elapsed / maxDuration, 1));
+      setRecordingProgress(isInfinite ? (elapsed % 3) / 3 : Math.min(elapsed / (maxDuration || 1), 1));
     }, 100);
-    stopTimeoutRef.current = setTimeout(stopRecording, maxDuration * 1000);
+    if (maxDuration) {
+      stopTimeoutRef.current = setTimeout(stopRecording, maxDuration * 1000);
+    }
 
     try {
       cameraRef.current.startRecording({
@@ -164,6 +169,39 @@ export default function TopicClipCameraScreen() {
     setTimer((value) => value === 0 ? 3 : value === 3 ? 10 : 0);
   };
 
+  const cycleDuration = () => {
+    setDuration((value) => value === '5' ? '2' : value === '2' ? 'inf' : '5');
+  };
+
+  const openLibrary = async () => {
+    if (isRecording) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('需要相簿權限', '請允許 SOON-LOG 存取相簿。');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images', 'videos'],
+      allowsEditing: false,
+      quality: 1,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    const now = new Date();
+    router.push({
+      pathname: '/(app)/log/preview',
+      params: {
+        uri: asset.uri,
+        mediaType: asset.type === 'image' ? 'image' : 'video',
+        timeStr: formatTime(now),
+        dateStr: formatDate(now)
+      }
+    });
+  };
+
   if (!device) {
     return (
       <View style={styles.permissionScreen}>
@@ -200,12 +238,6 @@ export default function TopicClipCameraScreen() {
         <Text style={styles.dateText}>{currentDate}</Text>
       </View>
 
-      {isRecording ? (
-        <View pointerEvents="none" style={styles.progressTrack}>
-          <View style={[styles.progressFill, { height: `${recordingProgress * 100}%` }]} />
-        </View>
-      ) : null}
-
       {countdown ? (
         <View pointerEvents="none" style={styles.countdownOverlay}>
           <Text style={styles.countdownText}>{countdown}</Text>
@@ -213,18 +245,28 @@ export default function TopicClipCameraScreen() {
       ) : null}
 
       <View style={[styles.topControls, { top: insets.top + 10 }]}>
-        <TouchableOpacity style={styles.topButton} onPress={() => router.back()}>
-          <Text style={styles.topButtonText}>✕</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.topButton} onPress={() => setFacing((value) => value === 'front' ? 'back' : 'front')}>
-          <Text style={styles.topButtonText}>🔄</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.topButton} onPress={() => setAudio((value) => !value)}>
-          <Text style={styles.topButtonText}>{audio ? '🔊' : '🔇'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.durationPill} onPress={() => setDuration((value) => value === '5' ? '2' : '5')}>
-          <Text style={styles.durationText}>{duration}s</Text>
-        </TouchableOpacity>
+        <View style={styles.topControlsRow}>
+          <TouchableOpacity style={styles.topButton} onPress={() => router.back()}>
+            <Feather name="x" size={22} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.topButton} onPress={() => setFacing((value) => value === 'front' ? 'back' : 'front')}>
+            <Feather name="rotate-cw" size={20} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.topButton} onPress={() => setAudio((value) => !value)}>
+            <Feather name={audio ? 'volume-2' : 'volume-x'} size={20} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.topButton} onPress={() => setFlash((value) => value === 'off' ? 'on' : 'off')}>
+            <Feather name="zap" size={20} color={flash === 'on' ? '#F5A623' : '#fff'} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.durationPill} onPress={cycleDuration}>
+            <Text style={styles.durationText}>{duration === 'inf' ? '∞' : `${duration}s`}</Text>
+          </TouchableOpacity>
+        </View>
+        {isRecording ? (
+          <View pointerEvents="none" style={styles.topProgressTrack}>
+            <View style={[styles.topProgressFill, { width: `${recordingProgress * 100}%` }]} />
+          </View>
+        ) : null}
       </View>
 
       <View style={[styles.controls, { bottom: insets.bottom + 28 }]}>
@@ -244,16 +286,16 @@ export default function TopicClipCameraScreen() {
         </View>
 
         <View style={styles.bottomControls}>
-          <TouchableOpacity style={styles.sideButton} onPress={() => setFlash((value) => value === 'off' ? 'on' : 'off')}>
-            <Text style={styles.sideButtonText}>{flash === 'off' ? '⚡' : '🔦'}</Text>
+          <TouchableOpacity style={styles.sideButton} onPress={openLibrary}>
+            <Feather name="file" size={23} color="#fff" />
           </TouchableOpacity>
 
-          <TouchableOpacity disabled={isRecording} style={styles.recordButton} onPress={startRecording}>
+          <TouchableOpacity style={styles.recordButton} onPress={isRecording ? stopRecording : startRecording}>
             <View style={[styles.recordInner, isRecording && styles.recordInnerRecording]} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.sideButton} onPress={cycleTimer}>
-            <Text style={styles.timerText}>{timer === 0 ? '⏱' : `${timer}s`}</Text>
+            {timer === 0 ? <Feather name="clock" size={22} color="#fff" /> : <Text style={styles.timerText}>{timer}s</Text>}
           </TouchableOpacity>
         </View>
       </View>
@@ -316,27 +358,25 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
+    gap: 8
+  },
+  topControlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between'
   },
   topButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.42)'
   },
-  topButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '800'
-  },
   durationPill: {
-    minWidth: 56,
-    height: 44,
-    borderRadius: 22,
+    minWidth: 54,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.42)',
@@ -347,17 +387,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900'
   },
-  progressTrack: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: 6,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(255,255,255,0.18)'
+  topProgressTrack: {
+    height: 4,
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.24)'
   },
-  progressFill: {
-    width: '100%',
+  topProgressFill: {
+    height: '100%',
+    borderRadius: 999,
     backgroundColor: colors.primary
   },
   countdownOverlay: {
