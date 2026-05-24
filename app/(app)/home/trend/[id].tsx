@@ -7,6 +7,7 @@ import {
   Image,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   SafeAreaView,
@@ -28,6 +29,10 @@ type Trend = {
   icon: string | null;
   heat_score: number | null;
   angles: TrendAngle[];
+  description?: string | null;
+  why_trending?: string | null;
+  creator_tips?: string | null;
+  related_links?: Array<{ url: string }> | null;
 };
 type DiscussionProfile = {
   username: string | null;
@@ -81,6 +86,57 @@ function TrendInfoCard({ trend }: { trend: Trend }) {
           </View>
         ))}
       </View>
+    </View>
+  );
+}
+
+function TrendDetailSection({ trend }: { trend: Trend }) {
+  const links = trend.related_links ?? [];
+  const hasDetail = Boolean(trend.description || trend.why_trending || trend.creator_tips || links.length > 0);
+  if (!hasDetail) return null;
+
+  return (
+    <View style={styles.detailSection}>
+      <Text style={styles.detailTitle}>📖 話題詳細</Text>
+
+      {trend.description ? (
+        <View style={styles.detailCard}>
+          <Text style={styles.detailLabel}>背景</Text>
+          <Text style={styles.detailText}>{trend.description}</Text>
+        </View>
+      ) : null}
+
+      {trend.why_trending ? (
+        <View style={styles.detailCard}>
+          <Text style={styles.detailLabel}>點解而家咁熱？</Text>
+          <Text style={styles.detailText}>{trend.why_trending}</Text>
+        </View>
+      ) : null}
+
+      {trend.creator_tips ? (
+        <View style={styles.detailCard}>
+          <Text style={styles.detailLabel}>🎬 Creator 可以點拍？</Text>
+          <Text style={styles.detailText}>{trend.creator_tips}</Text>
+        </View>
+      ) : null}
+
+      {links.length > 0 ? (
+        <View style={styles.detailCard}>
+          <Text style={styles.detailLabel}>🔗 相關連結</Text>
+          {links.map((link, index) => (
+            <Pressable
+              key={`${link.url}-${index}`}
+              onPress={() => Linking.openURL(link.url)}
+              style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
+            >
+              <Text style={styles.linkIcon}>↗</Text>
+              <Text style={styles.linkText} numberOfLines={1}>
+                {link.url}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -382,6 +438,7 @@ export default function TrendDetailScreen() {
   const ListHeader = (
     <>
       {trend ? <TrendInfoCard trend={trend} /> : null}
+      {trend ? <TrendDetailSection trend={trend} /> : null}
       <View style={styles.discussionTitleRow}>
         <Text style={styles.discussionTitle}>討論區</Text>
         <Text style={styles.discussionCount}>{discussions.length} 則討論</Text>
@@ -556,6 +613,57 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: colors.primary
   },
+  detailSection: {
+    marginBottom: 16
+  },
+  detailTitle: {
+    marginBottom: 12,
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 18,
+    fontWeight: '700'
+  },
+  detailCard: {
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    borderRadius: 12,
+    backgroundColor: colors.bgBodyMuted,
+    padding: 14
+  },
+  detailLabel: {
+    marginBottom: 6,
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase'
+  },
+  detailText: {
+    color: '#3A3A3A',
+    fontFamily: fonts.body,
+    fontSize: 15,
+    lineHeight: 22
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6
+  },
+  linkIcon: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14
+  },
+  linkText: {
+    flex: 1,
+    color: colors.primary,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    textDecorationLine: 'underline'
+  },
   discussionTitleRow: {
     marginBottom: 12,
     flexDirection: 'row',
@@ -714,5 +822,8 @@ const styles = StyleSheet.create({
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 18
+  },
+  pressed: {
+    opacity: 0.72
   }
 });
