@@ -24,7 +24,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
-import Svg, { Circle, Path } from 'react-native-svg';
 
 type ActiveTab = 'personal' | 'following' | 'explore';
 type StarProps = {
@@ -148,26 +147,39 @@ function StarField({ heroHeight, screenWidth }: { heroHeight: number; screenWidt
   );
 }
 
-function EggIcon() {
+function RotatingEggButton({ top }: { top: number }) {
+  const rotate = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.timing(rotate, {
+        toValue: 1,
+        duration: 6000,
+        easing: Easing.linear,
+        useNativeDriver: true
+      })
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [rotate]);
+
+  const spin = rotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg']
+  });
+
   return (
-    <Svg width={40} height={40} viewBox="0 0 100 100">
-      <Path
-        d="M50 8 C65 8, 85 20, 90 38 C95 55, 88 75, 72 85 C58 94, 38 94, 25 85 C10 75, 5 55, 10 38 C15 20, 35 8, 50 8 Z"
-        fill="white"
-        stroke="rgba(255,255,255,0.3)"
-        strokeWidth="2"
+    <TouchableOpacity
+      style={[styles.cameraBtn, { top }]}
+      onPress={() => router.push('/(app)/log/camera')}
+      activeOpacity={0.8}
+    >
+      <Animated.Image
+        source={require('../../../assets/soon-egg.png')}
+        style={[styles.eggImage, { transform: [{ rotate: spin }] }]}
+        resizeMode="contain"
       />
-      <Circle cx="50" cy="52" r="18" fill="#F5A623" />
-      <Circle cx="45" cy="50" r="2" fill="#1A1A1A" />
-      <Circle cx="55" cy="50" r="2" fill="#1A1A1A" />
-      <Path
-        d="M44 56 Q50 62 56 56"
-        stroke="#1A1A1A"
-        strokeWidth="2"
-        fill="none"
-        strokeLinecap="round"
-      />
-    </Svg>
+    </TouchableOpacity>
   );
 }
 
@@ -233,6 +245,11 @@ export default function StudioLogScreen() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [joiningRoom, setJoiningRoom] = useState(false);
+  const [visibleRoomIds, setVisibleRoomIds] = useState<Set<string>>(new Set());
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 55 }).current;
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ item?: TopicRoomCardRoom; isViewable?: boolean }> }) => {
+    setVisibleRoomIds(new Set(viewableItems.filter((viewable) => viewable.isViewable && viewable.item?.id).map((viewable) => viewable.item!.id)));
+  }).current;
 
   const fetchRoomsByIds = useCallback(async (roomIds: string[]) => {
     const uniqueIds = [...new Set(roomIds.filter(Boolean))];
@@ -497,14 +514,9 @@ export default function StudioLogScreen() {
         <StarField heroHeight={heroHeight} screenWidth={screenWidth} />
         <View style={[styles.heroContent, { paddingTop: insets.top + 20 }]}>
           <Text style={styles.heroTitle}>EGGS</Text>
-          <Text style={styles.heroSubtitle}>創作者嘅製作過程</Text>
+          <Text style={styles.heroSubtitle}>一起打開生蛋過程</Text>
         </View>
-        <TouchableOpacity
-          style={[styles.cameraBtn, { top: insets.top + 20 }]}
-          onPress={() => router.push('/(app)/log/camera')}
-        >
-          <EggIcon />
-        </TouchableOpacity>
+        <RotatingEggButton top={insets.top + 20} />
       </View>
 
       <View style={styles.tabSwitcher}>
@@ -529,20 +541,22 @@ export default function StudioLogScreen() {
         <FlatList
           data={currentRooms}
           keyExtractor={(item) => item.id}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 104 }]}
           ListHeaderComponent={activeTab === 'personal' ? (
             <View style={styles.personalActions}>
               <Pressable onPress={() => router.push('/(app)/log/create-room')} style={({ pressed }) => [styles.createRoomTop, pressed && styles.pressed]}>
                 <Feather name="plus" size={16} color={colors.primary} />
-                <Text style={styles.createRoomTopText}>新建 Topic Room</Text>
+                <Text numberOfLines={1} style={styles.createRoomTopText}>新建 Topic Room</Text>
               </Pressable>
               <TouchableOpacity
                 style={styles.inviteCodeBtn}
                 onPress={() => setShowInviteModal(true)}
               >
                 <Feather name="hash" size={14} color={colors.primary} />
-                <Text style={styles.inviteCodeText}>輸入邀請碼加入 Room</Text>
+                <Text numberOfLines={1} style={styles.inviteCodeText}>輸入邀請碼加入 Room</Text>
               </TouchableOpacity>
             </View>
           ) : null}
@@ -550,6 +564,7 @@ export default function StudioLogScreen() {
           renderItem={({ item }) => (
             <TopicRoomCard
               room={item}
+              isVisible={visibleRoomIds.has(item.id)}
               onPress={() => router.push(`/(app)/log/room/${item.id}`)}
             />
           )}
@@ -634,6 +649,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
+  eggImage: {
+    width: 48,
+    height: 48
+  },
   tabSwitcher: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -668,43 +687,44 @@ const styles = StyleSheet.create({
     paddingTop: 14
   },
   personalActions: {
-    alignItems: 'flex-end',
-    marginRight: 16,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginHorizontal: 16,
     marginBottom: 12,
     gap: 8
   },
   createRoomTop: {
-    alignSelf: 'flex-end',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.bodyBorder,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     backgroundColor: colors.bgBodyCard
   },
   createRoomTopText: {
     color: colors.primary,
     fontFamily: fonts.bodyBold,
-    fontSize: 13
+    fontSize: 12
   },
   inviteCodeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.primary,
-    alignSelf: 'flex-end'
+    flexShrink: 1
   },
   inviteCodeText: {
     color: colors.primary,
     fontFamily: fonts.bodyBold,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600'
   },
   modalOverlay: {

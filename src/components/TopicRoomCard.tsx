@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useEventListener } from 'expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useEffect } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
@@ -45,6 +46,7 @@ export type TopicRoomCardRoom = {
 type TopicRoomCardProps = {
   room: TopicRoomCardRoom;
   onPress: () => void;
+  isVisible?: boolean;
 };
 
 function relativeTime(value?: string | null) {
@@ -81,21 +83,30 @@ function AvatarStack({ members = [] }: { members?: TopicRoomCardRoom['members'] 
   );
 }
 
-function VideoThumbnail({ videoUrl }: { videoUrl: string }) {
+function VideoThumbnail({ videoUrl, shouldPlay }: { videoUrl: string; shouldPlay: boolean }) {
   const player = useVideoPlayer(videoUrl, (videoPlayer) => {
     videoPlayer.loop = true;
     videoPlayer.muted = true;
-    videoPlayer.play();
   });
 
+  useEffect(() => {
+    if (shouldPlay) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [player, shouldPlay]);
+
   useEventListener(player, 'statusChange', ({ status }) => {
-    if (status === 'readyToPlay') {
+    if (status === 'readyToPlay' && shouldPlay) {
       player.play();
     }
   });
 
   useEventListener(player, 'playToEnd', () => {
-    player.replay();
+    if (shouldPlay) {
+      player.replay();
+    }
   });
 
   return (
@@ -110,7 +121,7 @@ function VideoThumbnail({ videoUrl }: { videoUrl: string }) {
   );
 }
 
-function ClipStrip({ clips = [] }: { clips?: TopicRoomCardRoom['latest_clips'] }) {
+function ClipStrip({ clips = [], isVisible = false }: { clips?: TopicRoomCardRoom['latest_clips']; isVisible?: boolean }) {
   const visible = clips.slice(0, 3);
 
   if (visible.length === 0) {
@@ -126,7 +137,7 @@ function ClipStrip({ clips = [] }: { clips?: TopicRoomCardRoom['latest_clips'] }
       {visible.map((clip) => (
         <View key={clip.id} style={styles.clipCell}>
           {clip.video_url ? (
-            <VideoThumbnail videoUrl={clip.video_url} />
+            <VideoThumbnail videoUrl={clip.video_url} shouldPlay={isVisible} />
           ) : Array.isArray(clip.media_urls) && clip.media_urls[0] ? (
             <Image source={{ uri: clip.media_urls[0] }} style={styles.clipImage} resizeMode="cover" />
           ) : (
@@ -147,14 +158,14 @@ function ClipStrip({ clips = [] }: { clips?: TopicRoomCardRoom['latest_clips'] }
   );
 }
 
-export function TopicRoomCard({ room, onPress }: TopicRoomCardProps) {
+export function TopicRoomCard({ room, onPress, isVisible = false }: TopicRoomCardProps) {
   const memberCount = room.member_count ?? room.members?.length ?? 0;
   const clipCount = room.clip_count ?? room.latest_clips?.length ?? 0;
   const latestClip = room.latest_clips?.[0];
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
-      <ClipStrip clips={room.latest_clips} />
+      <ClipStrip clips={room.latest_clips} isVisible={isVisible} />
 
       {latestClip?.time_str || latestClip?.date_str ? (
         <View style={styles.timeBar}>
@@ -184,7 +195,7 @@ export function TopicRoomCard({ room, onPress }: TopicRoomCardProps) {
             <AvatarStack members={room.members} />
             <Text style={styles.memberText}>{memberCount} 位成員</Text>
           </View>
-          <Text style={styles.updateText}>{clipCount} 個片 · {relativeTime(latestClip?.created_at ?? room.updated_at)}</Text>
+          <Text style={styles.updateText}>影片數量：{clipCount} · {relativeTime(latestClip?.created_at ?? room.updated_at)}</Text>
         </View>
 
         {latestClip ? (
