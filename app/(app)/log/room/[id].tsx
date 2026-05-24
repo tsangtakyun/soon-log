@@ -67,6 +67,19 @@ type Clip = {
   caption_align: 'left' | 'center' | 'right' | null;
   text_size: 'small' | 'medium' | 'large' | null;
   background_color: 'cream' | 'black' | null;
+  like_count: number | null;
+  comment_count: number | null;
+  liked_by_me?: boolean;
+  created_at: string;
+  username: string | null;
+  avatar_url: string | null;
+};
+
+type ClipComment = {
+  id: string;
+  clip_id: string;
+  user_id: string;
+  body: string;
   created_at: string;
   username: string | null;
   avatar_url: string | null;
@@ -278,8 +291,23 @@ export default function TopicRoomScreen() {
       const clipRows = (clipData ?? []).map((clip) => ({
         ...clip,
         username: clip.profile?.username ?? null,
-        avatar_url: clip.profile?.avatar_url ?? null
+        avatar_url: clip.profile?.avatar_url ?? null,
+        liked_by_me: false
       })) as Clip[];
+
+      if (user && clipRows.length > 0) {
+        const { data: likesData, error: likesError } = await supabase
+          .from('topic_clip_likes')
+          .select('clip_id')
+          .eq('user_id', user.id)
+          .in('clip_id', clipRows.map((clip) => clip.id));
+
+        if (likesError) throw likesError;
+        const likedIds = new Set((likesData ?? []).map((like) => like.clip_id));
+        clipRows.forEach((clip) => {
+          clip.liked_by_me = likedIds.has(clip.id);
+        });
+      }
 
       setRoom({ ...(roomData as Room), member_count: memberRows.length });
       setMembers(memberRows);
@@ -487,8 +515,46 @@ export default function TopicRoomScreen() {
 }
 
 function ClipCard({ clip, angle }: { clip: Clip; angle?: string | null }) {
+  const { user } = useAuth();
   const playerWidth = Dimensions.get('window').width - 32;
   const playerHeight = playerWidth * (16 / 9);
+  const [liked, setLiked] = useState(Boolean(clip.liked_by_me));
+  const [likeCount, setLikeCount] = useState(clip.like_count ?? 0);
+  const [commentCount, setCommentCount] = useState(clip.comment_count ?? 0);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+
+  useEffect(() => {
+    setLiked(Boolean(clip.liked_by_me));
+    setLikeCount(clip.like_count ?? 0);
+    setCommentCount(clip.comment_count ?? 0);
+  }, [clip.comment_count, clip.like_count, clip.liked_by_me]);
+
+  const toggleLike = async () => {
+    if (!user) {
+      Alert.alert('請先登入', '登入後即可為影片按讚。');
+      return;
+    }
+
+    const wasLiked = liked;
+    setLiked(!wasLiked);
+    setLikeCount((count) => Math.max(0, count + (wasLiked ? -1 : 1)));
+
+    const { error } = wasLiked
+      ? await supabase
+        .from('topic_clip_likes')
+        .delete()
+        .eq('clip_id', clip.id)
+        .eq('user_id', user.id)
+      : await supabase
+        .from('topic_clip_likes')
+        .insert({ clip_id: clip.id, user_id: user.id });
+
+    if (error) {
+      setLiked(wasLiked);
+      setLikeCount((count) => Math.max(0, count + (wasLiked ? 1 : -1)));
+      Alert.alert('操作失敗', error.message);
+    }
+  };
 
   return (
     <View style={styles.clipCard}>
@@ -518,14 +584,156 @@ function ClipCard({ clip, angle }: { clip: Clip; angle?: string | null }) {
       {!clip.video_url && clip.caption ? <Text style={styles.caption}>{clip.caption}</Text> : null}
       {clip.notes ? <Text style={styles.notes}>📝 製作筆記：{clip.notes}</Text> : null}
       <View style={styles.clipActions}>
-        <Pressable onPress={() => Alert.alert('Like', 'Coming soon')}>
-          <Text style={styles.clipActionText}>♡ Like</Text>
+        <Pressable onPress={toggleLike} hitSlop={8}>
+          <Text style={[styles.clipActionText, liked && styles.clipActionLiked]}>{liked ? '♥' : '♡'} {likeCount}</Text>
         </Pressable>
-        <Pressable onPress={() => Alert.alert('Comment', 'Coming soon')}>
-          <Text style={styles.clipActionText}>💬 Comment</Text>
+        <Pressable onPress={() => setCommentsOpen(true)} hitSlop={8}>
+          <Text style={styles.clipActionText}>💬 {commentCount}</Text>
         </Pressable>
       </View>
+      <ClipCommentsSheet
+        clip={clip}
+        visible={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        onCommentAdded={() => setCommentCount((count) => count + 1)}
+      />
     </View>
+  );
+}
+
+function ClipCommentsSheet({
+  clip,
+  visible,
+  onClose,
+  onCommentAdded
+}: {
+  clip: Clip;
+  visible: boolean;
+  onClose: () => void;
+  onCommentAdded: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const [comments, setComments] = useState<ClipComment[]>([]);
+  const [body, setBody] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const loadComments = useCallback(async () => {
+    if (!visible) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('topic_clip_comments')
+      .select('*, profile:profiles!topic_clip_comments_user_id_fkey(username, avatar_url)')
+      .eq('clip_id', clip.id)
+      .order('created_at', { ascending: true });
+
+    setLoading(false);
+    if (error) {
+      Alert.alert('載入留言失敗', error.message);
+      return;
+    }
+
+    setComments((data ?? []).map((comment) => ({
+      ...comment,
+      username: comment.profile?.username ?? null,
+      avatar_url: comment.profile?.avatar_url ?? null
+    })) as ClipComment[]);
+  }, [clip.id, visible]);
+
+  useEffect(() => {
+    loadComments();
+  }, [loadComments]);
+
+  const submitComment = async () => {
+    const text = body.trim();
+    if (!text || sending) return;
+    if (!user) {
+      Alert.alert('請先登入', '登入後即可留言。');
+      return;
+    }
+
+    setSending(true);
+    setBody('');
+    const { error } = await supabase.from('topic_clip_comments').insert({
+      clip_id: clip.id,
+      user_id: user.id,
+      body: text
+    });
+    setSending(false);
+
+    if (error) {
+      setBody(text);
+      Alert.alert('留言失敗', error.message);
+      return;
+    }
+
+    onCommentAdded();
+    await loadComments();
+  };
+
+  return (
+    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetOverlay}>
+        <Pressable style={styles.sheetBackdrop} onPress={onClose} />
+        <View style={[styles.commentsSheet, { paddingBottom: insets.bottom + 14 }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.commentsHeader}>
+            <Text style={styles.commentsTitle}>留言</Text>
+            <Pressable onPress={onClose} hitSlop={10}>
+              <Feather name="x" size={22} color={colors.textMuted} />
+            </Pressable>
+          </View>
+
+          <ScrollView style={styles.commentsList} contentContainerStyle={styles.commentsListContent} keyboardShouldPersistTaps="handled">
+            {loading ? <ActivityIndicator color={colors.primary} /> : null}
+            {!loading && comments.length === 0 ? (
+              <View style={styles.commentEmpty}>
+                <Text style={styles.commentEmptyTitle}>尚未有留言</Text>
+                <Text style={styles.commentEmptyBody}>成為第一個回應這段影片的人。</Text>
+              </View>
+            ) : null}
+            {comments.map((comment) => (
+              <View key={comment.id} style={styles.commentRow}>
+                {comment.avatar_url ? (
+                  <Image source={{ uri: comment.avatar_url }} style={styles.commentAvatar} />
+                ) : (
+                  <View style={styles.commentAvatarFallback}>
+                    <Text style={styles.commentInitial}>{(comment.username || 'S').slice(0, 1).toUpperCase()}</Text>
+                  </View>
+                )}
+                <View style={styles.commentContent}>
+                  <View style={styles.commentMeta}>
+                    <Text style={styles.commentUsername}>@{comment.username || 'soon'}</Text>
+                    <Text style={styles.commentTime}>{timeAgo(comment.created_at)}</Text>
+                  </View>
+                  <Text style={styles.commentBody}>{comment.body}</Text>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+
+          <View style={styles.commentInputRow}>
+            <TextInput
+              value={body}
+              onChangeText={setBody}
+              placeholder="寫下你的留言..."
+              placeholderTextColor={colors.textMuted}
+              style={styles.commentInput}
+              returnKeyType="send"
+              onSubmitEditing={submitComment}
+            />
+            <Pressable
+              onPress={submitComment}
+              disabled={!body.trim() || sending}
+              style={[styles.commentSendButton, (!body.trim() || sending) && styles.commentSendDisabled]}
+            >
+              {sending ? <ActivityIndicator color={colors.textOnDark} /> : <Feather name="send" size={17} color={colors.textOnDark} />}
+            </Pressable>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -1086,6 +1294,135 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: fonts.bodyBold,
     fontSize: 13
+  },
+  clipActionLiked: {
+    color: colors.primary
+  },
+  commentsSheet: {
+    maxHeight: '82%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: colors.bgBody,
+    paddingTop: 10
+  },
+  commentsHeader: {
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.bodyBorder
+  },
+  commentsTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 20
+  },
+  commentsList: {
+    maxHeight: 380
+  },
+  commentsListContent: {
+    padding: 18,
+    gap: 14
+  },
+  commentEmpty: {
+    alignItems: 'center',
+    paddingVertical: 32
+  },
+  commentEmptyTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16
+  },
+  commentEmptyBody: {
+    marginTop: 6,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13
+  },
+  commentRow: {
+    flexDirection: 'row',
+    gap: 10
+  },
+  commentAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.bgBodyMuted
+  },
+  commentAvatarFallback: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  commentInitial: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13
+  },
+  commentContent: {
+    flex: 1,
+    borderRadius: 14,
+    backgroundColor: colors.bgBodyMuted,
+    paddingHorizontal: 12,
+    paddingVertical: 9
+  },
+  commentMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  commentUsername: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13
+  },
+  commentTime: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 12
+  },
+  commentBody: {
+    marginTop: 5,
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20
+  },
+  commentInputRow: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.bodyBorder,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  commentInput: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 999,
+    backgroundColor: colors.bgBodyMuted,
+    paddingHorizontal: 16,
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: 15
+  },
+  commentSendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  commentSendDisabled: {
+    opacity: 0.45
   },
   fab: {
     position: 'absolute',
