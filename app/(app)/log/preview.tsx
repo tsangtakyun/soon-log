@@ -5,6 +5,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { StatusBar } from 'expo-status-bar';
+import { Feather } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -340,6 +341,7 @@ export default function TopicClipPreviewScreen() {
             ]}
             active={captionAlign}
             onSelect={(value) => setCaptionAlign(value as CaptionAlign)}
+            iconMap={{ left: 'align-left', center: 'align-center', right: 'align-right' }}
           />
           <OptionRow
             label="位置"
@@ -350,6 +352,7 @@ export default function TopicClipPreviewScreen() {
             ]}
             active={overlayVertical}
             onSelect={(value) => setOverlayVertical(value as OverlayVertical)}
+            iconMap={{ top: 'arrow-up', middle: 'minus', bottom: 'arrow-down' }}
           />
           <OptionRow
             label="大小"
@@ -360,15 +363,16 @@ export default function TopicClipPreviewScreen() {
             ]}
             active={textSize}
             onSelect={(value) => setTextSize(value as TextSize)}
+            iconMap={{ small: 'type', medium: 'type', large: 'type' }}
           />
 
           <View style={styles.actions}>
             <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
-              <Text style={styles.actionIcon}>✕</Text>
+              <Feather name="x" size={22} color="#fff" />
               <Text style={styles.actionText}>放棄</Text>
             </Pressable>
             <Pressable onPress={saveToLibrary} style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
-              <Text style={styles.actionIcon}>💾</Text>
+              <Feather name="save" size={21} color="#fff" />
               <Text style={styles.actionText}>儲存</Text>
             </Pressable>
             <Pressable onPress={handleUploadPress} disabled={uploading} style={({ pressed }) => [styles.uploadButton, (pressed || uploading) && styles.pressed]}>
@@ -376,7 +380,7 @@ export default function TopicClipPreviewScreen() {
                 <ActivityIndicator color="#fff" />
               ) : (
                 <>
-                  <Text style={styles.uploadIcon}>📤</Text>
+                  <Feather name="upload-cloud" size={22} color="#fff" />
                   <Text style={styles.uploadText}>
                     {selectedRoomId ? `上載到 ${selectedRoomName || 'Topic Room'}` : '選擇房間上載'}
                   </Text>
@@ -444,12 +448,14 @@ function OptionRow({
   label,
   options,
   active,
-  onSelect
+  onSelect,
+  iconMap
 }: {
   label: string;
   options: Array<[string, string]>;
   active: string;
   onSelect: (value: string) => void;
+  iconMap?: Record<string, keyof typeof Feather.glyphMap>;
 }) {
   return (
     <View style={styles.optionRow}>
@@ -459,6 +465,13 @@ function OptionRow({
           const isActive = active === value;
           return (
             <Pressable key={value} onPress={() => onSelect(value)} style={[styles.optionPill, isActive && styles.optionPillActive]}>
+              {iconMap?.[value] ? (
+                <Feather
+                  name={iconMap[value]}
+                  size={value === 'large' ? 19 : value === 'small' ? 15 : 17}
+                  color={isActive ? '#000' : '#fff'}
+                />
+              ) : null}
               <Text style={[styles.optionPillText, isActive && styles.optionPillTextActive]}>{title}</Text>
             </Pressable>
           );
@@ -578,6 +591,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.32)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     paddingHorizontal: 14,
     paddingVertical: 8
   },
@@ -614,12 +630,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary
-  },
-  actionIcon: {
-    fontSize: 20
-  },
-  uploadIcon: {
-    fontSize: 20
   },
   actionText: {
     marginTop: 3,
