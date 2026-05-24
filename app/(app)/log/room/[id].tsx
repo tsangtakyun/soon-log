@@ -391,7 +391,7 @@ export default function TopicRoomScreen() {
               </View>
             </View>
             <Text style={styles.roomTitle}>{room.name}</Text>
-            <Text style={styles.topicText}>{room.topic}</Text>
+            {room.description ? <Text style={styles.topicText}>{room.description}</Text> : null}
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.membersRow}>
               {members.map((member) => (
@@ -439,8 +439,8 @@ export default function TopicRoomScreen() {
           <Text style={styles.sectionTitle}>最新影片</Text>
           {clips.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>仲未有 clips</Text>
-              <Text style={styles.emptyBody}>係呢個 topic room 分享你嘅製作過程</Text>
+              <Text style={styles.emptyTitle}>尚未有影片</Text>
+              <Text style={styles.emptyBody}>在這裡分享你今日發生的事</Text>
             </View>
           ) : null}
           {clips.map((clip) => (
@@ -687,25 +687,25 @@ function RoomSettingsSheet({
 }) {
   const insets = useSafeAreaInsets();
   const [name, setName] = useState(room.name);
-  const [topic, setTopic] = useState(room.topic);
+  const [subtitle, setSubtitle] = useState(room.description ?? '');
   const [isOpen, setIsOpen] = useState(room.privacy === 'open');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
     setName(room.name);
-    setTopic(room.topic);
+    setSubtitle(room.description ?? '');
     setIsOpen(room.privacy === 'open');
-  }, [room.name, room.privacy, room.topic, visible]);
+  }, [room.description, room.name, room.privacy, visible]);
 
   const saveSettings = async () => {
     const nextName = name.trim();
-    const nextTopic = topic.trim();
+    const nextSubtitle = subtitle.trim();
     if (!nextName || saving) return;
     setSaving(true);
     const { error } = await supabase
       .from('topic_rooms')
-      .update({ name: nextName, topic: nextTopic || nextName, privacy: isOpen ? 'open' : 'private' })
+      .update({ name: nextName, description: nextSubtitle || null, privacy: isOpen ? 'open' : 'private' })
       .eq('id', room.id);
 
     setSaving(false);
@@ -761,8 +761,8 @@ function RoomSettingsSheet({
           <View style={styles.settingsField}>
             <Text style={styles.settingsLabel}>副題</Text>
             <TextInput
-              value={topic}
-              onChangeText={setTopic}
+              value={subtitle}
+              onChangeText={setSubtitle}
               placeholder="副題 / 題材描述"
               placeholderTextColor={colors.textMuted}
               style={styles.sheetInput}

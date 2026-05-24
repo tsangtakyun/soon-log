@@ -56,6 +56,7 @@ type TopicMemberRow = {
 type TopicRoomRow = {
   id: string;
   name: string;
+  description?: string | null;
   topic: string;
   privacy: string;
   owner_id: string;
@@ -192,6 +193,7 @@ function normaliseRoom(row: TopicRoomRow): TopicRoomCardRoom {
   return {
     id: row.id,
     name: row.name,
+    description: row.description ?? null,
     topic: row.topic,
     privacy: row.privacy,
     owner_id: row.owner_id,

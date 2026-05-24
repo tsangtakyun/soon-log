@@ -12,6 +12,7 @@ const clipCellWidth = cardWidth / 3;
 export type TopicRoomCardRoom = {
   id: string;
   name: string;
+  description?: string | null;
   topic: string;
   privacy: string;
   owner_id: string;
@@ -188,7 +189,7 @@ export function TopicRoomCard({ room, onPress, isVisible = false }: TopicRoomCar
           </View>
         </View>
 
-        <Text numberOfLines={1} style={styles.topic}>{room.topic}</Text>
+        <Text numberOfLines={1} style={styles.topic}>{room.description || room.topic}</Text>
 
         <View style={styles.metaRow}>
           <View style={styles.memberRow}>
