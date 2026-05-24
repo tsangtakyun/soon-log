@@ -1,44 +1,97 @@
 import { Feather } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
-import { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Tabs, usePathname } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { fonts } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/theme/colors';
 
+const eggsLastSeenKey = (userId: string) => `eggs-last-seen-at:${userId}`;
+
+function isEggsPath(pathname: string) {
+  return pathname === '/log' || pathname.startsWith('/log/room') || pathname.startsWith('/log/clip');
+}
+
 export default function AppTabs() {
   const { user } = useAuth();
-  const [todayCount, setTodayCount] = useState(0);
+  const pathname = usePathname();
+  const [unreadClipCount, setUnreadClipCount] = useState(0);
 
-  useEffect(() => {
+  const markEggsSeen = useCallback(async () => {
+    if (!user) return;
+    await AsyncStorage.setItem(eggsLastSeenKey(user.id), new Date().toISOString());
+    setUnreadClipCount(0);
+  }, [user]);
+
+  const loadUnreadClipCount = useCallback(async () => {
     if (!user) {
-      setTodayCount(0);
+      setUnreadClipCount(0);
       return;
     }
 
-    const loadTodayCount = async () => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const { count } = await supabase
-        .from('topic_clips')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('created_at', today.toISOString());
+    const lastSeenAt = await AsyncStorage.getItem(eggsLastSeenKey(user.id));
+    if (!lastSeenAt) {
+      await markEggsSeen();
+      return;
+    }
 
-      setTodayCount(count || 0);
-    };
+    const { data: memberships, error: membershipError } = await supabase
+      .from('topic_room_members')
+      .select('room_id')
+      .eq('user_id', user.id);
 
-    loadTodayCount();
+    if (membershipError) return;
+
+    const roomIds = [...new Set((memberships ?? []).map((membership) => membership.room_id).filter(Boolean))];
+    if (roomIds.length === 0) {
+      setUnreadClipCount(0);
+      return;
+    }
+
+    const { count, error } = await supabase
+      .from('topic_clips')
+      .select('id', { count: 'exact', head: true })
+      .in('room_id', roomIds)
+      .neq('user_id', user.id)
+      .gt('created_at', lastSeenAt);
+
+    if (!error) {
+      setUnreadClipCount(count || 0);
+    }
+  }, [markEggsSeen, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (isEggsPath(pathname)) {
+      markEggsSeen();
+    }
+  }, [markEggsSeen, pathname, user]);
+
+  useEffect(() => {
+    if (!user) {
+      setUnreadClipCount(0);
+      return;
+    }
+
+    loadUnreadClipCount();
     const channel = supabase
-      .channel(`today-clip-count-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_clips', filter: `user_id=eq.${user.id}` }, () => loadTodayCount())
+      .channel(`eggs-unread-clip-count-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_clips' }, () => {
+        if (isEggsPath(pathname)) {
+          markEggsSeen();
+        } else {
+          loadUnreadClipCount();
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_room_members', filter: `user_id=eq.${user.id}` }, () => loadUnreadClipCount())
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [loadUnreadClipCount, markEggsSeen, pathname, user]);
 
   return (
     <Tabs
@@ -85,7 +138,7 @@ export default function AppTabs() {
                   borderColor: color
                 }}
               />
-              {todayCount > 0 ? (
+              {unreadClipCount > 0 ? (
                 <View
                   style={{
                     position: 'absolute',
@@ -100,7 +153,7 @@ export default function AppTabs() {
                     paddingHorizontal: 3
                   }}
                 >
-                  <Text style={{ color: colors.textOnDark, fontSize: 10, fontWeight: '700' }}>{todayCount}</Text>
+                  <Text style={{ color: colors.textOnDark, fontSize: 10, fontWeight: '700' }}>{unreadClipCount}</Text>
                 </View>
               ) : null}
             </View>
