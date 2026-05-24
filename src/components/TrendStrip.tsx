@@ -72,7 +72,7 @@ export function TrendStrip() {
 
   return (
     <TouchableOpacity
-      onPress={() => router.push('/(app)/home/trend/' + current.id)}
+      onPress={() => router.push({ pathname: '/(app)/predikt', params: { focus: current.id } })}
       activeOpacity={0.85}
     >
       <Animated.View style={[styles.card, { opacity: fadeAnim }]}>

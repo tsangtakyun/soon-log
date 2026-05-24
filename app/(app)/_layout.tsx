@@ -9,15 +9,21 @@ import { supabase } from '@/lib/supabase';
 import { colors } from '@/theme/colors';
 
 const eggsLastSeenKey = (userId: string) => `eggs-last-seen-at:${userId}`;
+const prediktLastSeenKey = (userId: string) => `predikt-last-seen-at:${userId}`;
 
 function isEggsPath(pathname: string) {
   return pathname === '/log' || pathname.startsWith('/log/room') || pathname.startsWith('/log/clip');
+}
+
+function isPrediktPath(pathname: string) {
+  return pathname === '/predikt' || pathname.startsWith('/home/trend');
 }
 
 export default function AppTabs() {
   const { user } = useAuth();
   const pathname = usePathname();
   const [unreadClipCount, setUnreadClipCount] = useState(0);
+  const [unreadTrendCount, setUnreadTrendCount] = useState(0);
 
   const markEggsSeen = useCallback(async () => {
     if (!user) return;
@@ -62,12 +68,44 @@ export default function AppTabs() {
     }
   }, [markEggsSeen, user]);
 
+  const markPrediktSeen = useCallback(async () => {
+    if (!user) return;
+    await AsyncStorage.setItem(prediktLastSeenKey(user.id), new Date().toISOString());
+    setUnreadTrendCount(0);
+  }, [user]);
+
+  const loadUnreadTrendCount = useCallback(async () => {
+    if (!user) {
+      setUnreadTrendCount(0);
+      return;
+    }
+
+    const lastSeenAt = await AsyncStorage.getItem(prediktLastSeenKey(user.id));
+    if (!lastSeenAt) {
+      await markPrediktSeen();
+      return;
+    }
+
+    const { count, error } = await supabase
+      .from('trends')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_active', true)
+      .gt('created_at', lastSeenAt);
+
+    if (!error) {
+      setUnreadTrendCount(count || 0);
+    }
+  }, [markPrediktSeen, user]);
+
   useEffect(() => {
     if (!user) return;
     if (isEggsPath(pathname)) {
       markEggsSeen();
     }
-  }, [markEggsSeen, pathname, user]);
+    if (isPrediktPath(pathname)) {
+      markPrediktSeen();
+    }
+  }, [markEggsSeen, markPrediktSeen, pathname, user]);
 
   useEffect(() => {
     if (!user) {
@@ -92,6 +130,29 @@ export default function AppTabs() {
       supabase.removeChannel(channel);
     };
   }, [loadUnreadClipCount, markEggsSeen, pathname, user]);
+
+  useEffect(() => {
+    if (!user) {
+      setUnreadTrendCount(0);
+      return;
+    }
+
+    loadUnreadTrendCount();
+    const channel = supabase
+      .channel(`predikt-unread-trend-count-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trends' }, () => {
+        if (isPrediktPath(pathname)) {
+          markPrediktSeen();
+        } else {
+          loadUnreadTrendCount();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadUnreadTrendCount, markPrediktSeen, pathname, user]);
 
   return (
     <Tabs
@@ -164,7 +225,29 @@ export default function AppTabs() {
         name="predikt/index"
         options={{
           title: '討論區',
-          tabBarIcon: ({ color }) => <Feather name="trending-up" size={22} color={color} />
+          tabBarIcon: ({ color }) => (
+            <View>
+              <Feather name="trending-up" size={22} color={color} />
+              {unreadTrendCount > 0 ? (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -8,
+                    minWidth: 16,
+                    height: 16,
+                    borderRadius: 999,
+                    backgroundColor: colors.primary,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingHorizontal: 3
+                  }}
+                >
+                  <Text style={{ color: colors.textOnDark, fontSize: 10, fontWeight: '700' }}>{unreadTrendCount}</Text>
+                </View>
+              ) : null}
+            </View>
+          )
         }}
       />
       <Tabs.Screen

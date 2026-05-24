@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
@@ -12,7 +12,15 @@ type Trend = {
   icon: string | null;
   heat_score: number | null;
   angles: TrendAngle[];
+  created_at?: string | null;
 };
+type SortMode = 'heat' | 'newest' | 'az';
+
+const sortOptions: Array<{ key: SortMode; label: string }> = [
+  { key: 'heat', label: '熱度' },
+  { key: 'newest', label: '最新' },
+  { key: 'az', label: 'A-Z' }
+];
 
 function TrendCard({ trend }: { trend: Trend }) {
   const angles = trend.angles ?? [];
@@ -42,22 +50,26 @@ function TrendCard({ trend }: { trend: Trend }) {
 }
 
 export default function PrediktScreen() {
+  const params = useLocalSearchParams<{ focus?: string }>();
+  const focusId = Array.isArray(params.focus) ? params.focus[0] : params.focus;
   const [trends, setTrends] = useState<Trend[]>([]);
+  const [sortMode, setSortMode] = useState<SortMode>('heat');
   const [refreshing, setRefreshing] = useState(false);
 
   const loadTrends = useCallback(async () => {
     const { data, error } = await supabase
       .from('trends')
       .select('*')
-      .eq('is_active', true)
-      .order('heat_score', { ascending: false });
+      .eq('is_active', true);
 
     setTrends(error ? [] : (data ?? []) as Trend[]);
   }, []);
 
-  useEffect(() => {
-    loadTrends();
-  }, [loadTrends]);
+  useFocusEffect(
+    useCallback(() => {
+      loadTrends();
+    }, [loadTrends])
+  );
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -65,18 +77,53 @@ export default function PrediktScreen() {
     setRefreshing(false);
   }, [loadTrends]);
 
+  const sortedTrends = useMemo(() => {
+    const next = [...trends].sort((a, b) => {
+      if (sortMode === 'newest') {
+        return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+      }
+      if (sortMode === 'az') {
+        return a.topic.localeCompare(b.topic);
+      }
+      return (b.heat_score ?? 0) - (a.heat_score ?? 0);
+    });
+
+    if (!focusId) return next;
+    const focusIndex = next.findIndex((trend) => trend.id === focusId);
+    if (focusIndex <= 0) return next;
+    const [focused] = next.splice(focusIndex, 1);
+    return [focused, ...next];
+  }, [focusId, sortMode, trends]);
+
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.title}>討論區</Text>
         <Text style={styles.subtitle}>🔥 創作者社群熱話</Text>
       </View>
+      <View style={styles.sortBar}>
+        {sortOptions.map((option) => (
+          <Pressable
+            key={option.key}
+            onPress={() => setSortMode(option.key)}
+            style={({ pressed }) => [
+              styles.sortPill,
+              sortMode === option.key && styles.sortPillActive,
+              pressed && styles.pressed
+            ]}
+          >
+            <Text style={[styles.sortText, sortMode === option.key && styles.sortTextActive]}>
+              {option.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
       <FlatList
-        data={trends}
+        data={sortedTrends}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <TrendCard trend={item} />}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
-        contentContainerStyle={trends.length === 0 ? styles.emptyList : styles.list}
+        contentContainerStyle={sortedTrends.length === 0 ? styles.emptyList : styles.list}
         ListEmptyComponent={<Text style={styles.emptyText}>暫時未有熱話</Text>}
       />
     </View>
@@ -103,6 +150,33 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 14
+  },
+  sortBar: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 14
+  },
+  sortPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    backgroundColor: colors.bgBodyMuted,
+    paddingHorizontal: 14,
+    paddingVertical: 7
+  },
+  sortPillActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary
+  },
+  sortText: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13
+  },
+  sortTextActive: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold
   },
   list: {
     paddingHorizontal: 16,
