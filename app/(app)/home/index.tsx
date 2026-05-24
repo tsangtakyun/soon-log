@@ -44,6 +44,23 @@ type HomeLog = Log & {
     avatar_url: string | null;
     display_name: string | null;
   } | null;
+  source?: 'log' | 'clip';
+};
+type HomeClip = {
+  id: string;
+  caption: string | null;
+  media_urls: string[] | null;
+  video_url: string | null;
+  created_at: string;
+  profile?: {
+    username: string | null;
+    avatar_url: string | null;
+    display_name: string | null;
+  } | Array<{
+    username: string | null;
+    avatar_url: string | null;
+    display_name: string | null;
+  }> | null;
 };
 type StarProps = {
   x: number;
@@ -162,10 +179,11 @@ function MiniLogCard({ log, compact = false }: { log: HomeLog; compact?: boolean
   const isVideo = !!cover && (cover.endsWith('.mp4') || cover.includes('video'));
   const username = log.profile?.username || 'soon';
   const avatar = log.profile?.avatar_url;
+  const target = log.source === 'clip' ? `/(app)/log/clip/${log.id}` : `/(app)/log/${log.id}`;
 
   return (
     <Pressable
-      onPress={() => router.push(`/(app)/log/${log.id}`)}
+      onPress={() => router.push(target)}
       style={({ pressed }) => [styles.miniLogCard, compact && styles.ownMiniLogCard, pressed && styles.pressed]}
     >
       {cover ? (
@@ -182,7 +200,7 @@ function MiniLogCard({ log, compact = false }: { log: HomeLog; compact?: boolean
       ) : (
         <View style={[styles.miniLogFallback, compact && styles.ownMiniLogFallback]}>
           <Text numberOfLines={3} style={[styles.miniLogFallbackText, compact && styles.ownMiniLogFallbackText]}>
-            {log.title || log.body || '日記'}
+            {log.title || log.body || '影片日記'}
           </Text>
         </View>
       )}
@@ -194,7 +212,7 @@ function MiniLogCard({ log, compact = false }: { log: HomeLog; compact?: boolean
           </Text>
         </View>
         <Text numberOfLines={1} style={[styles.miniLogTitle, compact && !cover && styles.ownMiniLogText]}>
-          {log.title || log.body || '未命名日記'}
+          {log.title || log.body || '影片日記'}
         </Text>
       </View>
     </Pressable>
@@ -316,26 +334,36 @@ export default function HomeScreen() {
     setHasFollowing(followingIds.length > 0);
 
     const ownQuery = supabase
-      .from('logs')
-      .select('*, profile:profiles!logs_user_id_fkey(username, avatar_url, display_name)')
+      .from('topic_clips')
+      .select('id, caption, media_urls, video_url, created_at, profile:profiles!topic_clips_user_id_fkey(username, avatar_url, display_name)')
       .eq('user_id', user.id)
-      .eq('is_published', true)
       .order('created_at', { ascending: false })
       .limit(3);
 
     const followingQuery = followingIds.length > 0
       ? supabase
-        .from('logs')
-        .select('*, profile:profiles!logs_user_id_fkey(username, avatar_url, display_name)')
+        .from('topic_clips')
+        .select('id, caption, media_urls, video_url, created_at, profile:profiles!topic_clips_user_id_fkey(username, avatar_url, display_name)')
         .in('user_id', followingIds)
-        .eq('is_published', true)
         .order('created_at', { ascending: false })
         .limit(5)
       : Promise.resolve({ data: [], error: null });
 
     const [{ data: ownData }, { data: followingData }] = await Promise.all([ownQuery, followingQuery]);
-    setOwnLogs((ownData ?? []) as HomeLog[]);
-    setFollowingLogs((followingData ?? []) as HomeLog[]);
+    const normaliseProfile = (profile: HomeClip['profile']) => Array.isArray(profile) ? profile[0] ?? null : profile ?? null;
+    const mapClip = (clip: HomeClip): HomeLog => ({
+      id: clip.id,
+      title: clip.caption || '影片日記',
+      body: clip.caption || '',
+      media_urls: clip.media_urls || [],
+      video_url: clip.video_url || null,
+      created_at: clip.created_at,
+      profile: normaliseProfile(clip.profile),
+      source: 'clip'
+    } as HomeLog);
+
+    setOwnLogs(((ownData ?? []) as unknown as HomeClip[]).map(mapClip));
+    setFollowingLogs(((followingData ?? []) as unknown as HomeClip[]).map(mapClip));
   }, [user]);
 
   useEffect(() => {

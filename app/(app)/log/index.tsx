@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -71,6 +72,8 @@ const tabs: Array<{ key: ActiveTab; label: string }> = [
   { key: 'following', label: '追蹤' },
   { key: 'explore', label: '探索' }
 ];
+
+const tabSeenKey = (userId: string, tab: ActiveTab) => `eggs-tab-seen-at:${userId}:${tab}`;
 
 function AnimatedStar({ x, y, size, color, delay }: StarProps) {
   const opacity = useRef(new Animated.Value(0.3)).current;
@@ -238,10 +241,15 @@ export default function StudioLogScreen() {
   const { user } = useAuth();
   const screenWidth = Dimensions.get('window').width;
   const heroHeight = insets.top + 116;
-  const [activeTab, setActiveTab] = useState<ActiveTab>('explore');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('personal');
   const [personalRooms, setPersonalRooms] = useState<TopicRoomCardRoom[]>([]);
   const [followingRooms, setFollowingRooms] = useState<TopicRoomCardRoom[]>([]);
   const [exploreRooms, setExploreRooms] = useState<TopicRoomCardRoom[]>([]);
+  const [tabUpdateCounts, setTabUpdateCounts] = useState<Record<ActiveTab, number>>({
+    personal: 0,
+    following: 0,
+    explore: 0
+  });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -277,6 +285,79 @@ export default function StudioLogScreen() {
       .map(normaliseRoom)
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
   }, []);
+
+  const markTabSeen = useCallback(async (tab: ActiveTab) => {
+    if (!user) return;
+    await AsyncStorage.setItem(tabSeenKey(user.id, tab), new Date().toISOString());
+    setTabUpdateCounts((current) => ({ ...current, [tab]: 0 }));
+  }, [user]);
+
+  const countClipsAfter = useCallback(async (roomIds: string[], since: string | null) => {
+    if (!user || !since) return 0;
+    const uniqueIds = [...new Set(roomIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return 0;
+
+    const { count, error } = await supabase
+      .from('topic_clips')
+      .select('id', { count: 'exact', head: true })
+      .in('room_id', uniqueIds)
+      .neq('user_id', user.id)
+      .gt('created_at', since);
+
+    if (error) return 0;
+    return count || 0;
+  }, [user]);
+
+  const loadTabUpdateCounts = useCallback(async () => {
+    if (!user) {
+      setTabUpdateCounts({ personal: 0, following: 0, explore: 0 });
+      return;
+    }
+
+    const [personalSeenAt, followingSeenAt] = await Promise.all([
+      AsyncStorage.getItem(tabSeenKey(user.id, 'personal')),
+      AsyncStorage.getItem(tabSeenKey(user.id, 'following'))
+    ]);
+
+    if (!personalSeenAt) await AsyncStorage.setItem(tabSeenKey(user.id, 'personal'), new Date().toISOString());
+    if (!followingSeenAt) await AsyncStorage.setItem(tabSeenKey(user.id, 'following'), new Date().toISOString());
+
+    const { data: memberships } = await supabase
+      .from('topic_room_members')
+      .select('room_id')
+      .eq('user_id', user.id);
+    const personalRoomIds = (memberships ?? []).map((membership) => membership.room_id);
+
+    const { data: following } = await supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', user.id);
+    const followingIds = (following ?? []).map((row) => row.following_id).filter(Boolean);
+
+    let followingRoomIds: string[] = [];
+    if (followingIds.length > 0) {
+      const { data: openRooms } = await supabase
+        .from('topic_rooms')
+        .select('id, owner_id, topic_room_members(user_id)')
+        .eq('privacy', 'open')
+        .limit(80);
+      const followingSet = new Set(followingIds);
+      followingRoomIds = ((openRooms ?? []) as Array<{ id: string; owner_id: string; topic_room_members?: Array<{ user_id: string }> | null }>)
+        .filter((room) => followingSet.has(room.owner_id) || (room.topic_room_members ?? []).some((member) => followingSet.has(member.user_id)))
+        .map((room) => room.id);
+    }
+
+    const [personalCount, followingCount] = await Promise.all([
+      countClipsAfter(personalRoomIds, personalSeenAt),
+      countClipsAfter(followingRoomIds, followingSeenAt)
+    ]);
+
+    setTabUpdateCounts({
+      personal: activeTab === 'personal' ? 0 : personalCount,
+      following: activeTab === 'following' ? 0 : followingCount,
+      explore: 0
+    });
+  }, [activeTab, countClipsAfter, user]);
 
   const fetchPersonalRooms = useCallback(async () => {
     if (!user) {
@@ -449,17 +530,29 @@ export default function StudioLogScreen() {
 
   useEffect(() => {
     loadAll().catch(() => setLoading(false));
+    loadTabUpdateCounts();
     const channel = supabase
       .channel('eggs-topic-room-feed')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_rooms' }, () => loadAll())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_room_members' }, () => loadAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_clips' }, () => loadAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_clips' }, () => {
+        loadAll();
+        if (activeTab === 'personal' || activeTab === 'following') {
+          markTabSeen(activeTab);
+        } else {
+          loadTabUpdateCounts();
+        }
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [loadAll]);
+  }, [activeTab, loadAll, loadTabUpdateCounts, markTabSeen]);
+
+  useEffect(() => {
+    markTabSeen(activeTab);
+  }, [activeTab, markTabSeen]);
 
   const currentRooms = useMemo(() => {
     if (activeTab === 'personal') return personalRooms;
@@ -528,9 +621,16 @@ export default function StudioLogScreen() {
             style={[styles.tab, activeTab === tab.key && styles.tabActive]}
             onPress={() => setActiveTab(tab.key)}
           >
-            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-              {tab.label}
-            </Text>
+            <View style={styles.tabLabelWrap}>
+              <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
+                {tab.label}
+              </Text>
+              {tabUpdateCounts[tab.key] > 0 ? (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>{tabUpdateCounts[tab.key]}</Text>
+                </View>
+              ) : null}
+            </View>
           </TouchableOpacity>
         ))}
       </View>
@@ -679,6 +779,30 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontFamily: fonts.bodyBold,
     fontWeight: '600'
+  },
+  tabLabelWrap: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -18,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 4
+  },
+  tabBadgeText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
+    fontWeight: '700'
   },
   loading: {
     flex: 1,
