@@ -12,6 +12,7 @@ type Trend = {
   id: string;
   topic: string;
   icon: string | null;
+  category?: string | null;
   heat_score: number | null;
   angles: TrendAngle[];
   created_at?: string | null;
@@ -19,12 +20,19 @@ type Trend = {
   deadline_timezone?: string | null;
   news_headlines?: NewsHeadline[] | null;
 };
-type SortMode = 'heat' | 'newest' | 'deadline';
+type FilterMode = 'hot' | 'newest' | 'news' | 'finance' | 'tech' | 'life' | 'sports' | 'gaming' | 'anime' | 'entertainment';
 
-const sortOptions: Array<{ key: SortMode; label: string }> = [
-  { key: 'heat', label: '熱度' },
+const filterOptions: Array<{ key: FilterMode; label: string; category?: string }> = [
+  { key: 'hot', label: '熱門' },
   { key: 'newest', label: '最新' },
-  { key: 'deadline', label: '即將截止' }
+  { key: 'news', label: '新聞', category: 'news' },
+  { key: 'finance', label: '財經', category: 'finance' },
+  { key: 'tech', label: '科技', category: 'tech' },
+  { key: 'life', label: '生活', category: 'life' },
+  { key: 'sports', label: '體育', category: 'sports' },
+  { key: 'gaming', label: '遊戲', category: 'gaming' },
+  { key: 'anime', label: '動漫', category: 'anime' },
+  { key: 'entertainment', label: '娛樂', category: 'entertainment' }
 ];
 
 function isImageIcon(value: string | null | undefined) {
@@ -39,35 +47,24 @@ function TrendIcon({ value, size = 40 }: { value?: string | null; size?: number 
   return <Text style={[styles.trendIcon, { fontSize: size }]}>{value || '🔥'}</Text>;
 }
 
-const timezoneLabels: Record<string, string> = {
-  'Asia/Hong_Kong': 'HKT',
-  'Europe/London': 'London',
-  'Europe/Paris': 'Paris',
-  'Asia/Tokyo': 'JST',
-  'Asia/Taipei': 'Taipei',
-  'Asia/Singapore': 'SGT',
-  'America/New_York': 'ET'
-};
-
-function formatDeadline(value?: string | null, timezone?: string | null) {
+function formatDeadline(value?: string | null) {
   if (!value) return '未設定截止時間';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '未設定截止時間';
-  const timeZone = timezone || 'Asia/Hong_Kong';
+  const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const dateText = date.toLocaleDateString('zh-HK', {
     year: 'numeric',
     month: 'long',
-    day: 'numeric',
-    timeZone
+    day: 'numeric'
   });
   const timeText = date.toLocaleTimeString('zh-HK', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-    timeZone
+    timeZoneName: 'short'
   });
-  return `${dateText} ${timeText} ${timezoneLabels[timeZone] || timeZone} 截止`;
+  return `${dateText} ${timeText} 截止 · 你嘅時區 ${localTimeZone}`;
 }
 
 function getHeadlineTitle(headline: NewsHeadline) {
@@ -158,7 +155,7 @@ function TrendCard({ trend }: { trend: Trend }) {
       </View>
       <View style={styles.deadlineRow}>
         <Feather name="clock" size={13} color={colors.textMuted} />
-        <Text style={styles.deadlineText}>{formatDeadline(trend.deadline_at, trend.deadline_timezone)}</Text>
+        <Text style={styles.deadlineText}>{formatDeadline(trend.deadline_at)}</Text>
       </View>
       <View style={styles.angles}>
         {angles.slice(0, 4).map((angle) => (
@@ -181,7 +178,7 @@ export default function PrediktScreen() {
   const params = useLocalSearchParams<{ focus?: string }>();
   const focusId = Array.isArray(params.focus) ? params.focus[0] : params.focus;
   const [trends, setTrends] = useState<Trend[]>([]);
-  const [sortMode, setSortMode] = useState<SortMode>('heat');
+  const [filterMode, setFilterMode] = useState<FilterMode>('hot');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -207,14 +204,13 @@ export default function PrediktScreen() {
   }, [loadTrends]);
 
   const sortedTrends = useMemo(() => {
-    const next = [...trends].sort((a, b) => {
-      if (sortMode === 'newest') {
+    const activeFilter = filterOptions.find((option) => option.key === filterMode);
+    const filtered = activeFilter?.category
+      ? trends.filter((trend) => trend.category === activeFilter.category)
+      : trends;
+    const next = [...filtered].sort((a, b) => {
+      if (filterMode === 'newest') {
         return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
-      }
-      if (sortMode === 'deadline') {
-        const aTime = a.deadline_at ? new Date(a.deadline_at).getTime() : Number.POSITIVE_INFINITY;
-        const bTime = b.deadline_at ? new Date(b.deadline_at).getTime() : Number.POSITIVE_INFINITY;
-        return aTime - bTime;
       }
       return (b.heat_score ?? 0) - (a.heat_score ?? 0);
     });
@@ -224,7 +220,7 @@ export default function PrediktScreen() {
     if (focusIndex <= 0) return next;
     const [focused] = next.splice(focusIndex, 1);
     return [focused, ...next];
-  }, [focusId, sortMode, trends]);
+  }, [filterMode, focusId, trends]);
 
   return (
     <View style={styles.screen}>
@@ -239,7 +235,7 @@ export default function PrediktScreen() {
             style={({ pressed }) => [styles.sortButton, pressed && styles.pressed]}
           >
             <Feather name="sliders" size={16} color={colors.primary} />
-            <Text style={styles.sortButtonText}>{sortOptions.find((option) => option.key === sortMode)?.label}</Text>
+            <Text style={styles.sortButtonText}>{filterOptions.find((option) => option.key === filterMode)?.label}</Text>
             <Feather name="chevron-down" size={14} color={colors.textMuted} />
           </Pressable>
         </View>
@@ -247,22 +243,22 @@ export default function PrediktScreen() {
       <Modal visible={showSortMenu} transparent animationType="fade" onRequestClose={() => setShowSortMenu(false)}>
         <Pressable style={styles.sortOverlay} onPress={() => setShowSortMenu(false)}>
           <View style={styles.sortMenu}>
-            <Text style={styles.sortMenuTitle}>排列方法</Text>
-            {sortOptions.map((option) => (
+            <Text style={styles.sortMenuTitle}>分類</Text>
+            {filterOptions.map((option) => (
               <Pressable
                 key={option.key}
                 onPress={() => {
-                  setSortMode(option.key);
+                  setFilterMode(option.key);
                   setShowSortMenu(false);
                 }}
                 style={({ pressed }) => [
                   styles.sortMenuItem,
-                  sortMode === option.key && styles.sortMenuItemActive,
+                  filterMode === option.key && styles.sortMenuItemActive,
                   pressed && styles.pressed
                 ]}
               >
-                <Text style={[styles.sortMenuText, sortMode === option.key && styles.sortMenuTextActive]}>{option.label}</Text>
-                {sortMode === option.key ? <Feather name="check" size={16} color={colors.primary} /> : null}
+                <Text style={[styles.sortMenuText, filterMode === option.key && styles.sortMenuTextActive]}>{option.label}</Text>
+                {filterMode === option.key ? <Feather name="check" size={16} color={colors.primary} /> : null}
               </Pressable>
             ))}
           </View>

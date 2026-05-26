@@ -8,9 +8,11 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -25,12 +27,19 @@ import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 
 type TrendAngle = { emoji: string; name: string; percentage: number };
+type NewsHeadline = string | {
+  title?: string;
+  source?: string;
+  url?: string;
+  published_at?: string | null;
+};
 type Trend = {
   id: string;
   topic: string;
   icon: string | null;
   heat_score: number | null;
   angles: TrendAngle[];
+  news_headlines?: NewsHeadline[] | null;
   description?: string | null;
   why_trending?: string | null;
   creator_tips?: string | null;
@@ -61,8 +70,36 @@ function timeAgo(value: string) {
   return `${Math.floor(hours / 24)} 日前`;
 }
 
+function parseNewsItems(value?: NewsHeadline[] | null) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => {
+    if (typeof item === 'string') return null;
+    const title = (item.title || '').trim();
+    const url = (item.url || '').trim();
+    if (!title || !url) return null;
+    return {
+      title,
+      url,
+      source: (item.source || '').trim(),
+      published_at: item.published_at || null
+    };
+  }).filter(Boolean) as Array<{ title: string; source: string; url: string; published_at: string | null }>;
+}
+
 function clampPercent(value: number) {
   return Math.max(0, Math.min(100, value));
+}
+
+function isImageIcon(value: string | null | undefined) {
+  return Boolean(value && (/^(https?:|data:image\/)/.test(value)));
+}
+
+function TrendIcon({ value, size = 30 }: { value?: string | null; size?: number }) {
+  if (isImageIcon(value)) {
+    return <Image source={{ uri: value || '' }} style={{ width: size, height: size, borderRadius: size * 0.22 }} resizeMode="cover" />;
+  }
+
+  return <Text style={[styles.trendIcon, { fontSize: size }]}>{value || '🔥'}</Text>;
 }
 
 function TrendInfoCard({ trend }: { trend: Trend }) {
@@ -70,7 +107,7 @@ function TrendInfoCard({ trend }: { trend: Trend }) {
     <View style={styles.trendCard}>
       <View style={styles.trendHeader}>
         <View style={styles.trendTopicWrap}>
-          <Text style={styles.trendIcon}>{trend.icon || '🔥'}</Text>
+          <TrendIcon value={trend.icon} />
           <Text numberOfLines={2} style={styles.trendTitle}>{trend.topic}</Text>
         </View>
         <Text style={styles.heat}>🔥 {trend.heat_score ?? 0}</Text>
@@ -79,7 +116,7 @@ function TrendInfoCard({ trend }: { trend: Trend }) {
       <View style={styles.angleList}>
         {(trend.angles ?? []).map((angle) => (
           <View key={`${angle.emoji}-${angle.name}`} style={styles.angleRow}>
-            <Text style={styles.angleEmoji}>{angle.emoji}</Text>
+            <TrendIcon value={angle.emoji} size={18} />
             <Text numberOfLines={1} style={styles.angleName}>{angle.name}</Text>
             <Text style={styles.anglePercent}>{angle.percentage}%</Text>
             <View style={styles.progressTrack}>
@@ -99,7 +136,7 @@ function TrendDetailSection({ trend }: { trend: Trend }) {
 
   return (
     <View style={styles.detailSection}>
-      <Text style={styles.detailTitle}>📖 話題詳細</Text>
+      <Text style={styles.detailTitle}>話題詳細</Text>
 
       {trend.description ? (
         <View style={styles.detailCard}>
@@ -117,14 +154,14 @@ function TrendDetailSection({ trend }: { trend: Trend }) {
 
       {trend.creator_tips ? (
         <View style={styles.detailCard}>
-          <Text style={styles.detailLabel}>🎬 Creator 可以點拍？</Text>
+          <Text style={styles.detailLabel}>Creator 可以點拍？</Text>
           <Text style={styles.detailText}>{trend.creator_tips}</Text>
         </View>
       ) : null}
 
       {links.length > 0 ? (
         <View style={styles.detailCard}>
-          <Text style={styles.detailLabel}>🔗 相關連結</Text>
+          <Text style={styles.detailLabel}>相關連結</Text>
           {links.map((link, index) => (
             <TouchableOpacity
               key={`${link.url}-${index}`}
@@ -140,6 +177,70 @@ function TrendDetailSection({ trend }: { trend: Trend }) {
         </View>
       ) : null}
     </View>
+  );
+}
+
+function NewsSection({ trend }: { trend: Trend }) {
+  const newsItems = parseNewsItems(trend.news_headlines);
+  if (newsItems.length === 0) return null;
+
+  return (
+    <View style={styles.newsSection}>
+      <Text style={styles.newsTitle}>相關新聞</Text>
+      {newsItems.map((item, index) => (
+        <Pressable
+          key={`${item.url}-${index}`}
+          onPress={() => Linking.openURL(item.url)}
+          style={({ pressed }) => [
+            styles.newsItem,
+            index === newsItems.length - 1 && styles.newsItemLast,
+            pressed && styles.pressed
+          ]}
+        >
+          <Text numberOfLines={2} style={styles.newsItemTitle}>{item.title}</Text>
+          <Text style={styles.newsItemMeta}>
+            {item.source || 'News'}{item.published_at ? `・${timeAgo(item.published_at)}` : ''}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function TrendDetailSheet({
+  trend,
+  visible,
+  onClose,
+  bottomInset
+}: {
+  trend: Trend | null;
+  visible: boolean;
+  onClose: () => void;
+  bottomInset: number;
+}) {
+  if (!trend) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.sheetOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View style={[styles.sheet, { paddingBottom: bottomInset + 20 }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>話題詳細</Text>
+            <Pressable onPress={onClose} hitSlop={10} style={styles.sheetCloseButton}>
+              <Feather name="x" size={22} color={colors.textMuted} />
+            </Pressable>
+          </View>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.sheetContent}
+          >
+            <TrendDetailSection trend={trend} />
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -178,9 +279,16 @@ export default function TrendDetailScreen() {
   const [savedDiscussionIds, setSavedDiscussionIds] = useState<Set<string>>(new Set());
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [detailVisible, setDetailVisible] = useState(false);
   const canSend = inputText.trim().length > 0;
 
   const discussionIds = useMemo(() => discussions.map((discussion) => discussion.id), [discussions]);
+  const hasTrendDetail = Boolean(
+    trend?.description
+    || trend?.why_trending
+    || trend?.creator_tips
+    || (trend?.related_links?.length ?? 0) > 0
+  );
 
   const loadLikedStatus = useCallback(async (ids: string[]) => {
     if (!user || ids.length === 0) {
@@ -440,7 +548,7 @@ export default function TrendDetailScreen() {
   const ListHeader = (
     <>
       {trend ? <TrendInfoCard trend={trend} /> : null}
-      {trend ? <TrendDetailSection trend={trend} /> : null}
+      {trend ? <NewsSection trend={trend} /> : null}
       <View style={styles.discussionTitleRow}>
         <Text style={styles.discussionTitle}>討論區</Text>
         <Text style={styles.discussionCount}>{discussions.length} 則討論</Text>
@@ -456,9 +564,23 @@ export default function TrendDetailScreen() {
             <Text style={styles.back}>← 返回</Text>
           </Pressable>
           <Text numberOfLines={1} style={styles.headerTitle}>{trend?.topic ?? 'Trend'}</Text>
-          <Pressable onPress={toggleTrendSave} hitSlop={10}>
-            <Text style={[styles.save, savedTrend && styles.savedSmall]}>🔖</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              disabled={!hasTrendDetail}
+              onPress={() => setDetailVisible(true)}
+              hitSlop={10}
+              style={[styles.headerIconButton, !hasTrendDetail && styles.headerIconDisabled]}
+            >
+              <Feather name="info" size={22} color={hasTrendDetail ? colors.textMuted : colors.bodyBorder} />
+            </Pressable>
+            <Pressable onPress={toggleTrendSave} hitSlop={10} style={styles.headerIconButton}>
+              <Feather
+                name="bookmark"
+                size={21}
+                color={savedTrend ? colors.primary : colors.textMuted}
+              />
+            </Pressable>
+          </View>
         </View>
       </SafeAreaView>
 
@@ -495,6 +617,13 @@ export default function TrendDetailScreen() {
           <Text style={styles.sendText}>→</Text>
         </Pressable>
       </View>
+
+      <TrendDetailSheet
+        trend={trend}
+        visible={detailVisible}
+        onClose={() => setDetailVisible(false)}
+        bottomInset={insets.bottom}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -528,6 +657,22 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 16,
     textAlign: 'center'
+  },
+  headerActions: {
+    minWidth: 80,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 10
+  },
+  headerIconButton: {
+    width: 28,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  headerIconDisabled: {
+    opacity: 0.45
   },
   save: {
     width: 46,
@@ -660,6 +805,83 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 13,
     textDecorationLine: 'underline'
+  },
+  newsSection: {
+    marginBottom: 22
+  },
+  newsTitle: {
+    marginBottom: 10,
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 18
+  },
+  newsItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eeeeee'
+  },
+  newsItemLast: {
+    borderBottomWidth: 0
+  },
+  newsItemTitle: {
+    color: '#1a1a1a',
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    lineHeight: 19
+  },
+  newsItemMeta: {
+    marginTop: 5,
+    color: '#888888',
+    fontFamily: fonts.body,
+    fontSize: 12
+  },
+  sheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.45)'
+  },
+  sheet: {
+    maxHeight: '82%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: colors.bgBody,
+    paddingTop: 10,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: -6 },
+    elevation: 12
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: colors.bodyBorder,
+    marginBottom: 12
+  },
+  sheetHeader: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6
+  },
+  sheetTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 20,
+    fontWeight: '700'
+  },
+  sheetCloseButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  sheetContent: {
+    paddingTop: 8
   },
   discussionTitleRow: {
     marginBottom: 12,
