@@ -63,6 +63,16 @@ type Discussion = {
   created_at: string;
   profiles?: DiscussionProfile | null;
 };
+type DiscussionReply = {
+  id: string;
+  discussion_id: string;
+  author_id: string;
+  body: string;
+  like_count: number | null;
+  created_at: string;
+  profiles?: DiscussionProfile | null;
+};
+type DiscussionSort = 'hot' | 'recent';
 
 function timeAgo(value: string) {
   const diff = Date.now() - new Date(value).getTime();
@@ -315,6 +325,149 @@ function EmptyDiscussionState() {
   );
 }
 
+function DiscussionSortToggle({
+  value,
+  onChange
+}: {
+  value: DiscussionSort;
+  onChange: (value: DiscussionSort) => void;
+}) {
+  return (
+    <View style={styles.discussionSort}>
+      {[
+        { key: 'hot' as const, label: '熱門' },
+        { key: 'recent' as const, label: '最近' }
+      ].map((option) => (
+        <Pressable
+          key={option.key}
+          onPress={() => onChange(option.key)}
+          style={[styles.sortChip, value === option.key && styles.sortChipActive]}
+        >
+          <Text style={[styles.sortChipText, value === option.key && styles.sortChipTextActive]}>
+            {option.label}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function DiscussionThreadSheet({
+  discussion,
+  replies,
+  loading,
+  replyText,
+  canReply,
+  onChangeReply,
+  onSubmitReply,
+  onClose,
+  bottomInset
+}: {
+  discussion: Discussion | null;
+  replies: DiscussionReply[];
+  loading: boolean;
+  replyText: string;
+  canReply: boolean;
+  onChangeReply: (value: string) => void;
+  onSubmitReply: () => void;
+  onClose: () => void;
+  bottomInset: number;
+}) {
+  if (!discussion) return null;
+
+  const username = discussion.profiles?.username || 'soon';
+
+  return (
+    <Modal visible={Boolean(discussion)} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.threadOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.threadKeyboard}
+        >
+          <View style={[styles.threadSheet, { paddingBottom: bottomInset + 12 }]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.threadHeader}>
+              <Text style={styles.threadTitle}>留言串</Text>
+              <Pressable onPress={onClose} hitSlop={10} style={styles.threadCloseButton}>
+                <Feather name="x" size={22} color={colors.textMuted} />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.threadContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.threadOriginal}>
+                <View style={styles.threadOriginalHeader}>
+                  <Avatar profile={discussion.profiles} />
+                  <Text numberOfLines={1} style={styles.discussionMeta}>
+                    <Text style={styles.username}>@{username}</Text>
+                    <Text style={styles.discussionTime}> · {timeAgo(discussion.created_at)}</Text>
+                  </Text>
+                </View>
+                <Text style={styles.threadOriginalBody}>{discussion.body}</Text>
+                <View style={styles.threadStats}>
+                  <Text style={styles.threadStat}>♡ {discussion.like_count ?? 0}</Text>
+                  <Text style={styles.threadStat}>💬 {discussion.reply_count ?? replies.length}</Text>
+                </View>
+              </View>
+
+              <View style={styles.threadRepliesHeader}>
+                <Text style={styles.threadRepliesTitle}>回覆</Text>
+                <Text style={styles.threadRepliesCount}>{replies.length} 則</Text>
+              </View>
+
+              {loading ? (
+                <View style={styles.threadLoading}>
+                  <ActivityIndicator color={colors.primary} />
+                </View>
+              ) : replies.length === 0 ? (
+                <View style={styles.threadEmpty}>
+                  <Text style={styles.threadEmptyText}>仲未有回覆</Text>
+                  <Text style={styles.threadEmptySubtext}>接住呢個留言繼續傾。</Text>
+                </View>
+              ) : (
+                replies.map((reply) => (
+                  <View key={reply.id} style={styles.replyRow}>
+                    <Avatar profile={reply.profiles} />
+                    <View style={styles.replyBodyWrap}>
+                      <Text numberOfLines={1} style={styles.discussionMeta}>
+                        <Text style={styles.username}>@{reply.profiles?.username || 'soon'}</Text>
+                        <Text style={styles.discussionTime}> · {timeAgo(reply.created_at)}</Text>
+                      </Text>
+                      <Text style={styles.replyText}>{reply.body}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+
+            <View style={styles.threadInputRow}>
+              <TextInput
+                value={replyText}
+                onChangeText={onChangeReply}
+                placeholder="回覆呢個留言⋯"
+                placeholderTextColor={colors.textMuted}
+                style={styles.threadInput}
+                multiline
+              />
+              <Pressable
+                disabled={!canReply}
+                onPress={onSubmitReply}
+                style={({ pressed }) => [styles.threadSendButton, (!canReply || pressed) && styles.sendButtonDisabled]}
+              >
+                <Feather name="arrow-up" size={18} color={colors.textOnDark} />
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
 export default function TrendDetailScreen() {
   const insets = useSafeAreaInsets();
   const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();
@@ -329,9 +482,28 @@ export default function TrendDetailScreen() {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [detailVisible, setDetailVisible] = useState(false);
+  const [discussionSort, setDiscussionSort] = useState<DiscussionSort>('hot');
+  const [selectedDiscussion, setSelectedDiscussion] = useState<Discussion | null>(null);
+  const [threadReplies, setThreadReplies] = useState<DiscussionReply[]>([]);
+  const [threadReplyText, setThreadReplyText] = useState('');
+  const [loadingThread, setLoadingThread] = useState(false);
   const canSend = inputText.trim().length > 0;
+  const canReply = threadReplyText.trim().length > 0;
 
   const discussionIds = useMemo(() => discussions.map((discussion) => discussion.id), [discussions]);
+  const sortedDiscussions = useMemo(() => {
+    const next = [...discussions];
+    if (discussionSort === 'recent') {
+      return next.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+
+    return next.sort((a, b) => {
+      const hotA = (a.like_count ?? 0) + (a.reply_count ?? 0) * 2;
+      const hotB = (b.like_count ?? 0) + (b.reply_count ?? 0) * 2;
+      if (hotB !== hotA) return hotB - hotA;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [discussionSort, discussions]);
   const hasTrendDetail = Boolean(
     trend?.description
     || trend?.why_trending
@@ -486,6 +658,77 @@ export default function TrendDetailScreen() {
     }
   }
 
+  async function loadThreadReplies(discussionId: string) {
+    setLoadingThread(true);
+    const { data, error } = await supabase
+      .from('trend_discussion_replies')
+      .select('*, profiles!trend_discussion_replies_author_id_fkey(username, avatar_url, display_name)')
+      .eq('discussion_id', discussionId)
+      .order('created_at', { ascending: true });
+
+    setThreadReplies(error ? [] : (data ?? []) as DiscussionReply[]);
+    setLoadingThread(false);
+  }
+
+  function openDiscussionThread(discussion: Discussion) {
+    setSelectedDiscussion(discussion);
+    setThreadReplyText('');
+    loadThreadReplies(discussion.id);
+  }
+
+  async function submitThreadReply() {
+    const body = threadReplyText.trim();
+    if (!body || !user || !selectedDiscussion) return;
+
+    const discussionId = selectedDiscussion.id;
+    const optimisticReply: DiscussionReply = {
+      id: `local-reply-${Date.now()}`,
+      discussion_id: discussionId,
+      author_id: user.id,
+      body,
+      like_count: 0,
+      created_at: new Date().toISOString(),
+      profiles: {
+        username: profile?.username ?? null,
+        display_name: profile?.display_name ?? null,
+        avatar_url: profile?.avatar_url ?? user.user_metadata?.avatar_url ?? null
+      }
+    };
+
+    setThreadReplyText('');
+    setThreadReplies((current) => [...current, optimisticReply]);
+    setSelectedDiscussion((current) => current?.id === discussionId
+      ? { ...current, reply_count: (current.reply_count ?? 0) + 1 }
+      : current);
+    setDiscussions((current) => current.map((discussion) => discussion.id === discussionId
+      ? { ...discussion, reply_count: (discussion.reply_count ?? 0) + 1 }
+      : discussion));
+
+    const { data, error } = await supabase
+      .from('trend_discussion_replies')
+      .insert({ discussion_id: discussionId, author_id: user.id, body })
+      .select('*, profiles!trend_discussion_replies_author_id_fkey(username, avatar_url, display_name)')
+      .single();
+
+    if (error) {
+      setThreadReplies((current) => current.filter((reply) => reply.id !== optimisticReply.id));
+      setThreadReplyText(body);
+      setSelectedDiscussion((current) => current?.id === discussionId
+        ? { ...current, reply_count: Math.max(0, (current.reply_count ?? 1) - 1) }
+        : current);
+      setDiscussions((current) => current.map((discussion) => discussion.id === discussionId
+        ? { ...discussion, reply_count: Math.max(0, (discussion.reply_count ?? 1) - 1) }
+        : discussion));
+      Alert.alert('回覆失敗', '請稍後再試');
+      return;
+    }
+
+    setThreadReplies((current) => [
+      ...current.filter((reply) => reply.id !== optimisticReply.id),
+      data as DiscussionReply
+    ]);
+  }
+
   async function submitDiscussion() {
     const body = inputText.trim();
     if (!body || !user || !trendId) return;
@@ -578,7 +821,10 @@ export default function TrendDetailScreen() {
     const isSaved = savedDiscussionIds.has(item.id);
 
     return (
-      <View style={styles.discussionCard}>
+      <Pressable
+        onPress={() => openDiscussionThread(item)}
+        style={({ pressed }) => [styles.discussionCard, pressed && styles.discussionCardPressed]}
+      >
         <View style={styles.discussionHeader}>
           <Avatar profile={item.profiles} />
           <Text numberOfLines={1} style={styles.discussionMeta}>
@@ -590,25 +836,49 @@ export default function TrendDetailScreen() {
         <Text style={styles.discussionBody}>{item.body}</Text>
 
         <View style={styles.discussionFooter}>
-          <Pressable onPress={() => toggleLike(item.id)} hitSlop={8}>
+          <Pressable
+            onPress={(event) => {
+              event.stopPropagation();
+              toggleLike(item.id);
+            }}
+            hitSlop={8}
+          >
             <Text style={[styles.footerAction, isLiked && styles.likedAction]}>{isLiked ? '♥' : '♡'} {item.like_count ?? 0}</Text>
           </Pressable>
-          <Text style={styles.footerAction}>💬 {item.reply_count ?? 0}</Text>
-          <Pressable onPress={() => toggleDiscussionSave(item.id)} hitSlop={8} style={styles.footerSave}>
+          <Pressable
+            onPress={(event) => {
+              event.stopPropagation();
+              openDiscussionThread(item);
+            }}
+            hitSlop={8}
+          >
+            <Text style={styles.footerAction}>💬 {item.reply_count ?? 0}</Text>
+          </Pressable>
+          <Pressable
+            onPress={(event) => {
+              event.stopPropagation();
+              toggleDiscussionSave(item.id);
+            }}
+            hitSlop={8}
+            style={styles.footerSave}
+          >
             <Text style={[styles.saveSmall, isSaved && styles.savedSmall]}>🔖</Text>
           </Pressable>
         </View>
-      </View>
+      </Pressable>
     );
   };
 
   const ListHeader = (
     <>
-      {trend ? <TrendInfoCard trend={trend} /> : null}
       {trend ? <NewsSection trend={trend} /> : null}
+      {trend ? <TrendInfoCard trend={trend} /> : null}
       <View style={styles.discussionTitleRow}>
-        <Text style={styles.discussionTitle}>討論區</Text>
-        <Text style={styles.discussionCount}>{discussions.length} 則討論</Text>
+        <View>
+          <Text style={styles.discussionTitle}>討論區</Text>
+          <Text style={styles.discussionCount}>{discussions.length} 則討論</Text>
+        </View>
+        <DiscussionSortToggle value={discussionSort} onChange={setDiscussionSort} />
       </View>
     </>
   );
@@ -620,7 +890,7 @@ export default function TrendDetailScreen() {
           <Pressable onPress={handleBack} hitSlop={10}>
             <Text style={styles.back}>← 返回</Text>
           </Pressable>
-          <Text numberOfLines={1} style={styles.headerTitle}>{trend?.topic ?? 'Trend'}</Text>
+          <View style={styles.headerCenterSpacer} />
           <View style={styles.headerActions}>
             <Pressable
               disabled={!hasTrendDetail}
@@ -645,7 +915,7 @@ export default function TrendDetailScreen() {
         <View style={styles.loading}><ActivityIndicator color={colors.primary} /></View>
       ) : (
         <FlatList
-          data={discussions}
+          data={sortedDiscussions}
           keyExtractor={(item) => item.id}
           renderItem={renderDiscussion}
           ListHeaderComponent={ListHeader}
@@ -681,6 +951,21 @@ export default function TrendDetailScreen() {
         onClose={() => setDetailVisible(false)}
         bottomInset={insets.bottom}
       />
+      <DiscussionThreadSheet
+        discussion={selectedDiscussion}
+        replies={threadReplies}
+        loading={loadingThread}
+        replyText={threadReplyText}
+        canReply={canReply}
+        onChangeReply={setThreadReplyText}
+        onSubmitReply={submitThreadReply}
+        onClose={() => {
+          setSelectedDiscussion(null);
+          setThreadReplies([]);
+          setThreadReplyText('');
+        }}
+        bottomInset={insets.bottom}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -714,6 +999,9 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 16,
     textAlign: 'center'
+  },
+  headerCenterSpacer: {
+    flex: 1
   },
   headerActions: {
     minWidth: 80,
@@ -971,6 +1259,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12
   },
+  discussionSort: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    borderRadius: 999,
+    backgroundColor: colors.bgBodyCard,
+    padding: 3
+  },
+  sortChip: {
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 5
+  },
+  sortChipActive: {
+    backgroundColor: colors.primary
+  },
+  sortChipText: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
+  },
+  sortChipTextActive: {
+    color: colors.textOnDark
+  },
   discussionTitle: {
     color: colors.text,
     fontFamily: fonts.bodyBold,
@@ -988,6 +1301,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgBodyCard,
     padding: 16,
     marginBottom: 12
+  },
+  discussionCardPressed: {
+    opacity: 0.72
   },
   discussionHeader: {
     flexDirection: 'row',
@@ -1122,6 +1438,162 @@ const styles = StyleSheet.create({
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 18
+  },
+  threadOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.45)'
+  },
+  threadKeyboard: {
+    flex: 1,
+    justifyContent: 'flex-end'
+  },
+  threadSheet: {
+    maxHeight: '88%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: colors.bgBody,
+    paddingTop: 10,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: -6 },
+    elevation: 12
+  },
+  threadHeader: {
+    minHeight: 40,
+    marginBottom: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  threadTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 20
+  },
+  threadCloseButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  threadContent: {
+    paddingTop: 8,
+    paddingBottom: 16
+  },
+  threadOriginal: {
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    borderRadius: 16,
+    backgroundColor: colors.bgBodyCard,
+    padding: 14
+  },
+  threadOriginalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  threadOriginalBody: {
+    marginTop: 12,
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: 16,
+    lineHeight: 23
+  },
+  threadStats: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18
+  },
+  threadStat: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13
+  },
+  threadRepliesHeader: {
+    marginTop: 18,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  threadRepliesTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 17
+  },
+  threadRepliesCount: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13
+  },
+  threadLoading: {
+    paddingVertical: 28,
+    alignItems: 'center'
+  },
+  threadEmpty: {
+    paddingVertical: 28,
+    alignItems: 'center'
+  },
+  threadEmptyText: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15
+  },
+  threadEmptySubtext: {
+    marginTop: 5,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13
+  },
+  replyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.bodyBorder
+  },
+  replyBodyWrap: {
+    flex: 1
+  },
+  replyText: {
+    marginTop: 6,
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    lineHeight: 22
+  },
+  threadInputRow: {
+    borderTopWidth: 1,
+    borderTopColor: colors.bodyBorder,
+    paddingTop: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8
+  },
+  threadInput: {
+    flex: 1,
+    maxHeight: 110,
+    minHeight: 44,
+    borderRadius: 22,
+    backgroundColor: colors.bgBodyMuted,
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 10
+  },
+  threadSendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   pressed: {
     opacity: 0.72
