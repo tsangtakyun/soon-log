@@ -51,7 +51,6 @@ function formatDeadline(value?: string | null) {
   if (!value) return '未設定截止時間';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '未設定截止時間';
-  const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const dateText = date.toLocaleDateString('zh-HK', {
     year: 'numeric',
@@ -64,7 +63,7 @@ function formatDeadline(value?: string | null) {
     hour12: false,
     timeZoneName: 'short'
   });
-  return `${dateText} ${timeText} 截止 · 你嘅時區 ${localTimeZone}`;
+  return `${dateText} ${timeText} 截止`;
 }
 
 function getHeadlineTitle(headline: NewsHeadline) {
