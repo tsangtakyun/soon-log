@@ -1,11 +1,13 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, FlatList, Image, Modal, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 
 type TrendAngle = { emoji: string; name: string; percentage: number };
+type NewsHeadline = string | { title?: string; source?: string; url?: string };
 type Trend = {
   id: string;
   topic: string;
@@ -13,14 +15,135 @@ type Trend = {
   heat_score: number | null;
   angles: TrendAngle[];
   created_at?: string | null;
+  deadline_at?: string | null;
+  deadline_timezone?: string | null;
+  news_headlines?: NewsHeadline[] | null;
 };
-type SortMode = 'heat' | 'newest' | 'az';
+type SortMode = 'heat' | 'newest' | 'deadline';
 
 const sortOptions: Array<{ key: SortMode; label: string }> = [
   { key: 'heat', label: '熱度' },
   { key: 'newest', label: '最新' },
-  { key: 'az', label: 'A-Z' }
+  { key: 'deadline', label: '即將截止' }
 ];
+
+function isImageIcon(value: string | null | undefined) {
+  return Boolean(value && (/^(https?:|data:image\/)/.test(value)));
+}
+
+function TrendIcon({ value, size = 40 }: { value?: string | null; size?: number }) {
+  if (isImageIcon(value)) {
+    return <Image source={{ uri: value || '' }} style={{ width: size, height: size, borderRadius: size * 0.22 }} resizeMode="cover" />;
+  }
+
+  return <Text style={[styles.trendIcon, { fontSize: size }]}>{value || '🔥'}</Text>;
+}
+
+const timezoneLabels: Record<string, string> = {
+  'Asia/Hong_Kong': 'HKT',
+  'Europe/London': 'London',
+  'Europe/Paris': 'Paris',
+  'Asia/Tokyo': 'JST',
+  'Asia/Taipei': 'Taipei',
+  'Asia/Singapore': 'SGT',
+  'America/New_York': 'ET'
+};
+
+function formatDeadline(value?: string | null, timezone?: string | null) {
+  if (!value) return '未設定截止時間';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '未設定截止時間';
+  const timeZone = timezone || 'Asia/Hong_Kong';
+
+  const dateText = date.toLocaleDateString('zh-HK', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone
+  });
+  const timeText = date.toLocaleTimeString('zh-HK', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone
+  });
+  return `${dateText} ${timeText} ${timezoneLabels[timeZone] || timeZone} 截止`;
+}
+
+function getHeadlineTitle(headline: NewsHeadline) {
+  if (typeof headline === 'string') return headline.trim();
+  return (headline.title || headline.url || '').trim();
+}
+
+function normaliseHeadlines(headlines?: NewsHeadline[] | null) {
+  if (!Array.isArray(headlines)) return [];
+  return headlines.map(getHeadlineTitle).filter(Boolean).slice(0, 8);
+}
+
+function NewsTicker({ headlines }: { headlines?: NewsHeadline[] | null }) {
+  const items = normaliseHeadlines(headlines);
+  const [index, setIndex] = useState(0);
+  const translateY = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (items.length <= 1) return undefined;
+    const interval = setInterval(() => {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true
+        }),
+        Animated.timing(translateY, {
+          toValue: -8,
+          duration: 220,
+          useNativeDriver: true
+        })
+      ]).start(() => {
+        setIndex((current) => (current + 1) % items.length);
+        translateY.setValue(8);
+        Animated.parallel([
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: 260,
+            useNativeDriver: true
+          }),
+          Animated.timing(translateY, {
+            toValue: 0,
+            duration: 260,
+            useNativeDriver: true
+          })
+        ]).start();
+      });
+    }, 3200);
+
+    return () => clearInterval(interval);
+  }, [items.length, opacity, translateY]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <View style={styles.newsTicker}>
+      <View style={styles.newsMeta}>
+        <Feather name="radio" size={12} color={colors.primary} />
+        <Text style={styles.newsMetaText}>新聞標題</Text>
+      </View>
+      <Animated.Text
+        numberOfLines={1}
+        style={[
+          styles.newsText,
+          {
+            opacity,
+            transform: [{ translateY }]
+          }
+        ]}
+      >
+        {items[index]}
+      </Animated.Text>
+    </View>
+  );
+}
 
 function TrendCard({ trend }: { trend: Trend }) {
   const angles = trend.angles ?? [];
@@ -28,15 +151,19 @@ function TrendCard({ trend }: { trend: Trend }) {
     <Pressable onPress={() => router.push('/(app)/home/trend/' + trend.id)} style={({ pressed }) => [styles.trendCard, pressed && styles.pressed]}>
       <View style={styles.trendHeader}>
         <View style={styles.trendTopic}>
-          <Text style={styles.trendIcon}>{trend.icon || '🔥'}</Text>
+          <TrendIcon value={trend.icon} />
           <Text style={styles.trendTitle}>{trend.topic}</Text>
         </View>
         <Text style={styles.heat}>🔥 {trend.heat_score ?? 0}</Text>
       </View>
+      <View style={styles.deadlineRow}>
+        <Feather name="clock" size={13} color={colors.textMuted} />
+        <Text style={styles.deadlineText}>{formatDeadline(trend.deadline_at, trend.deadline_timezone)}</Text>
+      </View>
       <View style={styles.angles}>
         {angles.slice(0, 4).map((angle) => (
           <View key={`${trend.id}-${angle.name}`} style={styles.angleRow}>
-            <Text style={styles.angleEmoji}>{angle.emoji}</Text>
+            <TrendIcon value={angle.emoji} size={18} />
             <Text numberOfLines={1} style={styles.angleName}>{angle.name}</Text>
             <Text style={styles.anglePercent}>{angle.percentage}%</Text>
             <View style={styles.progress}>
@@ -45,6 +172,7 @@ function TrendCard({ trend }: { trend: Trend }) {
           </View>
         ))}
       </View>
+      <NewsTicker headlines={trend.news_headlines} />
     </Pressable>
   );
 }
@@ -54,6 +182,7 @@ export default function PrediktScreen() {
   const focusId = Array.isArray(params.focus) ? params.focus[0] : params.focus;
   const [trends, setTrends] = useState<Trend[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>('heat');
+  const [showSortMenu, setShowSortMenu] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadTrends = useCallback(async () => {
@@ -82,8 +211,10 @@ export default function PrediktScreen() {
       if (sortMode === 'newest') {
         return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
       }
-      if (sortMode === 'az') {
-        return a.topic.localeCompare(b.topic);
+      if (sortMode === 'deadline') {
+        const aTime = a.deadline_at ? new Date(a.deadline_at).getTime() : Number.POSITIVE_INFINITY;
+        const bTime = b.deadline_at ? new Date(b.deadline_at).getTime() : Number.POSITIVE_INFINITY;
+        return aTime - bTime;
       }
       return (b.heat_score ?? 0) - (a.heat_score ?? 0);
     });
@@ -98,26 +229,45 @@ export default function PrediktScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.title}>討論區</Text>
-        <Text style={styles.subtitle}>🔥 創作者社群熱話</Text>
-      </View>
-      <View style={styles.sortBar}>
-        {sortOptions.map((option) => (
+        <View style={styles.headerTop}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.title}>討論區</Text>
+            <Text style={styles.subtitle}>🔥 創作者社群熱話</Text>
+          </View>
           <Pressable
-            key={option.key}
-            onPress={() => setSortMode(option.key)}
-            style={({ pressed }) => [
-              styles.sortPill,
-              sortMode === option.key && styles.sortPillActive,
-              pressed && styles.pressed
-            ]}
+            onPress={() => setShowSortMenu(true)}
+            style={({ pressed }) => [styles.sortButton, pressed && styles.pressed]}
           >
-            <Text style={[styles.sortText, sortMode === option.key && styles.sortTextActive]}>
-              {option.label}
-            </Text>
+            <Feather name="sliders" size={16} color={colors.primary} />
+            <Text style={styles.sortButtonText}>{sortOptions.find((option) => option.key === sortMode)?.label}</Text>
+            <Feather name="chevron-down" size={14} color={colors.textMuted} />
           </Pressable>
-        ))}
+        </View>
       </View>
+      <Modal visible={showSortMenu} transparent animationType="fade" onRequestClose={() => setShowSortMenu(false)}>
+        <Pressable style={styles.sortOverlay} onPress={() => setShowSortMenu(false)}>
+          <View style={styles.sortMenu}>
+            <Text style={styles.sortMenuTitle}>排列方法</Text>
+            {sortOptions.map((option) => (
+              <Pressable
+                key={option.key}
+                onPress={() => {
+                  setSortMode(option.key);
+                  setShowSortMenu(false);
+                }}
+                style={({ pressed }) => [
+                  styles.sortMenuItem,
+                  sortMode === option.key && styles.sortMenuItemActive,
+                  pressed && styles.pressed
+                ]}
+              >
+                <Text style={[styles.sortMenuText, sortMode === option.key && styles.sortMenuTextActive]}>{option.label}</Text>
+                {sortMode === option.key ? <Feather name="check" size={16} color={colors.primary} /> : null}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
       <FlatList
         data={sortedTrends}
         keyExtractor={(item) => item.id}
@@ -140,6 +290,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 18
   },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12
+  },
+  headerCopy: {
+    flex: 1
+  },
   title: {
     color: colors.text,
     fontFamily: fonts.bodyBold,
@@ -150,6 +309,70 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 14
+  },
+  sortButton: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    borderRadius: 999,
+    backgroundColor: colors.bgBodyCard,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  sortButtonText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13
+  },
+  sortOverlay: {
+    flex: 1,
+    alignItems: 'flex-end',
+    paddingTop: 104,
+    paddingRight: 16,
+    backgroundColor: 'rgba(0,0,0,0.08)'
+  },
+  sortMenu: {
+    width: 160,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    borderRadius: 14,
+    backgroundColor: colors.bgBodyCard,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8
+  },
+  sortMenuTitle: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 11,
+    paddingHorizontal: 8,
+    paddingVertical: 6
+  },
+  sortMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10
+  },
+  sortMenuItemActive: {
+    backgroundColor: '#FBF4EE'
+  },
+  sortMenuText: {
+    color: colors.text,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14
+  },
+  sortMenuTextActive: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold
   },
   sortBar: {
     flexDirection: 'row',
@@ -227,6 +450,17 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 16
   },
+  deadlineRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  deadlineText: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12
+  },
   angles: {
     marginTop: 14,
     gap: 12
@@ -263,6 +497,30 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 999,
     backgroundColor: colors.primary
+  },
+  newsTicker: {
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.bodyBorder,
+    paddingTop: 12,
+    overflow: 'hidden'
+  },
+  newsMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 4
+  },
+  newsMetaText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 11
+  },
+  newsText: {
+    color: colors.text,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13,
+    lineHeight: 18
   },
   pressed: {
     opacity: 0.72
