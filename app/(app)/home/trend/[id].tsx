@@ -269,8 +269,9 @@ function EmptyDiscussionState() {
 
 export default function TrendDetailScreen() {
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();
   const trendId = Array.isArray(id) ? id[0] : id;
+  const returnPath = Array.isArray(returnTo) ? returnTo[0] : returnTo;
   const { user, profile } = useAuth();
   const [trend, setTrend] = useState<Trend | null>(null);
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
@@ -289,6 +290,14 @@ export default function TrendDetailScreen() {
     || trend?.creator_tips
     || (trend?.related_links?.length ?? 0) > 0
   );
+
+  function handleBack() {
+    if (returnPath) {
+      router.replace(returnPath as never);
+      return;
+    }
+    router.back();
+  }
 
   const loadLikedStatus = useCallback(async (ids: string[]) => {
     if (!user || ids.length === 0) {
@@ -560,7 +569,7 @@ export default function TrendDetailScreen() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
       <SafeAreaView style={styles.safeHeader}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={10}>
+          <Pressable onPress={handleBack} hitSlop={10}>
             <Text style={styles.back}>← 返回</Text>
           </Pressable>
           <Text numberOfLines={1} style={styles.headerTitle}>{trend?.topic ?? 'Trend'}</Text>

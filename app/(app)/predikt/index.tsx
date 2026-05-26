@@ -145,7 +145,13 @@ function NewsTicker({ headlines }: { headlines?: NewsHeadline[] | null }) {
 function TrendCard({ trend }: { trend: Trend }) {
   const angles = trend.angles ?? [];
   return (
-    <Pressable onPress={() => router.push('/(app)/home/trend/' + trend.id)} style={({ pressed }) => [styles.trendCard, pressed && styles.pressed]}>
+    <Pressable
+      onPress={() => router.push({
+        pathname: '/(app)/home/trend/[id]',
+        params: { id: trend.id, returnTo: '/(app)/predikt' }
+      })}
+      style={({ pressed }) => [styles.trendCard, pressed && styles.pressed]}
+    >
       <View style={styles.trendHeader}>
         <View style={styles.trendTopic}>
           <TrendIcon value={trend.icon} />
