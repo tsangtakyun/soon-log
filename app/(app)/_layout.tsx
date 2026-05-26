@@ -115,7 +115,7 @@ export default function AppTabs() {
 
     loadUnreadClipCount();
     const channel = supabase
-      .channel(`eggs-unread-clip-count-${user.id}`)
+      .channel(`eggs-unread-clip-count-${user.id}-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_clips' }, () => {
         if (isEggsPath(pathname)) {
           markEggsSeen();
@@ -139,7 +139,7 @@ export default function AppTabs() {
 
     loadUnreadTrendCount();
     const channel = supabase
-      .channel(`predikt-unread-trend-count-${user.id}`)
+      .channel(`predikt-unread-trend-count-${user.id}-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trends' }, () => {
         if (isPrediktPath(pathname)) {
           markPrediktSeen();
