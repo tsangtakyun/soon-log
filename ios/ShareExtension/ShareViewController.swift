@@ -24,13 +24,22 @@ class ShareViewController: UIViewController {
   let fileURLType: String = UTType.fileURL.identifier
   let pkpassContentType: String = "com.apple.pkpass"
   let pdfContentType: String = UTType.pdf.identifier
+  private var didStartProcessing = false
+  private var pendingRedirectType: RedirectType?
+  private let titleLabel = UILabel()
+  private let statusLabel = UILabel()
+  private let saveButton = UIButton(type: .system)
+  private let linkPreviewLabel = UILabel()
 
   override func viewDidLoad() {
     super.viewDidLoad()
+    setupMinimalSaveUI()
   }
 
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
+    guard !didStartProcessing else { return }
+    didStartProcessing = true
     Task {
       guard let extensionContext = self.extensionContext,
         let content = extensionContext.inputItems.first as? NSExtensionItem,
@@ -77,7 +86,7 @@ class ShareViewController: UIViewController {
             let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
             userDefaults?.set(self.sharedText, forKey: self.sharedKey)
             userDefaults?.synchronize()
-            self.redirectToHostApp(type: .text)
+            self.finishLoading(type: .text)
           }
 
         }
@@ -100,7 +109,8 @@ class ShareViewController: UIViewController {
             let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
             userDefaults?.set(self.toData(data: self.sharedWebUrl), forKey: self.sharedKey)
             userDefaults?.synchronize()
-            self.redirectToHostApp(type: .weburl)
+            self.linkPreviewLabel.text = item.absoluteString
+            self.finishLoading(type: .weburl)
           }
 
         }
@@ -135,7 +145,8 @@ class ShareViewController: UIViewController {
               let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
               userDefaults?.set(self.toData(data: self.sharedWebUrl), forKey: self.sharedKey)
               userDefaults?.synchronize()
-              self.redirectToHostApp(type: .weburl)
+              self.linkPreviewLabel.text = results["baseURI"] as? String
+              self.finishLoading(type: .weburl)
             }
           } else {
             NSLog("[ERROR] Cannot load preprocessing results !\(String(describing: content))")
@@ -254,7 +265,7 @@ class ShareViewController: UIViewController {
             let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
             userDefaults?.set(self.toData(data: self.sharedMedia), forKey: self.sharedKey)
             userDefaults?.synchronize()
-            self.redirectToHostApp(type: .media)
+            self.finishLoading(type: .media)
           }
 
         }
@@ -315,7 +326,7 @@ class ShareViewController: UIViewController {
             let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
             userDefaults?.set(self.toData(data: self.sharedMedia), forKey: self.sharedKey)
             userDefaults?.synchronize()
-            self.redirectToHostApp(type: .media)
+            self.finishLoading(type: .media)
           }
 
         }
@@ -383,8 +394,157 @@ class ShareViewController: UIViewController {
       let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
       userDefaults?.set(self.toData(data: self.sharedMedia), forKey: self.sharedKey)
       userDefaults?.synchronize()
-      self.redirectToHostApp(type: .file)
+      self.finishLoading(type: .file)
     }
+  }
+
+  private func setupMinimalSaveUI() {
+    view.backgroundColor = UIColor(red: 0.03, green: 0.04, blue: 0.03, alpha: 1.0)
+
+    let header = UIStackView()
+    header.axis = .horizontal
+    header.alignment = .center
+    header.distribution = .equalCentering
+    header.translatesAutoresizingMaskIntoConstraints = false
+
+    let cancelButton = UIButton(type: .system)
+    cancelButton.setTitle("Cancel", for: .normal)
+    cancelButton.setTitleColor(.systemBlue, for: .normal)
+    cancelButton.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .regular)
+    cancelButton.addTarget(self, action: #selector(cancelShare), for: .touchUpInside)
+
+    titleLabel.text = "Save to EGG"
+    titleLabel.textColor = .white
+    titleLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+    titleLabel.textAlignment = .center
+
+    let spacer = UIView()
+    spacer.widthAnchor.constraint(equalToConstant: 64).isActive = true
+
+    header.addArrangedSubview(cancelButton)
+    header.addArrangedSubview(titleLabel)
+    header.addArrangedSubview(spacer)
+
+    let contentStack = UIStackView()
+    contentStack.axis = .vertical
+    contentStack.spacing = 18
+    contentStack.translatesAutoresizingMaskIntoConstraints = false
+
+    let recentsRow = UIView()
+    recentsRow.translatesAutoresizingMaskIntoConstraints = false
+    recentsRow.backgroundColor = UIColor(white: 1, alpha: 0.08)
+    recentsRow.layer.cornerRadius = 18
+
+    let iconBox = UIView()
+    iconBox.translatesAutoresizingMaskIntoConstraints = false
+    iconBox.backgroundColor = UIColor(white: 1, alpha: 0.12)
+    iconBox.layer.cornerRadius = 12
+
+    let icon = UIImageView(image: UIImage(systemName: "bookmark"))
+    icon.translatesAutoresizingMaskIntoConstraints = false
+    icon.tintColor = .white
+    icon.contentMode = .scaleAspectFit
+
+    let rowTextStack = UIStackView()
+    rowTextStack.axis = .vertical
+    rowTextStack.spacing = 2
+    rowTextStack.translatesAutoresizingMaskIntoConstraints = false
+
+    let rowTitle = UILabel()
+    rowTitle.text = "Save to 題材庫"
+    rowTitle.textColor = .white
+    rowTitle.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
+
+    statusLabel.text = "讀取分享內容..."
+    statusLabel.textColor = UIColor(white: 1, alpha: 0.55)
+    statusLabel.font = UIFont.systemFont(ofSize: 14, weight: .regular)
+
+    rowTextStack.addArrangedSubview(rowTitle)
+    rowTextStack.addArrangedSubview(statusLabel)
+
+    let check = UIImageView(image: UIImage(systemName: "checkmark"))
+    check.translatesAutoresizingMaskIntoConstraints = false
+    check.tintColor = UIColor(red: 0.82, green: 0.31, blue: 0.49, alpha: 1)
+    check.contentMode = .scaleAspectFit
+
+    recentsRow.addSubview(iconBox)
+    iconBox.addSubview(icon)
+    recentsRow.addSubview(rowTextStack)
+    recentsRow.addSubview(check)
+
+    linkPreviewLabel.text = ""
+    linkPreviewLabel.textColor = UIColor(white: 1, alpha: 0.45)
+    linkPreviewLabel.font = UIFont.systemFont(ofSize: 13, weight: .regular)
+    linkPreviewLabel.numberOfLines = 1
+
+    saveButton.translatesAutoresizingMaskIntoConstraints = false
+    saveButton.setTitle("Save", for: .normal)
+    saveButton.setTitleColor(.white, for: .normal)
+    saveButton.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+    saveButton.backgroundColor = UIColor(red: 0.82, green: 0.31, blue: 0.49, alpha: 0.45)
+    saveButton.layer.cornerRadius = 18
+    saveButton.isEnabled = false
+    saveButton.addTarget(self, action: #selector(saveToHostApp), for: .touchUpInside)
+
+    contentStack.addArrangedSubview(recentsRow)
+    contentStack.addArrangedSubview(linkPreviewLabel)
+
+    view.addSubview(header)
+    view.addSubview(contentStack)
+    view.addSubview(saveButton)
+
+    NSLayoutConstraint.activate([
+      header.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 28),
+      header.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -28),
+      header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+      header.heightAnchor.constraint(equalToConstant: 44),
+
+      recentsRow.heightAnchor.constraint(equalToConstant: 86),
+      iconBox.leadingAnchor.constraint(equalTo: recentsRow.leadingAnchor, constant: 18),
+      iconBox.centerYAnchor.constraint(equalTo: recentsRow.centerYAnchor),
+      iconBox.widthAnchor.constraint(equalToConstant: 46),
+      iconBox.heightAnchor.constraint(equalToConstant: 46),
+      icon.centerXAnchor.constraint(equalTo: iconBox.centerXAnchor),
+      icon.centerYAnchor.constraint(equalTo: iconBox.centerYAnchor),
+      icon.widthAnchor.constraint(equalToConstant: 24),
+      icon.heightAnchor.constraint(equalToConstant: 24),
+
+      rowTextStack.leadingAnchor.constraint(equalTo: iconBox.trailingAnchor, constant: 14),
+      rowTextStack.centerYAnchor.constraint(equalTo: recentsRow.centerYAnchor),
+      rowTextStack.trailingAnchor.constraint(lessThanOrEqualTo: check.leadingAnchor, constant: -12),
+
+      check.trailingAnchor.constraint(equalTo: recentsRow.trailingAnchor, constant: -18),
+      check.centerYAnchor.constraint(equalTo: recentsRow.centerYAnchor),
+      check.widthAnchor.constraint(equalToConstant: 28),
+      check.heightAnchor.constraint(equalToConstant: 28),
+
+      contentStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 28),
+      contentStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -28),
+      contentStack.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 64),
+
+      saveButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 28),
+      saveButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -28),
+      saveButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
+      saveButton.heightAnchor.constraint(equalToConstant: 60)
+    ])
+  }
+
+  private func finishLoading(type: RedirectType) {
+    pendingRedirectType = type
+    statusLabel.text = "已準備好儲存"
+    saveButton.isEnabled = true
+    saveButton.backgroundColor = UIColor(red: 0.82, green: 0.31, blue: 0.49, alpha: 1)
+  }
+
+  @objc private func saveToHostApp() {
+    guard let type = pendingRedirectType else { return }
+    saveButton.isEnabled = false
+    saveButton.setTitle("Saving...", for: .normal)
+    redirectToHostApp(type: type)
+  }
+
+  @objc private func cancelShare() {
+    extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
   }
 
   private func dismissWithError(message: String? = nil) {
