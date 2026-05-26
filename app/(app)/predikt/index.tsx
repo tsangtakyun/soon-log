@@ -1,10 +1,13 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, FlatList, Image, Modal, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, FlatList, Image, Modal, Pressable, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
+import { useAuth } from '@/hooks/useAuth';
 
 type TrendAngle = { emoji: string; name: string; percentage: number };
 type NewsHeadline = string | { title?: string; source?: string; url?: string };
@@ -21,6 +24,11 @@ type Trend = {
   news_headlines?: NewsHeadline[] | null;
 };
 type FilterMode = 'hot' | 'newest' | 'news' | 'finance' | 'tech' | 'life' | 'sports' | 'gaming' | 'anime' | 'entertainment';
+type TrendStats = {
+  fires: number;
+  votes: number;
+  comments: number;
+};
 
 const filterOptions: Array<{ key: FilterMode; label: string; category?: string }> = [
   { key: 'hot', label: '熱門' },
@@ -74,6 +82,22 @@ function getHeadlineTitle(headline: NewsHeadline) {
 function normaliseHeadlines(headlines?: NewsHeadline[] | null) {
   if (!Array.isArray(headlines)) return [];
   return headlines.map(getHeadlineTitle).filter(Boolean).slice(0, 8);
+}
+
+function openTrendDetail(trendId: string) {
+  router.push({
+    pathname: '/(app)/home/trend/[id]',
+    params: { id: trendId, returnTo: '/(app)/predikt' }
+  });
+}
+
+function getShareText(trend: Trend) {
+  const angles = (trend.angles ?? [])
+    .slice(0, 2)
+    .map((angle) => `${angle.name} ${angle.percentage}%`)
+    .join(' · ');
+
+  return `我喺 EGG 討論緊：${trend.topic}${angles ? `\n${angles}` : ''}\n\n一齊投票同留言。`;
 }
 
 function NewsTicker({ headlines }: { headlines?: NewsHeadline[] | null }) {
@@ -141,14 +165,53 @@ function NewsTicker({ headlines }: { headlines?: NewsHeadline[] | null }) {
   );
 }
 
-function TrendCard({ trend }: { trend: Trend }) {
+function TrendAction({
+  icon,
+  label,
+  active,
+  onPress
+}: {
+  icon: ReactNode;
+  label?: string | number;
+  active?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={(event) => {
+        event.stopPropagation();
+        onPress();
+      }}
+      hitSlop={8}
+      style={({ pressed }) => [styles.actionButton, active && styles.actionButtonActive, pressed && styles.pressed]}
+    >
+      {icon}
+      {label !== undefined ? <Text style={[styles.actionText, active && styles.actionTextActive]}>{label}</Text> : null}
+    </Pressable>
+  );
+}
+
+function TrendCard({
+  trend,
+  stats,
+  hasFired,
+  hasVoted,
+  onFire,
+  onVote,
+  onShare
+}: {
+  trend: Trend;
+  stats: TrendStats;
+  hasFired: boolean;
+  hasVoted: boolean;
+  onFire: () => void;
+  onVote: () => void;
+  onShare: () => void;
+}) {
   const angles = trend.angles ?? [];
   return (
     <Pressable
-      onPress={() => router.push({
-        pathname: '/(app)/home/trend/[id]',
-        params: { id: trend.id, returnTo: '/(app)/predikt' }
-      })}
+      onPress={() => openTrendDetail(trend.id)}
       style={({ pressed }) => [styles.trendCard, pressed && styles.pressed]}
     >
       <View style={styles.trendHeader}>
@@ -174,18 +237,194 @@ function TrendCard({ trend }: { trend: Trend }) {
           </View>
         ))}
       </View>
+      <View style={styles.actionsRow}>
+        <TrendAction
+          active={hasFired}
+          onPress={onFire}
+          icon={<Text style={styles.fireActionIcon}>🔥</Text>}
+          label={stats.fires}
+        />
+        <TrendAction
+          active={hasVoted}
+          onPress={onVote}
+          icon={<Feather name="bar-chart-2" size={21} color={hasVoted ? colors.primary : colors.textMuted} />}
+          label={stats.votes}
+        />
+        <TrendAction
+          onPress={() => openTrendDetail(trend.id)}
+          icon={<Feather name="message-circle" size={21} color={colors.textMuted} />}
+          label={stats.comments}
+        />
+        <TrendAction
+          onPress={onShare}
+          icon={<Feather name="send" size={21} color={colors.textMuted} />}
+        />
+      </View>
       <NewsTicker headlines={trend.news_headlines} />
     </Pressable>
+  );
+}
+
+function VoteModal({
+  trend,
+  visible,
+  onClose,
+  onSubmit
+}: {
+  trend: Trend | null;
+  visible: boolean;
+  onClose: () => void;
+  onSubmit: (angle: TrendAngle, index: number) => void;
+}) {
+  if (!trend) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <Pressable style={styles.voteSheet}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.voteTitle}>投你一票</Text>
+          <Text style={styles.voteSubtitle}>{trend.topic}</Text>
+          {(trend.angles ?? []).map((angle, index) => (
+            <Pressable
+              key={`${trend.id}-vote-${angle.name}`}
+              onPress={() => onSubmit(angle, index)}
+              style={({ pressed }) => [styles.voteOption, pressed && styles.pressed]}
+            >
+              <TrendIcon value={angle.emoji} size={24} />
+              <Text style={styles.voteOptionText}>{angle.name}</Text>
+              <Text style={styles.voteOptionPercent}>{angle.percentage}%</Text>
+            </Pressable>
+          ))}
+          <Pressable onPress={onClose} style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]}>
+            <Text style={styles.cancelText}>取消</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function ShareMenu({
+  trend,
+  visible,
+  onClose
+}: {
+  trend: Trend | null;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  if (!trend) return null;
+
+  const shareUrl = `https://soon-core.vercel.app/predikt?topic=${trend.id}`;
+  const shareText = getShareText(trend);
+
+  async function shareNative() {
+    await Share.share({ message: `${shareText}\n${shareUrl}` });
+    onClose();
+  }
+
+  async function copyLink() {
+    await Clipboard.setStringAsync(shareUrl);
+    Alert.alert('已複製', '連結已複製');
+    onClose();
+  }
+
+  async function copyText() {
+    await Clipboard.setStringAsync(shareText);
+    Alert.alert('已複製', '話題文字已複製');
+    onClose();
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.shareOverlay} onPress={onClose}>
+        <View style={styles.shareMenu}>
+          <Pressable onPress={shareNative} style={({ pressed }) => [styles.shareMenuRow, pressed && styles.shareMenuRowPressed]}>
+            <Text style={styles.shareMenuText}>分享</Text>
+            <Feather name="send" size={24} color={colors.textOnDark} />
+          </Pressable>
+          <Pressable onPress={copyLink} style={({ pressed }) => [styles.shareMenuRow, pressed && styles.shareMenuRowPressed]}>
+            <Text style={styles.shareMenuText}>複製連結</Text>
+            <Feather name="link" size={24} color={colors.textOnDark} />
+          </Pressable>
+          <Pressable onPress={copyText} style={({ pressed }) => [styles.shareMenuRow, pressed && styles.shareMenuRowPressed]}>
+            <Text style={styles.shareMenuText}>複製為文字</Text>
+            <Feather name="copy" size={24} color={colors.textOnDark} />
+          </Pressable>
+        </View>
+      </Pressable>
+    </Modal>
   );
 }
 
 export default function PrediktScreen() {
   const params = useLocalSearchParams<{ focus?: string }>();
   const focusId = Array.isArray(params.focus) ? params.focus[0] : params.focus;
+  const { user } = useAuth();
   const [trends, setTrends] = useState<Trend[]>([]);
+  const [statsByTrend, setStatsByTrend] = useState<Record<string, TrendStats>>({});
+  const [firedTrendIds, setFiredTrendIds] = useState<Set<string>>(new Set());
+  const [votedTrendIds, setVotedTrendIds] = useState<Set<string>>(new Set());
+  const [voteTrend, setVoteTrend] = useState<Trend | null>(null);
+  const [shareTrend, setShareTrend] = useState<Trend | null>(null);
   const [filterMode, setFilterMode] = useState<FilterMode>('hot');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const loadInteractions = useCallback(async (trendIds: string[]) => {
+    if (trendIds.length === 0) {
+      setStatsByTrend({});
+      setFiredTrendIds(new Set());
+      setVotedTrendIds(new Set());
+      return;
+    }
+
+    const [
+      fireRowsResult,
+      voteRowsResult,
+      commentRowsResult,
+      myFireRowsResult,
+      myVoteRowsResult
+    ] = await Promise.all([
+      supabase.from('trend_fires').select('trend_id').in('trend_id', trendIds),
+      supabase.from('trend_votes').select('trend_id').in('trend_id', trendIds),
+      supabase.from('trend_discussions').select('trend_id').in('trend_id', trendIds),
+      user
+        ? supabase.from('trend_fires').select('trend_id').eq('user_id', user.id).in('trend_id', trendIds)
+        : Promise.resolve({ data: [], error: null }),
+      user
+        ? supabase.from('trend_votes').select('trend_id').eq('user_id', user.id).in('trend_id', trendIds)
+        : Promise.resolve({ data: [], error: null })
+    ]);
+
+    const nextStats = trendIds.reduce<Record<string, TrendStats>>((acc, trendId) => {
+      acc[trendId] = { fires: 0, votes: 0, comments: 0 };
+      return acc;
+    }, {});
+
+    if (!fireRowsResult.error) {
+      (fireRowsResult.data ?? []).forEach((row) => {
+        if (row.trend_id && nextStats[row.trend_id]) nextStats[row.trend_id].fires += 1;
+      });
+    }
+
+    if (!voteRowsResult.error) {
+      (voteRowsResult.data ?? []).forEach((row) => {
+        if (row.trend_id && nextStats[row.trend_id]) nextStats[row.trend_id].votes += 1;
+      });
+    }
+
+    if (!commentRowsResult.error) {
+      (commentRowsResult.data ?? []).forEach((row) => {
+        if (row.trend_id && nextStats[row.trend_id]) nextStats[row.trend_id].comments += 1;
+      });
+    }
+
+    setStatsByTrend(nextStats);
+    setFiredTrendIds(new Set((myFireRowsResult.data ?? []).map((row) => row.trend_id).filter(Boolean)));
+    setVotedTrendIds(new Set((myVoteRowsResult.data ?? []).map((row) => row.trend_id).filter(Boolean)));
+  }, [user]);
 
   const loadTrends = useCallback(async () => {
     const { data, error } = await supabase
@@ -193,8 +432,10 @@ export default function PrediktScreen() {
       .select('*')
       .eq('is_active', true);
 
-    setTrends(error ? [] : (data ?? []) as Trend[]);
-  }, []);
+    const rows = error ? [] : (data ?? []) as Trend[];
+    setTrends(rows);
+    await loadInteractions(rows.map((trend) => trend.id));
+  }, [loadInteractions]);
 
   useFocusEffect(
     useCallback(() => {
@@ -226,6 +467,102 @@ export default function PrediktScreen() {
     const [focused] = next.splice(focusIndex, 1);
     return [focused, ...next];
   }, [filterMode, focusId, trends]);
+
+  async function handleFire(trend: Trend) {
+    if (!user) {
+      Alert.alert('請先登入', '登入後就可以俾火');
+      return;
+    }
+
+    if (firedTrendIds.has(trend.id)) return;
+
+    setFiredTrendIds((current) => new Set(current).add(trend.id));
+    setStatsByTrend((current) => ({
+      ...current,
+      [trend.id]: {
+        fires: (current[trend.id]?.fires ?? 0) + 1,
+        votes: current[trend.id]?.votes ?? 0,
+        comments: current[trend.id]?.comments ?? 0
+      }
+    }));
+
+    const { error } = await supabase
+      .from('trend_fires')
+      .insert({ trend_id: trend.id, user_id: user.id });
+
+    if (error) {
+      setFiredTrendIds((current) => {
+        const next = new Set(current);
+        next.delete(trend.id);
+        return next;
+      });
+      setStatsByTrend((current) => ({
+        ...current,
+        [trend.id]: {
+          fires: Math.max(0, (current[trend.id]?.fires ?? 1) - 1),
+          votes: current[trend.id]?.votes ?? 0,
+          comments: current[trend.id]?.comments ?? 0
+        }
+      }));
+      Alert.alert('暫時未能俾火', '請稍後再試');
+    }
+  }
+
+  function handleVotePress(trend: Trend) {
+    if (!user) {
+      Alert.alert('請先登入', '登入後就可以投票');
+      return;
+    }
+
+    if (votedTrendIds.has(trend.id)) {
+      Alert.alert('已投票', '每個話題只可以投一次票');
+      return;
+    }
+
+    setVoteTrend(trend);
+  }
+
+  async function submitVote(angle: TrendAngle, index: number) {
+    if (!user || !voteTrend) return;
+    const trendId = voteTrend.id;
+
+    setVotedTrendIds((current) => new Set(current).add(trendId));
+    setStatsByTrend((current) => ({
+      ...current,
+      [trendId]: {
+        fires: current[trendId]?.fires ?? 0,
+        votes: (current[trendId]?.votes ?? 0) + 1,
+        comments: current[trendId]?.comments ?? 0
+      }
+    }));
+    setVoteTrend(null);
+
+    const { error } = await supabase
+      .from('trend_votes')
+      .insert({
+        trend_id: trendId,
+        user_id: user.id,
+        angle_index: index,
+        angle_name: angle.name
+      });
+
+    if (error) {
+      setVotedTrendIds((current) => {
+        const next = new Set(current);
+        next.delete(trendId);
+        return next;
+      });
+      setStatsByTrend((current) => ({
+        ...current,
+        [trendId]: {
+          fires: current[trendId]?.fires ?? 0,
+          votes: Math.max(0, (current[trendId]?.votes ?? 1) - 1),
+          comments: current[trendId]?.comments ?? 0
+        }
+      }));
+      Alert.alert('投票失敗', '請稍後再試');
+    }
+  }
 
   return (
     <View style={styles.screen}>
@@ -272,10 +609,31 @@ export default function PrediktScreen() {
       <FlatList
         data={sortedTrends}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <TrendCard trend={item} />}
+        renderItem={({ item }) => (
+          <TrendCard
+            trend={item}
+            stats={statsByTrend[item.id] ?? { fires: 0, votes: 0, comments: 0 }}
+            hasFired={firedTrendIds.has(item.id)}
+            hasVoted={votedTrendIds.has(item.id)}
+            onFire={() => handleFire(item)}
+            onVote={() => handleVotePress(item)}
+            onShare={() => setShareTrend(item)}
+          />
+        )}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
         contentContainerStyle={sortedTrends.length === 0 ? styles.emptyList : styles.list}
         ListEmptyComponent={<Text style={styles.emptyText}>暫時未有熱話</Text>}
+      />
+      <VoteModal
+        trend={voteTrend}
+        visible={Boolean(voteTrend)}
+        onClose={() => setVoteTrend(null)}
+        onSubmit={submitVote}
+      />
+      <ShareMenu
+        trend={shareTrend}
+        visible={Boolean(shareTrend)}
+        onClose={() => setShareTrend(null)}
       />
     </View>
   );
@@ -499,6 +857,40 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: colors.primary
   },
+  actionsRow: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: colors.bodyBorder,
+    paddingTop: 12
+  },
+  actionButton: {
+    minWidth: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6
+  },
+  actionButtonActive: {
+    backgroundColor: colors.primaryLight
+  },
+  fireActionIcon: {
+    fontSize: 19
+  },
+  actionText: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13
+  },
+  actionTextActive: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold
+  },
   newsTicker: {
     marginTop: 16,
     borderTopWidth: 1,
@@ -522,6 +914,101 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     fontSize: 13,
     lineHeight: 18
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.36)'
+  },
+  voteSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: colors.bgBodyCard,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 34
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: colors.bodyBorder,
+    marginBottom: 16
+  },
+  voteTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 22
+  },
+  voteSubtitle: {
+    marginTop: 4,
+    marginBottom: 14,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 14
+  },
+  voteOption: {
+    minHeight: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.bodyBorder
+  },
+  voteOptionText: {
+    flex: 1,
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16
+  },
+  voteOptionPercent: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14
+  },
+  cancelButton: {
+    alignItems: 'center',
+    marginTop: 14,
+    paddingVertical: 12
+  },
+  cancelText: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 15
+  },
+  shareOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingHorizontal: 18,
+    backgroundColor: 'rgba(0,0,0,0.22)'
+  },
+  shareMenu: {
+    width: 270,
+    borderRadius: 22,
+    backgroundColor: '#262626',
+    paddingVertical: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 12
+  },
+  shareMenuRow: {
+    minHeight: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20
+  },
+  shareMenuRowPressed: {
+    backgroundColor: 'rgba(255,255,255,0.08)'
+  },
+  shareMenuText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 18
   },
   pressed: {
     opacity: 0.72
