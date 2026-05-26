@@ -1,6 +1,6 @@
 module.exports = {
   expo: {
-    name: 'SOON LOG',
+    name: 'EGG',
     slug: 'soon-log',
     scheme: 'soonlog',
     version: '1.0.0',
@@ -9,9 +9,9 @@ module.exports = {
     jsEngine: 'jsc',
     newArchEnabled: false,
     splash: {
-      image: './assets/splash.png',
-      resizeMode: 'contain',
-      backgroundColor: '#F5F2ED'
+      image: './assets/loading-background.png',
+      resizeMode: 'cover',
+      backgroundColor: '#F9E293'
     },
     ios: {
       supportsTablet: true,
@@ -21,6 +21,7 @@ module.exports = {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       },
       infoPlist: {
+        CFBundleDisplayName: 'EGG',
         LSApplicationQueriesSchemes: [
           'googlechrome',
           'comgooglemaps'

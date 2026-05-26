@@ -23,6 +23,7 @@
     "expo": "~53.0.0",
     "expo-asset": "~11.1.7",
     "expo-auth-session": "~6.2.1",
+    "expo-clipboard": "~7.1.5",
     "expo-constants": "~17.1.8",
     "expo-crypto": "~14.1.5",
     "expo-device": "~7.1.4",
@@ -37,6 +38,7 @@
     "expo-router": "~5.1.0",
     "expo-share-intent": "4.1.2",
     "expo-sharing": "~13.1.5",
+    "expo-splash-screen": "^0.30.10",
     "expo-status-bar": "~2.2.3",
     "expo-video": "~2.2.2",
     "expo-web-browser": "~14.2.0",
@@ -51,9 +53,11 @@
     "react-native-vision-camera": "^4.7.3"
   },
   "devDependencies": {
+    "@expo/plist": "^0.7.0",
     "@types/react": "~19.0.10",
     "sharp": "^0.34.5",
-    "typescript": "~5.8.3"
+    "typescript": "~5.8.3",
+    "xmlbuilder": "^15.1.1"
   },
   "expo": {
     "doctor": {

@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import * as Location from 'expo-location';
 import MapView, { Callout, Marker } from 'react-native-maps';
 import { RegionFilter } from '@/components/RegionFilter';
 import { EmptyState, Screen } from '@/components/ui';
@@ -60,6 +59,23 @@ function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
     Math.cos(lat2 * Math.PI / 180) *
     Math.sin(dLng / 2) ** 2;
   return radiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+type OptionalLocationModule = {
+  requestForegroundPermissionsAsync: () => Promise<{ status: string }>;
+  getCurrentPositionAsync: (options?: Record<string, never>) => Promise<{
+    coords: { latitude: number; longitude: number };
+  }>;
+};
+
+function getOptionalLocationModule(): OptionalLocationModule | null {
+  try {
+    // Keep expo-location optional so a corrupted native module install does not block bundling.
+    const optionalRequire = eval('require') as (moduleName: string) => OptionalLocationModule;
+    return optionalRequire('expo-location');
+  } catch {
+    return null;
+  }
 }
 
 function IdeaCard({ item }: { item: Idea }) {
@@ -165,6 +181,9 @@ export default function IdeasLibraryScreen() {
 
   useEffect(() => {
     (async () => {
+      const Location = getOptionalLocationModule();
+      if (!Location) return;
+
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
 

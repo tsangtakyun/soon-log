@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
@@ -22,6 +22,60 @@ type Trend = {
 
 function normaliseAngles(value: unknown): TrendAngle[] {
   return Array.isArray(value) ? value.filter((angle): angle is TrendAngle => Boolean(angle && typeof angle === 'object' && 'name' in angle)) : [];
+}
+
+function isImageIcon(value: string | null | undefined) {
+  return Boolean(value && (/^(https?:|data:image\/)/.test(value)));
+}
+
+function TrendIcon({ value, size = 18 }: { value?: string | null; size?: number }) {
+  if (isImageIcon(value)) {
+    return <Image source={{ uri: value || '' }} style={{ width: size, height: size, borderRadius: size * 0.22 }} resizeMode="cover" />;
+  }
+
+  return <Text style={[styles.inlineIcon, { fontSize: size }]}>{value || '🔥'}</Text>;
+}
+
+function TopAnswerRow({ angles }: { angles: TrendAngle[] | null | undefined }) {
+  const topAngles = getTopTwoAngles(angles);
+  if (topAngles.length === 0) return null;
+
+  return (
+    <View style={styles.topAnswers}>
+      {topAngles.map((angle, index) => (
+        <View key={`${angle.name}-${index}`} style={styles.topAnswerItem}>
+          <TrendIcon value={angle.emoji} size={12} />
+          <Text style={styles.topAnswerText} numberOfLines={1}>
+            {angle.name} {typeof angle.percentage === 'number' ? `${Math.round(angle.percentage)}%` : ''}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function getTopTwoAngles(angles: TrendAngle[] | null | undefined) {
+  return [...(angles ?? [])]
+    .sort((a, b) => (b.percentage ?? 0) - (a.percentage ?? 0))
+    .slice(0, 2);
+}
+
+function getAnswerRatioWidths(angles: TrendAngle[] | null | undefined) {
+  const [first, second] = getTopTwoAngles(angles);
+  if (!first) return { firstWidth: 0, secondWidth: 0 };
+
+  const firstPercentage = Math.max(0, first.percentage ?? 0);
+  const secondPercentage = Math.max(0, second?.percentage ?? 0);
+  const total = firstPercentage + secondPercentage;
+
+  if (total <= 0) {
+    return { firstWidth: second ? 50 : 100, secondWidth: second ? 50 : 0 };
+  }
+
+  return {
+    firstWidth: (firstPercentage / total) * 100,
+    secondWidth: second ? (secondPercentage / total) * 100 : 0
+  };
 }
 
 export function TrendStrip() {
@@ -67,8 +121,7 @@ export function TrendStrip() {
   if (!current) return null;
 
   const heatScore = current.heat_score ?? 0;
-  const heatPct = Math.max(0, Math.min(100, heatScore));
-  const topAngle = current.angles?.[0];
+  const answerRatio = getAnswerRatioWidths(current.angles);
 
   return (
     <TouchableOpacity
@@ -82,23 +135,21 @@ export function TrendStrip() {
         </View>
 
         <View style={styles.topicSection}>
-          <Text style={styles.topicText} numberOfLines={1}>
-            {current.icon || '🔥'} {current.topic}
-          </Text>
-          <View style={styles.progressBg}>
-            <View style={[styles.progressFill, { width: `${heatPct}%` }]} />
+          <View style={styles.topicHeader}>
+            <TrendIcon value={current.icon} size={18} />
+            <Text style={styles.topicText} numberOfLines={1}>{current.topic}</Text>
           </View>
-          {topAngle ? (
-            <Text style={styles.topAngle} numberOfLines={1}>
-              熱門角度：{topAngle.name}
-            </Text>
-          ) : null}
+          <View style={styles.answerRatioBar}>
+            <View style={[styles.answerRatioFirst, { width: `${answerRatio.firstWidth}%` }]} />
+            <View style={[styles.answerRatioSecond, { width: `${answerRatio.secondWidth}%` }]} />
+          </View>
+          <TopAnswerRow angles={current.angles} />
         </View>
 
         <View style={styles.rightSection}>
           <View style={styles.dots}>
             {trends.map((trend, index) => (
-              <View key={trend.id} style={[styles.dot, index === currentIndex && styles.dotActive]} />
+              <View key={`${trend.id}-${index}`} style={[styles.dot, index === currentIndex && styles.dotActive]} />
             ))}
           </View>
           <Feather name="chevron-right" size={16} color={colors.primary} />
@@ -137,26 +188,53 @@ const styles = StyleSheet.create({
   topicSection: {
     flex: 1
   },
+  topicHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 6
+  },
+  inlineIcon: {
+    lineHeight: 20
+  },
   topicText: {
-    marginBottom: 6,
+    flex: 1,
     color: colors.text,
     fontFamily: fonts.bodyBold,
     fontSize: 15,
     fontWeight: '700'
   },
-  progressBg: {
-    height: 4,
-    borderRadius: 2,
+  answerRatioBar: {
+    height: 6,
+    borderRadius: 999,
     backgroundColor: '#f0f0f0',
+    overflow: 'hidden',
+    flexDirection: 'row'
+  },
+  answerRatioFirst: {
+    height: 6,
+    backgroundColor: '#34d399'
+  },
+  answerRatioSecond: {
+    height: 6,
+    backgroundColor: '#fb7185'
+  },
+  topAnswers: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 5,
     overflow: 'hidden'
   },
-  progressFill: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#E8614A'
+  topAnswerItem: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4
   },
-  topAngle: {
-    marginTop: 4,
+  topAnswerText: {
+    flex: 1,
     color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 11

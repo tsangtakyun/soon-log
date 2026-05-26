@@ -11,6 +11,45 @@ const autolinkingTarget = path.join(
   'reactNativeConfig.js'
 );
 
+function removeMacDuplicateFiles() {
+  const nodeModulesRoot = path.join(__dirname, '..', 'node_modules');
+
+  if (!fs.existsSync(nodeModulesRoot)) {
+    return;
+  }
+
+  let removed = 0;
+  const duplicatePattern = / 2(\.[^/]+)?$/;
+
+  function walk(currentPath) {
+    if (!fs.existsSync(currentPath)) {
+      return;
+    }
+
+    const entries = fs.readdirSync(currentPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const entryPath = path.join(currentPath, entry.name);
+
+      if (duplicatePattern.test(entry.name)) {
+        fs.rmSync(entryPath, { recursive: true, force: true });
+        removed += 1;
+        continue;
+      }
+
+      if (entry.isDirectory()) {
+        walk(entryPath);
+      }
+    }
+  }
+
+  walk(nodeModulesRoot);
+
+  if (removed > 0) {
+    console.log(`Removed ${removed} macOS duplicate node_modules entries`);
+  }
+}
+
 function patchExpoAutolinking() {
   if (!fs.existsSync(autolinkingTarget)) {
     return;
@@ -301,8 +340,35 @@ function patchExpoIosEstimatedBinaryPath() {
   console.log('Patched Expo CLI estimated iOS app binary path selection');
 }
 
+function patchReactNativeMapsGoogleManager() {
+  const googleMapManager = path.join(
+    __dirname,
+    '..',
+    'node_modules',
+    'react-native-maps',
+    'ios',
+    'AirGoogleMaps',
+    'AIRGoogleMapManager.m'
+  );
+
+  if (!fs.existsSync(googleMapManager)) {
+    return;
+  }
+
+  const source = fs.readFileSync(googleMapManager, 'utf8');
+
+  if (!source.startsWith('x//')) {
+    return;
+  }
+
+  fs.writeFileSync(googleMapManager, source.replace(/^x\/\//, '//'));
+  console.log('Patched react-native-maps AIRGoogleMapManager rogue prefix');
+}
+
+removeMacDuplicateFiles();
 patchExpoAutolinking();
 patchExpoDevMenuSwiftImport();
 patchExpoDevMenuAppInfo();
 patchExpoIosBinaryPath();
 patchExpoIosEstimatedBinaryPath();
+patchReactNativeMapsGoogleManager();

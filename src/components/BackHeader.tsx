@@ -6,15 +6,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 type BackHeaderProps = {
   title: string;
   rightElement?: ReactNode;
+  backTo?: string;
 };
 
-export function BackHeader({ title, rightElement }: BackHeaderProps) {
+export function BackHeader({ title, rightElement, backTo }: BackHeaderProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
   return (
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.back}>
+      <TouchableOpacity onPress={() => backTo ? router.replace(backTo as never) : router.back()} style={styles.back}>
         <Text style={styles.backText}>← 返回</Text>
       </TouchableOpacity>
       <Text style={styles.title} numberOfLines={1}>{title}</Text>

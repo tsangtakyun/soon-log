@@ -31,6 +31,9 @@ target 'SOONLOG' do
     ]
   end
 
+# @generated begin react-native-maps - expo prebuild (DO NOT MODIFY) sync-e9cc66c360abe50bc66d89fffb3c55b034d7d369
+  pod 'react-native-google-maps', path: File.dirname(`node --print "require.resolve('react-native-maps/package.json')"`)
+# @generated end react-native-maps
   config = use_native_modules!(config_command)
 
   use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
@@ -174,7 +177,11 @@ target 'SOONLOG' do
       updated = xcconfig.gsub(%r{\$\{PODS_CONFIGURATION_BUILD_DIR\}/([^/]+)/([^"\s]+\.modulemap)}) do
         pod_name = Regexp.last_match(1)
         modulemap = Regexp.last_match(2)
-        "${PODS_ROOT}/Headers/Public/#{pod_name}/#{modulemap}"
+        if pod_name == 'Google-Maps-iOS-Utils' && modulemap == 'GoogleMapsUtils.modulemap'
+          "${PODS_ROOT}/Headers/Public/GoogleMapsUtils/Google-Maps-iOS-Utils.modulemap"
+        else
+          "${PODS_ROOT}/Headers/Public/#{pod_name}/#{modulemap}"
+        end
       end
       File.write(xcconfig_path, updated) if updated != xcconfig
     end
@@ -218,7 +225,11 @@ post_integrate do |installer|
     updated = xcconfig.gsub(%r{\$\{PODS_CONFIGURATION_BUILD_DIR\}/([^/]+)/([^"\s]+\.modulemap)}) do
       pod_name = Regexp.last_match(1)
       modulemap = Regexp.last_match(2)
-      "${PODS_ROOT}/Headers/Public/#{pod_name}/#{modulemap}"
+      if pod_name == 'Google-Maps-iOS-Utils' && modulemap == 'GoogleMapsUtils.modulemap'
+        "${PODS_ROOT}/Headers/Public/GoogleMapsUtils/Google-Maps-iOS-Utils.modulemap"
+      else
+        "${PODS_ROOT}/Headers/Public/#{pod_name}/#{modulemap}"
+      end
     end
     File.write(xcconfig_path, updated) if updated != xcconfig
   end
@@ -228,13 +239,29 @@ post_integrate do |installer|
       target.shell_script_build_phases.each do |phase|
         next unless [
           '[CP] Check Pods Manifest.lock',
-          '[CP] Copy Pods Resources',
           '[Expo] Configure project',
           'Bundle React Native code and images'
         ].include?(phase.name)
 
         phase.remove_from_project
       end
+
+      # Google Maps iOS SDK expects GoogleMaps.bundle at the app bundle root.
+      # CocoaPods currently stages GoogleMapsResources.bundle, so copy the nested
+      # GoogleMaps.bundle explicitly to avoid a launch-time GMSServicesException.
+      phase_name = 'Copy GoogleMaps.bundle'
+      phase = target.shell_script_build_phases.find { |p| p.name == phase_name } ||
+        target.new_shell_script_build_phase(phase_name)
+      phase.shell_path = '/bin/bash'
+      phase.shell_script = <<~'SH'
+        set -e
+        GOOGLE_MAPS_BUNDLE="${PODS_ROOT}/GoogleMaps/Maps/Resources/GoogleMapsResources/GoogleMaps.bundle"
+        DESTINATION="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleMaps.bundle"
+        if [ -d "$GOOGLE_MAPS_BUNDLE" ]; then
+          rm -rf "$DESTINATION"
+          cp -R "$GOOGLE_MAPS_BUNDLE" "$DESTINATION"
+        fi
+      SH
     end
     aggregate_target.user_project.save
   end

@@ -38,6 +38,8 @@ PODS:
     - Yoga
   - ExpoAsset (11.1.7):
     - ExpoModulesCore
+  - ExpoClipboard (7.1.5):
+    - ExpoModulesCore
   - ExpoCrypto (14.1.5):
     - ExpoModulesCore
   - ExpoDevice (7.1.4):
@@ -86,6 +88,8 @@ PODS:
     - ExpoModulesCore
   - ExpoSharing (13.1.5):
     - ExpoModulesCore
+  - ExpoSplashScreen (0.30.10):
+    - ExpoModulesCore
   - ExpoVideo (2.2.3):
     - ExpoModulesCore
   - ExpoWebBrowser (14.2.0):
@@ -94,6 +98,13 @@ PODS:
   - FBLazyVector (0.79.6)
   - fmt (11.0.2)
   - glog (0.3.5)
+  - Google-Maps-iOS-Utils (5.0.0):
+    - GoogleMaps (~> 8.0)
+  - GoogleMaps (8.4.0):
+    - GoogleMaps/Maps (= 8.4.0)
+  - GoogleMaps/Base (8.4.0)
+  - GoogleMaps/Maps (8.4.0):
+    - GoogleMaps/Base
   - RCT-Folly (2024.11.18.00):
     - boost
     - DoubleConversion
@@ -1348,6 +1359,10 @@ PODS:
     - React-jsiexecutor
     - React-RCTFBReactNativeSpec
     - ReactCommon/turbomodule/core
+  - react-native-google-maps (1.20.1):
+    - Google-Maps-iOS-Utils (= 5.0.0)
+    - GoogleMaps (= 8.4.0)
+    - React-Core
   - react-native-maps (1.20.1):
     - React-Core
   - react-native-safe-area-context (5.4.0):
@@ -1695,6 +1710,7 @@ DEPENDENCIES:
   - EXNotifications (from `../node_modules/expo-notifications/ios`)
   - Expo (from `../node_modules/expo`)
   - ExpoAsset (from `../node_modules/expo-asset/ios`)
+  - ExpoClipboard (from `../node_modules/expo-clipboard/ios`)
   - ExpoCrypto (from `../node_modules/expo-crypto/ios`)
   - ExpoDevice (from `../node_modules/expo-device/ios`)
   - ExpoFileSystem (from `../node_modules/expo-file-system/ios`)
@@ -1708,6 +1724,7 @@ DEPENDENCIES:
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoShareIntentModule (from `../node_modules/expo-share-intent/ios`)
   - ExpoSharing (from `../node_modules/expo-sharing/ios`)
+  - ExpoSplashScreen (from `../node_modules/expo-splash-screen/ios`)
   - ExpoVideo (from `../node_modules/expo-video/ios`)
   - ExpoWebBrowser (from `../node_modules/expo-web-browser/ios`)
   - fast_float (from `../node_modules/react-native/third-party-podspecs/fast_float.podspec`)
@@ -1747,6 +1764,7 @@ DEPENDENCIES:
   - React-logger (from `../node_modules/react-native/ReactCommon/logger`)
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
+  - react-native-google-maps (from `/Users/tommytsang/Desktop/SOON/soon-idea-ios/node_modules/react-native-maps`)
   - react-native-maps (from `../node_modules/react-native-maps`)
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
@@ -1788,6 +1806,8 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - Google-Maps-iOS-Utils
+    - GoogleMaps
     - SocketRocket
 
 EXTERNAL SOURCES:
@@ -1807,6 +1827,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo"
   ExpoAsset:
     :path: "../node_modules/expo-asset/ios"
+  ExpoClipboard:
+    :path: "../node_modules/expo-clipboard/ios"
   ExpoCrypto:
     :path: "../node_modules/expo-crypto/ios"
   ExpoDevice:
@@ -1833,6 +1855,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-share-intent/ios"
   ExpoSharing:
     :path: "../node_modules/expo-sharing/ios"
+  ExpoSplashScreen:
+    :path: "../node_modules/expo-splash-screen/ios"
   ExpoVideo:
     :path: "../node_modules/expo-video/ios"
   ExpoWebBrowser:
@@ -1907,6 +1931,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   React-microtasksnativemodule:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
+  react-native-google-maps:
+    :path: "/Users/tommytsang/Desktop/SOON/soon-idea-ios/node_modules/react-native-maps"
   react-native-maps:
     :path: "../node_modules/react-native-maps"
   react-native-safe-area-context:
@@ -1993,6 +2019,7 @@ SPEC CHECKSUMS:
   EXNotifications: 6770976336aacdc7dc7aed7b538dd8f7ad2c55e8
   Expo: 052536aae777d5156739c960afd6aa54881df42a
   ExpoAsset: ef06e880126c375f580d4923fdd1cdf4ee6ee7d6
+  ExpoClipboard: 436f6de6971f14eb75ae160e076d9cb3b19eb795
   ExpoCrypto: a9f1d75baeea6ef8b03c1660621585196c382e85
   ExpoDevice: 7082f03af1c588333ef1417d5aa8287081d94b24
   ExpoFileSystem: 7f92f7be2f5c5ed40a7c9efc8fa30821181d9d63
@@ -2006,12 +2033,15 @@ SPEC CHECKSUMS:
   ExpoModulesCore: 272bc6c06ddd9c4bee2048acc57891cab3700627
   ExpoShareIntentModule: 992289764a1bca85f873df081e72c3a67bf113e2
   ExpoSharing: b0377be82430d07398c6a4cd60b5a15696accbd3
+  ExpoSplashScreen: 1c22c5d37647106e42d4ae1582bb6d0dda3b2385
   ExpoVideo: ecded6b0b802be921fcf85c8d831cc086c362fb4
   ExpoWebBrowser: dc39a88485f007e61a3dff05d6a75f22ab4a2e92
   fast_float: 06eeec4fe712a76acc9376682e4808b05ce978b6
   FBLazyVector: 07309209b7b914451b8f822544a18e2a0a85afff
   fmt: a40bb5bd0294ea969aaaba240a927bd33d878cdd
   glog: 5683914934d5b6e4240e497e0f4a3b42d1854183
+  Google-Maps-iOS-Utils: 66d6de12be1ce6d3742a54661e7a79cb317a9321
+  GoogleMaps: 8939898920281c649150e0af74aa291c60f2e77d
   RCT-Folly: e78785aa9ba2ed998ea4151e314036f6c49e6d82
   RCTDeprecation: 9bc64754b40b86fa5e32f293ab3ea8eea2248339
   RCTRequired: ee36c1ce9a5e65a3f629c13f38a85308eb8eebda
@@ -2043,6 +2073,7 @@ SPEC CHECKSUMS:
   React-logger: 1426d04b594a2e68b0ac2add21d45422d06397a3
   React-Mapbuffer: 70a29536f84ddffca4a91097651d2b8f194f7c67
   React-microtasksnativemodule: 460e1da397e71fbbdaf873d8512037f9f294a23e
+  react-native-google-maps: c4f5c5b2dda17e7cb2cb2b37a81f140b039b3e7e
   react-native-maps: 9febd31278b35cd21e4fad2cf6fa708993be5dab
   react-native-safe-area-context: 9d72abf6d8473da73033b597090a80b709c0b2f1
   React-NativeModulesApple: 5a9a3e70994c6c58efb27db651ec5e331b14ca0c
@@ -2083,6 +2114,6 @@ SPEC CHECKSUMS:
   VisionCamera: 7187b3dac1ff3071234ead959ce311875748e14f
   Yoga: dc7c21200195acacb62fa920c588e7c2106de45e
 
-PODFILE CHECKSUM: 878734ef8e57a1d53820c2bafb5aec12e235c578
+PODFILE CHECKSUM: c977e5dfa36110f58855844d5a65311e35314c5d
 
 COCOAPODS: 1.16.2

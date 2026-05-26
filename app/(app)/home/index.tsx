@@ -9,6 +9,7 @@ import {
   Easing,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -33,6 +34,18 @@ type Trend = {
   heat_score: number | null;
   angles: TrendAngle[];
 };
+
+function isImageIcon(value: string | null | undefined) {
+  return Boolean(value && (/^(https?:|data:image\/)/.test(value)));
+}
+
+function TrendIcon({ value, size = 40 }: { value?: string | null; size?: number }) {
+  if (isImageIcon(value)) {
+    return <Image source={{ uri: value || '' }} style={{ width: size, height: size, borderRadius: size * 0.22 }} resizeMode="cover" />;
+  }
+
+  return <Text style={[styles.trendIcon, { fontSize: size }]}>{value || '🔥'}</Text>;
+}
 type HomeProfile = {
   avatar_url: string | null;
   username: string | null;
@@ -152,7 +165,7 @@ function TrendCard({ trend }: { trend: Trend }) {
     <Pressable onPress={() => router.push('/(app)/home/trend/' + trend.id)} style={({ pressed }) => [styles.trendCard, pressed && styles.pressed]}>
       <View style={styles.trendHeader}>
         <View style={styles.trendTopic}>
-          <Text style={styles.trendIcon}>{trend.icon || '🔥'}</Text>
+          <TrendIcon value={trend.icon} />
           <Text style={styles.trendTitle}>{trend.topic}</Text>
         </View>
         <Text style={styles.heat}>🔥 {trend.heat_score ?? 0}</Text>
@@ -160,7 +173,7 @@ function TrendCard({ trend }: { trend: Trend }) {
       <View style={styles.angles}>
         {angles.slice(0, 3).map((angle) => (
           <View key={`${trend.id}-${angle.name}`} style={styles.angleRow}>
-            <Text style={styles.angleEmoji}>{angle.emoji}</Text>
+            <TrendIcon value={angle.emoji} size={18} />
             <Text numberOfLines={1} style={styles.angleName}>{angle.name}</Text>
             <Text style={styles.anglePercent}>{angle.percentage}%</Text>
             <View style={styles.progress}>
@@ -277,6 +290,8 @@ export default function HomeScreen() {
   const [ownLogs, setOwnLogs] = useState<HomeLog[]>([]);
   const [hasFollowing, setHasFollowing] = useState(false);
   const [loadingTrends, setLoadingTrends] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [trendStripRefreshKey, setTrendStripRefreshKey] = useState(0);
   const [credits, setCredits] = useState(30);
   const screenWidth = Dimensions.get('window').width;
   const heroHeight = Math.round(Dimensions.get('window').height * 0.36);
@@ -399,6 +414,17 @@ export default function HomeScreen() {
     }, [loadDiaries])
   );
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setTrendStripRefreshKey((current) => current + 1);
+    await Promise.all([
+      loadProfileSummary(),
+      loadTrends(),
+      loadDiaries()
+    ]);
+    setRefreshing(false);
+  }, [loadDiaries, loadProfileSummary, loadTrends]);
+
   return (
     <View style={styles.screen}>
       <View style={[styles.hero, { height: heroHeight }]}>
@@ -445,8 +471,21 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
-        <TrendStrip />
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
+        <Text style={styles.trendStripPrompt}>你點睇？入去表達你嘅意見</Text>
+        <TrendStrip key={trendStripRefreshKey} />
 
         <FollowingDiarySection logs={followingLogs} hasFollowing={hasFollowing} />
 
@@ -575,6 +614,15 @@ const styles = StyleSheet.create({
   },
   bodyContent: {
     paddingBottom: 110
+  },
+  trendStripPrompt: {
+    marginTop: 12,
+    marginBottom: 8,
+    marginHorizontal: 18,
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    textAlign: 'center'
   },
   diarySection: {
     marginTop: 22

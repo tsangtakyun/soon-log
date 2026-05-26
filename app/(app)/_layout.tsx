@@ -257,6 +257,13 @@ export default function AppTabs() {
           tabBarIcon: ({ color }) => <Feather name="tool" size={22} color={color} />
         }}
       />
+      <Tabs.Screen name="tools/idea-library" options={{ href: null }} />
+      <Tabs.Screen name="tools/script-generator" options={{ href: null }} />
+      <Tabs.Screen name="tools/script-history" options={{ href: null }} />
+      <Tabs.Screen name="tools/work-board" options={{ href: null }} />
+      <Tabs.Screen name="tools/schedule" options={{ href: null }} />
+      <Tabs.Screen name="tools/reply-centre" options={{ href: null }} />
+      <Tabs.Screen name="tools/soon-ai" options={{ href: null }} />
       <Tabs.Screen name="idea/library" options={{ href: null }} />
       <Tabs.Screen name="work/index" options={{ href: null }} />
       <Tabs.Screen name="mayan/index" options={{ href: null }} />
