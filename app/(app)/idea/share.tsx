@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useShareIntentContext } from 'expo-share-intent';
+import { Feather } from '@expo/vector-icons';
 import { Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -203,7 +204,7 @@ export default function IdeaShareScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.kicker}>SHARE TO SOON</Text>
-          <Text style={styles.title}>SOON Idea</Text>
+          <Text style={styles.title}>EGG Idea</Text>
         </View>
         <Pressable onPress={dismiss} style={styles.closeButton}>
           <Text style={styles.closeText}>✕</Text>
@@ -286,7 +287,14 @@ export default function IdeaShareScreen() {
             </View>
 
             <Pressable disabled={status === 'saving'} onPress={saveIdea} style={({ pressed }) => [styles.saveButton, (pressed || status === 'saving') && styles.pressed]}>
-              {status === 'saving' ? <ActivityIndicator color={colors.text} /> : <Text style={styles.saveButtonText}>◈ 儲存入題材庫</Text>}
+              {status === 'saving' ? (
+                <ActivityIndicator color={colors.textOnDark} />
+              ) : (
+                <View style={styles.saveButtonContent}>
+                  <Feather name="bookmark" size={18} color={colors.textOnDark} />
+                  <Text style={styles.saveButtonText}>儲存入題材庫</Text>
+                </View>
+              )}
             </Pressable>
 
             <Pressable onPress={dismiss} style={styles.dismissLink}>
@@ -515,10 +523,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.gold
+    backgroundColor: colors.primary
+  },
+  saveButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
   },
   saveButtonText: {
-    color: colors.text,
+    color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
     fontSize: 16
   },

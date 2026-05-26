@@ -288,7 +288,7 @@ export default function AppTabs() {
       <Tabs.Screen name="idea/index" options={{ href: null }} />
       <Tabs.Screen name="idea/[id]" options={{ href: null }} />
       <Tabs.Screen name="idea/script" options={{ href: null }} />
-      <Tabs.Screen name="idea/share" options={{ href: null }} />
+      <Tabs.Screen name="idea/share" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       <Tabs.Screen name="home/trend/[id]" options={{ href: null }} />
       <Tabs.Screen name="home/referrals" options={{ href: null }} />
       <Tabs.Screen name="home/discover" options={{ href: null }} />
