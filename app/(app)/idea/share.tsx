@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useShareIntentContext } from 'expo-share-intent';
 import { Feather } from '@expo/vector-icons';
 import { Screen } from '@/components/ui';
@@ -30,17 +30,7 @@ type AnalysisResult = {
   categories?: string[];
 };
 
-type Status = 'idle' | 'analyzing' | 'ready' | 'saving' | 'saved' | 'error';
-
-const potentialConfig: Record<ViralPotential, { label: string; color: string; bg: string }> = {
-  high: { label: '🔥 高潛力', color: colors.accent, bg: '#FFF0EE' },
-  medium: { label: '⚡ 中潛力', color: colors.gold, bg: '#FFF7E8' },
-  low: { label: '📊 低潛力', color: colors.textMuted, bg: colors.bgMuted }
-};
-
-function normalizePotential(value: unknown): ViralPotential {
-  return value === 'high' || value === 'low' || value === 'medium' ? value : 'medium';
-}
+type Status = 'idle' | 'ready' | 'saving' | 'saved' | 'error';
 
 function extractUrl(text?: string | null) {
   return text?.match(/https?:\/\/[^\s]+/)?.[0]?.replace(/[),.]+$/, '') ?? '';
@@ -76,48 +66,34 @@ export default function IdeaShareScreen() {
   const router = useRouter();
   const [status, setStatus] = useState<Status>('idle');
   const [url, setUrl] = useState('');
-  const [result, setResult] = useState<AnalysisResult | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
-  const [editTitle, setEditTitle] = useState('');
-  const [editNotes, setEditNotes] = useState('');
 
-  const analyzeUrl = useCallback(async (targetUrl: string) => {
-    setStatus('analyzing');
-    setResult(null);
-    setErrorMsg('');
+  const analyzeUrl = useCallback(async (targetUrl: string): Promise<AnalysisResult> => {
+    const response = await fetch(AUTOFILL_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: targetUrl })
+    });
 
-    try {
-      const response = await fetch(AUTOFILL_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: targetUrl })
-      });
+    if (!response.ok) throw new Error(`API error ${response.status}`);
 
-      if (!response.ok) throw new Error(`API error ${response.status}`);
-
-      const data = await response.json();
-      setResult({
-        title: data.title || 'Untitled',
-        topic: data.title || '',
-        description: data.desc || data.metadataDescription || '',
-        desc: data.desc || '',
-        hook: '',
-        country: data.country || 'HK',
-        region: data.country || 'HK',
-        viral_potential: 'medium',
-        tags: asStringArray(data.tags),
-        platform: data.platform || 'instagram',
-        image: data.image || '',
-        placeName: data.placeName || '',
-        placeAddress: data.placeAddress || '',
-        categories: []
-      });
-      setStatus('ready');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '分析失敗';
-      setStatus('error');
-      setErrorMsg(message);
-    }
+    const data = await response.json();
+    return {
+      title: data.title || 'IG Reel 靈感',
+      topic: data.title || '',
+      description: data.desc || data.metadataDescription || '',
+      desc: data.desc || '',
+      hook: '',
+      country: data.country || 'HK',
+      region: data.country || 'HK',
+      viral_potential: 'medium',
+      tags: asStringArray(data.tags),
+      platform: data.platform || 'instagram',
+      image: data.image || '',
+      placeName: data.placeName || '',
+      placeAddress: data.placeAddress || '',
+      categories: []
+    };
   }, []);
 
   useEffect(() => {
@@ -131,61 +107,83 @@ export default function IdeaShareScreen() {
     }
 
     setUrl(sharedUrl);
-    analyzeUrl(sharedUrl);
-  }, [analyzeUrl, hasShareIntent, shareIntent, status]);
+    setStatus('ready');
+  }, [hasShareIntent, shareIntent, status]);
 
-  useEffect(() => {
-    if (!result) return;
-
-    const blockedTitle = result.title === 'Instagram' || result.title === 'TikTok' || !result.title;
-    setEditTitle(blockedTitle ? '' : result.title);
-    setEditNotes('');
-  }, [result]);
-
-  const potential = useMemo(() => potentialConfig[result?.viral_potential ?? 'medium'], [result?.viral_potential]);
-
-  async function saveIdea() {
-    if (!result || !user) return;
-
-    const finalTitle = editTitle.trim() || result.title || 'Untitled';
-    const finalNotes = editNotes.trim();
-
-    setStatus('saving');
+  async function enrichIdea(ideaId: string, targetUrl: string) {
     try {
+      const result = await analyzeUrl(targetUrl);
+      const blockedTitle = result.title === 'Instagram' || result.title === 'TikTok' || !result.title;
+      const title = blockedTitle ? 'Instagram Reel 靈感' : result.title;
       const placeQuery = result.placeName || result.placeAddress || '';
       const coords = placeQuery ? await geocodePlace(placeQuery, result.country || 'HK') : null;
 
-      const { error } = await supabase.from('ideas').insert({
+      await supabase
+        .from('ideas')
+        .update({
+          thumb: result.image || null,
+          title,
+          topic: title,
+          summary: result.description ?? result.desc ?? '',
+          script_hook: result.script_hook ?? result.hook ?? '',
+          country: result.country ?? 'HK',
+          platform: result.platform ?? 'instagram',
+          tags: result.tags?.length ? result.tags : ['instagram'],
+          categories: result.categories ?? [],
+          place_name: result.placeName ?? '',
+          place_address: result.placeAddress ?? '',
+          lat: coords?.lat ?? null,
+          lng: coords?.lng ?? null,
+          description: result.desc ?? result.description ?? '',
+          hook: result.hook ?? '',
+          region: result.country ?? 'HK',
+          viral_potential: result.viral_potential ?? 'medium'
+        })
+        .eq('id', ideaId);
+    } catch (error) {
+      console.warn('[share-idea] background enrich failed', error);
+    }
+  }
+
+  async function saveIdea() {
+    if (!url || !user) return;
+
+    setStatus('saving');
+    try {
+      const { data, error } = await supabase.from('ideas').insert({
         user_id: user.id,
         url,
-        thumb: result.image || null,
-        title: finalTitle,
-        topic: finalTitle,
-        summary: result.description ?? result.desc ?? '',
-        script_hook: result.script_hook ?? result.hook ?? '',
-        country: result.country ?? 'HK',
-        platform: result.platform ?? 'instagram',
-        tags: result.tags ?? [],
-        categories: result.categories ?? [],
-        place_name: result.placeName ?? '',
-        place_address: result.placeAddress ?? '',
+        thumb: null,
+        title: 'IG Reel 靈感',
+        topic: 'IG Reel 靈感',
+        summary: '已由 Instagram 儲存，AI 會稍後補充題材資料。',
+        script_hook: '',
+        country: 'HK',
+        platform: 'instagram',
+        tags: ['instagram', '待分析'],
+        categories: [],
+        place_name: '',
+        place_address: '',
         viral_score: 0,
         ai_viral_base: 0,
         date: new Date().toISOString(),
-        notes: finalNotes,
-        lat: coords?.lat ?? null,
-        lng: coords?.lng ?? null,
-        description: result.desc ?? result.description ?? '',
-        hook: result.hook ?? '',
-        region: result.country ?? 'HK',
-        viral_potential: result.viral_potential ?? 'medium',
+        notes: '',
+        lat: null,
+        lng: null,
+        description: '',
+        hook: '',
+        region: 'HK',
+        viral_potential: 'medium',
         source_url: url
-      });
+      }).select('id').single();
 
       if (error) throw error;
 
       setStatus('saved');
       resetShareIntent();
+      if (data?.id) {
+        enrichIdea(data.id, url);
+      }
       setTimeout(() => router.replace('/(app)/idea/library'), 1200);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '請稍後再試';
@@ -204,7 +202,7 @@ export default function IdeaShareScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.kicker}>SHARE TO SOON</Text>
-          <Text style={styles.title}>EGG Idea</Text>
+          <Text style={styles.title}>Save Idea</Text>
         </View>
         <Pressable onPress={dismiss} style={styles.closeButton}>
           <Text style={styles.closeText}>✕</Text>
@@ -214,19 +212,12 @@ export default function IdeaShareScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {url ? <Text numberOfLines={2} style={styles.urlPill}>{url}</Text> : null}
 
-        {status === 'analyzing' ? (
-          <View style={styles.centerState}>
-            <ActivityIndicator color={colors.gold} />
-            <Text style={styles.centerText}>AI 分析緊...</Text>
-          </View>
-        ) : null}
-
         {status === 'error' ? (
           <View style={styles.centerState}>
-            <Text style={styles.errorTitle}>分析失敗</Text>
+            <Text style={styles.errorTitle}>讀取失敗</Text>
             <Text style={styles.errorText}>{errorMsg}</Text>
-            <Pressable onPress={() => url ? analyzeUrl(url) : dismiss()} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>{url ? '再試一次' : '返回動態'}</Text>
+            <Pressable onPress={dismiss} style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>返回動態</Text>
             </Pressable>
           </View>
         ) : null}
@@ -235,57 +226,19 @@ export default function IdeaShareScreen() {
           <View style={styles.centerState}>
             <Text style={styles.savedIcon}>◈</Text>
             <Text style={styles.savedText}>已儲存入題材庫</Text>
+            <Text style={styles.savedSubtext}>AI 會喺背景補充標題、Hook 同標籤。</Text>
           </View>
         ) : null}
 
-        {(status === 'ready' || status === 'saving') && result ? (
-          <View style={styles.card}>
-            <View style={styles.metaRow}>
-              <Text style={[styles.potentialBadge, { color: potential.color, backgroundColor: potential.bg }]}>{potential.label}</Text>
-              <Text style={styles.platformBadge}>{result.platform}</Text>
+        {status === 'ready' || status === 'saving' ? (
+          <View style={styles.quickCard}>
+            <View style={styles.quickIcon}>
+              <Feather name="bookmark" size={24} color={colors.primary} />
             </View>
-
-            <Text style={styles.ideaTitle}>{result.title}</Text>
-
-            {result.hook ? (
-              <View style={styles.hookBox}>
-                <Text style={styles.hookLabel}>核心 Hook</Text>
-                <Text style={styles.hookText}>{result.hook}</Text>
-              </View>
-            ) : null}
-
-            {result.description ? <Text style={styles.description}>{result.description}</Text> : null}
-
-            <View style={styles.editSection}>
-              <Text style={styles.editLabel}>題材名稱</Text>
-              <TextInput
-                style={styles.editInput}
-                value={editTitle}
-                onChangeText={setEditTitle}
-                placeholder="幫呢個靈感起個名..."
-                placeholderTextColor={colors.textMuted}
-                multiline={false}
-              />
+            <View style={styles.quickCopy}>
+              <Text style={styles.quickTitle}>Save to 題材庫</Text>
+              <Text style={styles.quickDescription}>先儲存連結，AI 之後自動補充標題、Hook 同標籤。</Text>
             </View>
-
-            <View style={styles.editSection}>
-              <Text style={styles.editLabel}>筆記（選填）</Text>
-              <TextInput
-                style={[styles.editInput, styles.editInputMultiline]}
-                value={editNotes}
-                onChangeText={setEditNotes}
-                placeholder="點解覺得呢個有潛力？記低諗法..."
-                placeholderTextColor={colors.textMuted}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-
-            <View style={styles.detailRow}>
-              <Text style={styles.region}>{result.region || result.country || 'HK'}</Text>
-              {result.tags.slice(0, 5).map((tag) => <Text key={tag} style={styles.tag}>#{tag}</Text>)}
-            </View>
-
             <Pressable disabled={status === 'saving'} onPress={saveIdea} style={({ pressed }) => [styles.saveButton, (pressed || status === 'saving') && styles.pressed]}>
               {status === 'saving' ? (
                 <ActivityIndicator color={colors.textOnDark} />
@@ -386,6 +339,49 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontFamily: fonts.heading,
     fontSize: 28
+  },
+  savedSubtext: {
+    maxWidth: 260,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center'
+  },
+  quickCard: {
+    borderRadius: 24,
+    backgroundColor: colors.bgCard,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
+    gap: 16
+  },
+  quickIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  quickCopy: {
+    gap: 6
+  },
+  quickTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 24
+  },
+  quickDescription: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    lineHeight: 22
   },
   card: {
     borderRadius: 18,
