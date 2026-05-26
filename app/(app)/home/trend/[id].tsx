@@ -27,19 +27,22 @@ import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 
 type TrendAngle = { emoji: string; name: string; percentage: number };
-type NewsHeadline = string | {
-  title?: string;
-  source?: string;
-  url?: string;
-  published_at?: string | null;
+type NewsItem = {
+  title: string;
+  original_title?: string;
+  source: string;
+  url: string;
+  published_at: string;
 };
+type NewsHeadline = string | Partial<NewsItem>;
+type NewsHeadlinesValue = NewsHeadline[] | string | null;
 type Trend = {
   id: string;
   topic: string;
   icon: string | null;
   heat_score: number | null;
   angles: TrendAngle[];
-  news_headlines?: NewsHeadline[] | null;
+  news_headlines?: NewsHeadlinesValue;
   description?: string | null;
   why_trending?: string | null;
   creator_tips?: string | null;
@@ -70,20 +73,62 @@ function timeAgo(value: string) {
   return `${Math.floor(hours / 24)} 日前`;
 }
 
-function parseNewsItems(value?: NewsHeadline[] | null) {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => {
-    if (typeof item === 'string') return null;
-    const title = (item.title || '').trim();
-    const url = (item.url || '').trim();
-    if (!title || !url) return null;
+function getRelativeTime(isoString: string): string {
+  const time = new Date(isoString).getTime();
+  if (Number.isNaN(time)) return '';
+
+  const diff = Math.max(0, Date.now() - time);
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (mins < 60) return `${mins}分前`;
+  if (hours < 24) return `${hours}時前`;
+  return `${days}天前`;
+}
+
+function parseNewsItems(value?: NewsHeadlinesValue) {
+  let raw: unknown = value;
+
+  if (typeof value === 'string') {
+    try {
+      raw = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+
+  if (!Array.isArray(raw)) return [];
+
+  const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+
+  return raw.map((item) => {
+    if (!item || typeof item === 'string') return null;
+
+    const headline = item as Partial<NewsItem>;
+    const title = (headline.title || '').trim();
+    const url = (headline.url || '').trim();
+    const publishedAt = (headline.published_at || '').trim();
+
+    if (!title || !url || !publishedAt) return null;
+
+    const publishedTime = new Date(publishedAt).getTime();
+    if (Number.isNaN(publishedTime) || publishedTime < sevenDaysAgo) return null;
+
     return {
       title,
+      original_title: headline.original_title?.trim(),
       url,
-      source: (item.source || '').trim(),
-      published_at: item.published_at || null
+      source: (headline.source || '').trim(),
+      published_at: publishedAt
     };
-  }).filter(Boolean) as Array<{ title: string; source: string; url: string; published_at: string | null }>;
+  })
+    .filter(Boolean)
+    .sort((a, b) => (
+      new Date((b as NewsItem).published_at).getTime()
+      - new Date((a as NewsItem).published_at).getTime()
+    ))
+    .slice(0, 10) as NewsItem[];
 }
 
 function clampPercent(value: number) {
@@ -186,7 +231,10 @@ function NewsSection({ trend }: { trend: Trend }) {
 
   return (
     <View style={styles.newsSection}>
-      <Text style={styles.newsTitle}>相關新聞</Text>
+      <View style={styles.newsHeader}>
+        <Text style={styles.newsTitle}>相關新聞</Text>
+        <Text style={styles.newsCount}>{newsItems.length} 則</Text>
+      </View>
       {newsItems.map((item, index) => (
         <Pressable
           key={`${item.url}-${index}`}
@@ -194,12 +242,12 @@ function NewsSection({ trend }: { trend: Trend }) {
           style={({ pressed }) => [
             styles.newsItem,
             index === newsItems.length - 1 && styles.newsItemLast,
-            pressed && styles.pressed
+            pressed && styles.newsItemPressed
           ]}
         >
           <Text numberOfLines={2} style={styles.newsItemTitle}>{item.title}</Text>
           <Text style={styles.newsItemMeta}>
-            {item.source || 'News'}{item.published_at ? `・${timeAgo(item.published_at)}` : ''}
+            {item.source || 'News'} · {getRelativeTime(item.published_at)}
           </Text>
         </Pressable>
       ))}
@@ -816,21 +864,45 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline'
   },
   newsSection: {
-    marginBottom: 22
+    marginBottom: 22,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    padding: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1
+  },
+  newsHeader: {
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12
   },
   newsTitle: {
-    marginBottom: 10,
     color: colors.text,
     fontFamily: fonts.bodyBold,
-    fontSize: 18
+    fontSize: 16
+  },
+  newsCount: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 14
   },
   newsItem: {
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eeeeee'
   },
   newsItemLast: {
     borderBottomWidth: 0
+  },
+  newsItemPressed: {
+    opacity: 0.6
   },
   newsItemTitle: {
     color: '#1a1a1a',
