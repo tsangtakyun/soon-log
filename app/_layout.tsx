@@ -4,7 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
+import { ShareIntentModule, ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import {
   DMSerifDisplay_400Regular,
   useFonts as useSerifFonts
@@ -27,6 +27,14 @@ function RootNavigator() {
   const { session, loading } = useAuth();
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
+  const didCheckPendingShare = useRef(false);
+
+  useEffect(() => {
+    if (loading || didCheckPendingShare.current) return;
+
+    didCheckPendingShare.current = true;
+    ShareIntentModule?.getShareIntent('soonlog://dataUrl=soonlogShareKey#weburl');
+  }, [loading]);
 
   useEffect(() => {
     if (!hasShareIntent || loading) return;

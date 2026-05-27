@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackHeader } from '@/components/BackHeader';
 import ClipPlayer from '@/components/ClipPlayer';
 import { useAuth } from '@/hooks/useAuth';
+import { loadLocalIdeaBoards, mergeLocalIdeaBoards } from '@/lib/ideaBoards';
 import { enrichIdeaFromUrl } from '@/lib/ideaEnrichment';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
@@ -696,6 +697,7 @@ export default function ToolsIdeaLibraryScreen() {
   const [regionFilter, setRegionFilter] = useState<RegionKey | null>(null);
   const [searchText, setSearchText] = useState('');
   const [boardFilter, setBoardFilter] = useState<string | null>(null);
+  const [localBoards, setLocalBoards] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -765,6 +767,7 @@ export default function ToolsIdeaLibraryScreen() {
       if (error) throw error;
       const nextIdeas = (data ?? []) as IdeaRecord[];
       setIdeas(nextIdeas);
+      setLocalBoards(await loadLocalIdeaBoards());
 
       if (autoEnrich) {
         const pending = nextIdeas.filter(ideaNeedsEnrichment).slice(0, 4);
@@ -793,13 +796,16 @@ export default function ToolsIdeaLibraryScreen() {
 
   const boardOptions = useMemo(() => {
     const categories = new Set<string>();
+    localBoards.forEach((board) => {
+      if (board) categories.add(board);
+    });
     ideas.forEach((idea) => {
       (Array.isArray(idea.categories) ? idea.categories : []).forEach((category) => {
         if (category && !REGIONS.some((region) => region.key === category)) categories.add(category);
       });
     });
     return Array.from(categories).sort((a, b) => a.localeCompare(b));
-  }, [ideas]);
+  }, [ideas, localBoards]);
 
   const filteredIdeas = useMemo(() => {
     const query = searchText.trim().toLowerCase();
@@ -942,6 +948,7 @@ export default function ToolsIdeaLibraryScreen() {
       if (error) throw error;
 
       const nextIdea = { ...idea, categories: nextCategories };
+      setLocalBoards(await mergeLocalIdeaBoards(nextBoards));
       setIdeas((current) => current.map((item) => item.id === idea.id ? { ...item, categories: nextCategories } : item));
       setSelectedIdea((current) => current?.id === idea.id ? nextIdea : current);
       if (boardFilter && !nextCategories.includes(boardFilter)) setBoardFilter(null);

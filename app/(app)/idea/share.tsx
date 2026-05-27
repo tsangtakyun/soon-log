@@ -7,6 +7,7 @@ import { Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { enrichIdeaFromUrl } from '@/lib/ideaEnrichment';
+import { mergeLocalIdeaBoards } from '@/lib/ideaBoards';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 
@@ -14,6 +15,25 @@ type Status = 'idle' | 'ready' | 'saving' | 'saved' | 'error';
 
 function extractUrl(text?: string | null) {
   return text?.match(/https?:\/\/[^\s]+/)?.[0]?.replace(/[),.]+$/, '') ?? '';
+}
+
+function boardsFromShareMeta(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    const text = value.trim();
+    if (!text) return [];
+
+    try {
+      return boardsFromShareMeta(JSON.parse(text));
+    } catch {
+      return text.split(',').map((item) => item.trim()).filter(Boolean);
+    }
+  }
+
+  return [];
 }
 
 export default function IdeaShareScreen() {
@@ -36,6 +56,14 @@ export default function IdeaShareScreen() {
     }
 
     const board = typeof shareIntent.meta?.soonBoard === 'string' ? shareIntent.meta.soonBoard.trim() : '';
+    const boards = boardsFromShareMeta(shareIntent.meta?.soonBoards);
+    if (board) boards.push(board);
+    if (boards.length > 0) {
+      mergeLocalIdeaBoards(boards).catch((error) => {
+        console.warn('[share-idea] board sync failed', error);
+      });
+    }
+
     setSelectedBoard(board);
     setUrl(sharedUrl);
     setStatus('ready');
@@ -107,6 +135,10 @@ export default function IdeaShareScreen() {
     setStatus('saving');
     try {
       const boardCategories = selectedBoard ? [selectedBoard] : [];
+      const sharedBoards = boardsFromShareMeta(shareIntent?.meta?.soonBoards);
+      if (sharedBoards.length > 0 || selectedBoard) {
+        await mergeLocalIdeaBoards([...sharedBoards, selectedBoard]);
+      }
       const workspaceId = await resolveWorkspaceId();
       const { data, error } = await supabase.from('ideas').insert({
         workspace_id: workspaceId,

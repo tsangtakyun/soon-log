@@ -619,6 +619,7 @@ class ShareViewController: UIViewController {
     }
 
     meta["soonBoard"] = selectedBoard == "Recents" ? "" : selectedBoard
+    meta["soonBoards"] = storedBoards()
 
     guard let data = try? JSONSerialization.data(withJSONObject: meta),
       let string = String(data: data, encoding: .utf8)
