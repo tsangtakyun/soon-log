@@ -601,6 +601,7 @@ class ShareViewController: UIViewController {
     let userDefaults = UserDefaults(suiteName: hostAppGroupIdentifier)
     userDefaults?.set(cleaned, forKey: boardsKey)
     userDefaults?.synchronize()
+    persistSelectedBoardToSharedPayload()
   }
 
   private func updateBoardSelection() {

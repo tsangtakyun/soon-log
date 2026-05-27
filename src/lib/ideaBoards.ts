@@ -1,6 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NativeModules } from 'react-native';
 
 const IDEA_BOARDS_KEY = 'soonlogIdeaBoards';
+
+type IdeaBoardsNativeModule = {
+  getBoards?: () => Promise<string[]>;
+};
+
+const nativeIdeaBoards = NativeModules.IdeaBoardsModule as IdeaBoardsNativeModule | undefined;
 
 function normalizeBoards(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -40,9 +47,30 @@ function uniqueBoards(boards: string[]) {
   return result;
 }
 
+async function loadNativeIdeaBoards() {
+  try {
+    return normalizeBoards(await nativeIdeaBoards?.getBoards?.());
+  } catch (error) {
+    console.warn('[idea-boards] native board load failed', error);
+    return [];
+  }
+}
+
 export async function loadLocalIdeaBoards() {
-  const stored = await AsyncStorage.getItem(IDEA_BOARDS_KEY);
-  return uniqueBoards(normalizeBoards(stored)).sort((a, b) => a.localeCompare(b));
+  const [stored, nativeBoards] = await Promise.all([
+    AsyncStorage.getItem(IDEA_BOARDS_KEY),
+    loadNativeIdeaBoards(),
+  ]);
+
+  const boards = uniqueBoards([...normalizeBoards(stored), ...nativeBoards]).sort((a, b) =>
+    a.localeCompare(b)
+  );
+
+  if (nativeBoards.length > 0) {
+    await AsyncStorage.setItem(IDEA_BOARDS_KEY, JSON.stringify(boards));
+  }
+
+  return boards;
 }
 
 export async function mergeLocalIdeaBoards(boards: unknown) {

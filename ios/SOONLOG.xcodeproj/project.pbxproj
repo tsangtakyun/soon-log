@@ -13,6 +13,8 @@
 		3C1C03A00C6946478E12DD89 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		55009D25EEBEA6F588CCE93B /* libPods-SOONLOG.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 66708DC70A49CD96870F2473 /* libPods-SOONLOG.a */; };
+		7C04C8EC4B6F4E8E9CE51101 /* IdeaBoardsModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C04C8EA4B6F4E8E9CE51101 /* IdeaBoardsModule.swift */; };
+		7C04C8ED4B6F4E8E9CE51101 /* IdeaBoardsModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 7C04C8EB4B6F4E8E9CE51101 /* IdeaBoardsModule.m */; };
 		A4C8C2C80B24457C92A9D032 /* ShareExtensionPreprocessor.js in Resources */ = {isa = PBXBuildFile; fileRef = A142CE13B04A4693A1D68415 /* ShareExtensionPreprocessor.js */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		BEF79A0AFB9ECF473D0B78A7 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 359CCD053C9268BF580CDB87 /* ExpoModulesProvider.swift */; };
@@ -56,6 +58,8 @@
 		5EEC31ACE11846CA9067CE2F /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = ShareExtension.appex; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		66708DC70A49CD96870F2473 /* libPods-SOONLOG.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SOONLOG.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		73B2750F5CF14540A64500F5 /* ShareExtension-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "ShareExtension-Info.plist"; path = "ShareExtension-Info.plist"; sourceTree = "<group>"; };
+		7C04C8EA4B6F4E8E9CE51101 /* IdeaBoardsModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IdeaBoardsModule.swift; path = SOONLOG/IdeaBoardsModule.swift; sourceTree = "<group>"; };
+		7C04C8EB4B6F4E8E9CE51101 /* IdeaBoardsModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = IdeaBoardsModule.m; path = SOONLOG/IdeaBoardsModule.m; sourceTree = "<group>"; };
 		A142CE13B04A4693A1D68415 /* ShareExtensionPreprocessor.js */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ShareExtensionPreprocessor.js; path = ShareExtensionPreprocessor.js; sourceTree = "<group>"; };
 		A4A48C389423C684B4763FB1 /* Pods-SOONLOG.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SOONLOG.release.xcconfig"; path = "Target Support Files/Pods-SOONLOG/Pods-SOONLOG.release.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = SOONLOG/SplashScreen.storyboard; sourceTree = "<group>"; };
@@ -90,6 +94,8 @@
 			isa = PBXGroup;
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
+				7C04C8EA4B6F4E8E9CE51101 /* IdeaBoardsModule.swift */,
+				7C04C8EB4B6F4E8E9CE51101 /* IdeaBoardsModule.m */,
 				F11748442D0722820044C1D9 /* SOONLOG-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
@@ -388,6 +394,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
+				7C04C8EC4B6F4E8E9CE51101 /* IdeaBoardsModule.swift in Sources */,
+				7C04C8ED4B6F4E8E9CE51101 /* IdeaBoardsModule.m in Sources */,
 				BEF79A0AFB9ECF473D0B78A7 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
