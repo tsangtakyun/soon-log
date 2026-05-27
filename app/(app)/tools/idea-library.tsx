@@ -119,6 +119,12 @@ function ideaRegions(idea: IdeaRecord): RegionKey[] {
   return matched.length > 0 ? matched : ['HK'];
 }
 
+function ideaBoards(idea: IdeaRecord) {
+  const regionKeys = new Set<string>(REGIONS.map((region) => region.key));
+  return (Array.isArray(idea.categories) ? idea.categories : [])
+    .filter((category) => category && !regionKeys.has(category));
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('zh-HK', {
     year: 'numeric',
@@ -135,6 +141,10 @@ function draftFromIdea(idea: IdeaRecord): IdeaDraft {
     regions: ideaRegions(idea),
     notes: idea.notes ?? idea.summary ?? ''
   };
+}
+
+function mergeRegionsAndBoards(regions: RegionKey[], boards: string[]) {
+  return Array.from(new Set([...regions, ...boards].filter(Boolean)));
 }
 
 function ideaSourceUrl(idea: IdeaRecord) {
@@ -298,14 +308,122 @@ function FormSheet({
   );
 }
 
+function BoardPickerSheet({
+  idea,
+  boards,
+  saving,
+  newBoardName,
+  onNewBoardNameChange,
+  onClose,
+  onSave
+}: {
+  idea: IdeaRecord | null;
+  boards: string[];
+  saving: boolean;
+  newBoardName: string;
+  onNewBoardNameChange: (value: string) => void;
+  onClose: () => void;
+  onSave: (idea: IdeaRecord, nextBoards: string[]) => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const [selectedBoards, setSelectedBoards] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSelectedBoards(idea ? ideaBoards(idea) : []);
+  }, [idea]);
+
+  if (!idea) return null;
+
+  const allBoards = Array.from(new Set([...boards, ...selectedBoards].filter(Boolean))).sort((a, b) => a.localeCompare(b));
+
+  function toggleBoard(board: string) {
+    setSelectedBoards((current) =>
+      current.includes(board) ? current.filter((item) => item !== board) : [...current, board]
+    );
+  }
+
+  function addNewBoard() {
+    const name = newBoardName.trim();
+    if (!name) return;
+    setSelectedBoards((current) => current.includes(name) ? current : [...current, name]);
+    onNewBoardNameChange('');
+  }
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.boardSheet, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <View>
+              <Text style={styles.sheetTitle}>加入分類</Text>
+              <Text style={styles.boardSheetSubtitle} numberOfLines={1}>{idea.title || '未命名題材'}</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Feather name="x" size={22} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.fieldLabel}>現有分類</Text>
+          {allBoards.length > 0 ? (
+            <View style={styles.boardRows}>
+              {allBoards.map((board) => {
+                const active = selectedBoards.includes(board);
+                return (
+                  <TouchableOpacity key={board} onPress={() => toggleBoard(board)} style={[styles.boardRow, active && styles.boardRowActive]}>
+                    <View style={styles.boardIconBox}>
+                      <Feather name="folder" size={18} color={active ? '#ffffff' : colors.primary} />
+                    </View>
+                    <Text style={[styles.boardRowText, active && styles.boardRowTextActive]}>{board}</Text>
+                    <Feather name={active ? 'check' : 'plus'} size={18} color={active ? '#ffffff' : colors.textMuted} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.noBoardsCard}>
+              <Feather name="folder-plus" size={22} color={colors.textMuted} />
+              <Text style={styles.noBoardsText}>未有分類，下面可以新增第一個。</Text>
+            </View>
+          )}
+
+          <Text style={styles.fieldLabel}>新增分類</Text>
+          <View style={styles.newBoardRow}>
+            <TextInput
+              value={newBoardName}
+              onChangeText={onNewBoardNameChange}
+              placeholder="例如：香港靈感、餐廳、旅行"
+              placeholderTextColor="#9ca3af"
+              style={styles.newBoardInput}
+            />
+            <TouchableOpacity onPress={addNewBoard} style={styles.newBoardButton}>
+              <Feather name="plus" size={18} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => onSave(idea, selectedBoards)}
+            disabled={saving}
+            style={[styles.saveButton, saving && styles.disabledButton]}
+          >
+            {saving ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.saveButtonText}>儲存分類</Text>}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function IdeaDetailSheet({
   idea,
   onClose,
-  onEdit
+  onEdit,
+  onManageBoards
 }: {
   idea: IdeaRecord | null;
   onClose: () => void;
   onEdit: (idea: IdeaRecord) => void;
+  onManageBoards: (idea: IdeaRecord) => void;
 }) {
   const insets = useSafeAreaInsets();
   if (!idea) return null;
@@ -382,7 +500,7 @@ function IdeaDetailSheet({
                 <Feather name="more-horizontal" size={25} color="#111827" />
               </TouchableOpacity>
               <View style={styles.detailActionSpacer} />
-              <TouchableOpacity onPress={() => onEdit(idea)} style={styles.addToBoardButton}>
+              <TouchableOpacity onPress={() => onManageBoards(idea)} style={styles.addToBoardButton}>
                 <Feather name="plus" size={19} color="#111827" />
                 <Text style={styles.addToBoardText}>加入分類</Text>
               </TouchableOpacity>
@@ -496,6 +614,8 @@ export default function ToolsIdeaLibraryScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedIdea, setSelectedIdea] = useState<IdeaRecord | null>(null);
   const [editingIdea, setEditingIdea] = useState<IdeaRecord | null>(null);
+  const [boardIdea, setBoardIdea] = useState<IdeaRecord | null>(null);
+  const [newBoardName, setNewBoardName] = useState('');
   const [draft, setDraft] = useState<IdeaDraft>(emptyDraft);
 
   const resolveWorkspace = useCallback(async () => {
@@ -642,6 +762,11 @@ export default function ToolsIdeaLibraryScreen() {
     setEditingIdea(idea);
   }
 
+  function openBoardPicker(idea: IdeaRecord) {
+    setNewBoardName('');
+    setBoardIdea(idea);
+  }
+
   async function saveNewIdea() {
     if (!user) return;
     if (!draft.title.trim()) {
@@ -691,6 +816,8 @@ export default function ToolsIdeaLibraryScreen() {
     setSaving(true);
     try {
       const primaryRegion = draft.regions[0] ?? 'HK';
+      const boardCategories = ideaBoards(editingIdea);
+      const nextCategories = mergeRegionsAndBoards(draft.regions, boardCategories);
       const { error } = await supabase
         .from('ideas')
         .update({
@@ -702,7 +829,7 @@ export default function ToolsIdeaLibraryScreen() {
           notes: draft.notes.trim(),
           summary: draft.notes.trim(),
           tags: draft.regions,
-          categories: draft.regions
+          categories: nextCategories
         })
         .eq('id', editingIdea.id);
 
@@ -712,6 +839,31 @@ export default function ToolsIdeaLibraryScreen() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '請稍後再試';
       Alert.alert('儲存失敗', message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveIdeaBoards(idea: IdeaRecord, nextBoards: string[]) {
+    setSaving(true);
+    try {
+      const nextCategories = mergeRegionsAndBoards(ideaRegions(idea), nextBoards);
+      const { error } = await supabase
+        .from('ideas')
+        .update({ categories: nextCategories })
+        .eq('id', idea.id);
+
+      if (error) throw error;
+
+      const nextIdea = { ...idea, categories: nextCategories };
+      setIdeas((current) => current.map((item) => item.id === idea.id ? { ...item, categories: nextCategories } : item));
+      setSelectedIdea((current) => current?.id === idea.id ? nextIdea : current);
+      if (boardFilter && !nextCategories.includes(boardFilter)) setBoardFilter(null);
+      setBoardIdea(null);
+      setNewBoardName('');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '請稍後再試';
+      Alert.alert('儲存分類失敗', message);
     } finally {
       setSaving(false);
     }
@@ -953,6 +1105,17 @@ export default function ToolsIdeaLibraryScreen() {
         idea={selectedIdea}
         onClose={() => setSelectedIdea(null)}
         onEdit={openEditModal}
+        onManageBoards={openBoardPicker}
+      />
+
+      <BoardPickerSheet
+        idea={boardIdea}
+        boards={boardOptions}
+        saving={saving}
+        newBoardName={newBoardName}
+        onNewBoardNameChange={setNewBoardName}
+        onClose={() => setBoardIdea(null)}
+        onSave={saveIdeaBoards}
       />
     </View>
   );
@@ -1519,6 +1682,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10
   },
+  boardSheet: {
+    maxHeight: '78%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingTop: 10
+  },
   sheetHandle: {
     alignSelf: 'center',
     width: 44,
@@ -1538,6 +1709,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 22,
     fontWeight: '800'
+  },
+  boardSheetSubtitle: {
+    marginTop: 3,
+    maxWidth: screenWidth - 112,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13
   },
   closeButton: {
     width: 36,
@@ -1574,6 +1752,84 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8
+  },
+  boardRows: {
+    gap: 8
+  },
+  boardRow: {
+    minHeight: 54,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    backgroundColor: colors.bgBodyMuted,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12
+  },
+  boardRowActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary
+  },
+  boardIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(92,42,34,0.08)'
+  },
+  boardRowText: {
+    flex: 1,
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15,
+    fontWeight: '700'
+  },
+  boardRowTextActive: {
+    color: '#ffffff'
+  },
+  noBoardsCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    backgroundColor: colors.bgBodyMuted,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 14
+  },
+  noBoardsText: {
+    flex: 1,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20
+  },
+  newBoardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  newBoardInput: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    backgroundColor: colors.bgBodyMuted,
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    paddingHorizontal: 14,
+    paddingVertical: 12
+  },
+  newBoardButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary
   },
   saveButton: {
     marginTop: 20,

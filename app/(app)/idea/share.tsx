@@ -89,7 +89,7 @@ export default function IdeaShareScreen() {
       if (data?.id) {
         enrichIdea(data.id, url, boardCategories);
       }
-      setTimeout(() => router.replace('/(app)/idea/library'), 1200);
+      setTimeout(() => router.replace('/(app)/tools/idea-library'), 1200);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '請稍後再試';
       Alert.alert('儲存失敗', message);
