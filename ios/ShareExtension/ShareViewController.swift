@@ -646,11 +646,14 @@ class ShareViewController: UIViewController {
   }
 
   @objc private func saveToHostApp() {
-    guard let type = pendingRedirectType else { return }
+    guard pendingRedirectType != nil else { return }
     persistSelectedBoardToSharedPayload()
     saveButton.isEnabled = false
-    saveButton.setTitle("Saving...", for: .normal)
-    redirectToHostApp(type: type)
+    saveButton.setTitle("Saved", for: .normal)
+
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+      self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+    }
   }
 
   @objc private func selectBoard(_ sender: UIControl) {
