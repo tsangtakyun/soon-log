@@ -155,6 +155,12 @@ function ideaPreviewImage(idea: IdeaRecord) {
   return idea.thumb || '';
 }
 
+function isPlayableVideoUrl(value?: string | null) {
+  if (!value) return false;
+  const url = value.toLowerCase();
+  return url.includes('.mp4') || url.includes('.mov') || url.includes('.m3u8') || url.includes('supabase') || url.includes('cloudinary') || url.includes('mux');
+}
+
 function ideaSearchText(idea: IdeaRecord) {
   return [
     idea.title,
@@ -183,8 +189,9 @@ function ideaNeedsEnrichment(idea: IdeaRecord) {
   const hasPendingTag = tags.includes('待分析');
   const hasGenericTitle = !idea.title || idea.title === 'IG Reel 靈感' || idea.title === 'Instagram Reel 靈感';
   const missingUsefulPreview = !idea.thumb && !idea.summary && !idea.description;
+  const missingMediaPreview = !idea.thumb && !idea.video_url;
 
-  return hasPendingTag || hasGenericTitle || missingUsefulPreview;
+  return hasPendingTag || hasGenericTitle || missingUsefulPreview || missingMediaPreview;
 }
 
 function Chip({
@@ -511,7 +518,7 @@ function IdeaDetailSheet({
   const currentIdea = idea;
   const sourceUrl = currentIdea.source_url || currentIdea.url || '';
   const imageUrl = currentIdea.thumb || '';
-  const videoUrl = currentIdea.video_url || '';
+  const videoUrl = isPlayableVideoUrl(currentIdea.video_url) ? currentIdea.video_url || '' : '';
   const placeName = currentIdea.place_name || currentIdea.shop_name || '';
   const description = currentIdea.notes || currentIdea.summary || currentIdea.description || '';
   const hasMap = typeof currentIdea.lat === 'number' && typeof currentIdea.lng === 'number';
@@ -686,7 +693,6 @@ export default function ToolsIdeaLibraryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<IdeaType>('all');
   const [regionFilter, setRegionFilter] = useState<RegionKey | null>(null);
   const [searchText, setSearchText] = useState('');
   const [boardFilter, setBoardFilter] = useState<string | null>(null);
@@ -798,13 +804,12 @@ export default function ToolsIdeaLibraryScreen() {
   const filteredIdeas = useMemo(() => {
     const query = searchText.trim().toLowerCase();
     return ideas.filter((idea) => {
-      const matchesType = typeFilter === 'all' || normalizeType(idea.platform) === typeFilter;
       const matchesRegion = !regionFilter || ideaRegions(idea).includes(regionFilter);
       const matchesBoard = !boardFilter || (Array.isArray(idea.categories) && idea.categories.includes(boardFilter));
       const matchesSearch = !query || ideaSearchText(idea).includes(query);
-      return matchesType && matchesRegion && matchesBoard && matchesSearch;
+      return matchesRegion && matchesBoard && matchesSearch;
     });
-  }, [boardFilter, ideas, regionFilter, searchText, typeFilter]);
+  }, [boardFilter, ideas, regionFilter, searchText]);
 
   const mappableIdeas = useMemo(() => {
     return filteredIdeas.filter((idea) => typeof idea.lat === 'number' && typeof idea.lng === 'number');
@@ -953,21 +958,26 @@ export default function ToolsIdeaLibraryScreen() {
   function renderIdea({ item }: { item: IdeaRecord }) {
     const regions = ideaRegions(item);
     const previewImage = ideaPreviewImage(item);
+    const playableVideoUrl = isPlayableVideoUrl(item.video_url) ? item.video_url : null;
+    const sourceUrl = ideaSourceUrl(item);
     const placeName = item.place_name || item.shop_name;
     return (
       <Pressable onPress={() => openDetailModal(item)} style={({ pressed }) => [styles.ideaCard, pressed && styles.pressed]}>
-        {previewImage ? (
-          <Image source={{ uri: previewImage }} style={styles.cardImage} resizeMode="cover" />
-        ) : item.video_url ? (
+        {playableVideoUrl ? (
           <ClipPlayer
-            clip={{ id: item.id, video_url: item.video_url, media_urls: [] }}
+            clip={{ id: item.id, video_url: playableVideoUrl, media_urls: previewImage ? [previewImage] : [] }}
             width={screenWidth - 32}
             height={ideaCardImageHeight}
             thumbnail
           />
+        ) : previewImage ? (
+          <Image source={{ uri: previewImage }} style={styles.cardImage} resizeMode="cover" />
         ) : (
           <View style={styles.cardImageEmpty}>
-            <Feather name="bookmark" size={28} color="#c7b8ad" />
+            <Feather name={sourceUrl ? 'instagram' : 'bookmark'} size={28} color="#c7b8ad" />
+            <Text style={styles.cardImageEmptyText}>
+              {sourceUrl ? '未能預覽原片' : '未有預覽'}
+            </Text>
           </View>
         )}
         <View style={styles.cardBody}>
@@ -994,20 +1004,25 @@ export default function ToolsIdeaLibraryScreen() {
 
   function renderMapIdeaCard(item: IdeaRecord) {
     const previewImage = ideaPreviewImage(item);
+    const playableVideoUrl = isPlayableVideoUrl(item.video_url) ? item.video_url : null;
+    const sourceUrl = ideaSourceUrl(item);
     return (
       <Pressable key={item.id} onPress={() => openDetailModal(item)} style={({ pressed }) => [styles.mapIdeaCard, pressed && styles.pressed]}>
-        {previewImage ? (
-          <Image source={{ uri: previewImage }} style={styles.mapIdeaImage} resizeMode="cover" />
-        ) : item.video_url ? (
+        {playableVideoUrl ? (
           <ClipPlayer
-            clip={{ id: item.id, video_url: item.video_url, media_urls: [] }}
+            clip={{ id: item.id, video_url: playableVideoUrl, media_urls: previewImage ? [previewImage] : [] }}
             width={170}
             height={112}
             thumbnail
           />
+        ) : previewImage ? (
+          <Image source={{ uri: previewImage }} style={styles.mapIdeaImage} resizeMode="cover" />
         ) : (
           <View style={styles.mapIdeaImageEmpty}>
-            <Feather name="bookmark" size={20} color="#c7b8ad" />
+            <Feather name={sourceUrl ? 'instagram' : 'bookmark'} size={20} color="#c7b8ad" />
+            <Text style={styles.mapIdeaImageEmptyText}>
+              {sourceUrl ? '未能預覽' : '未有預覽'}
+            </Text>
           </View>
         )}
         <Text style={styles.mapIdeaTitle} numberOfLines={2}>{item.title || '未命名題材'}</Text>
@@ -1101,34 +1116,16 @@ export default function ToolsIdeaLibraryScreen() {
           ) : null}
         </View>
         <View style={styles.controlRow}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.typeFilterScroll}
-            contentContainerStyle={styles.typeFilterContent}
-          >
-            {TYPE_FILTERS.map((filter) => (
-              <Chip
-                key={filter.key}
-                label={filter.label}
-                active={typeFilter === filter.key}
-                onPress={() => setTypeFilter(filter.key)}
-              />
-            ))}
-          </ScrollView>
-
-          <View style={styles.controlButtons}>
-            <TouchableOpacity onPress={() => setShowFilterSheet(true)} style={styles.controlButton}>
-              <Feather name="sliders" size={15} color={colors.primary} />
-              <Text style={styles.controlButtonText}>
-                {regionFilter ? REGIONS.find((region) => region.key === regionFilter)?.label : '地區'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setViewMode((current) => current === 'list' ? 'map' : 'list')} style={styles.controlButton}>
-              <Feather name={viewMode === 'list' ? 'grid' : 'map'} size={15} color={colors.primary} />
-              <Text style={styles.controlButtonText}>{viewMode === 'list' ? '清單' : '地圖'}</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity onPress={() => setShowFilterSheet(true)} style={styles.controlButton}>
+            <Feather name="sliders" size={15} color={colors.primary} />
+            <Text style={styles.controlButtonText}>
+              {regionFilter ? REGIONS.find((region) => region.key === regionFilter)?.label : '地區'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setViewMode((current) => current === 'list' ? 'map' : 'list')} style={styles.controlButton}>
+            <Feather name={viewMode === 'list' ? 'grid' : 'map'} size={15} color={colors.primary} />
+            <Text style={styles.controlButtonText}>{viewMode === 'list' ? '清單' : '地圖'}</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -1479,19 +1476,8 @@ const styles = StyleSheet.create({
   controlRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: 10
-  },
-  typeFilterScroll: {
-    flex: 1
-  },
-  typeFilterContent: {
-    gap: 8,
-    paddingRight: 4
-  },
-  controlButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8
   },
   controlButton: {
     minHeight: 38,
@@ -1611,7 +1597,14 @@ const styles = StyleSheet.create({
     height: ideaCardImageHeight,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
     backgroundColor: '#F5F2ED'
+  },
+  cardImageEmptyText: {
+    color: '#a89b92',
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    fontWeight: '600'
   },
   cardBody: {
     padding: 16
@@ -1767,7 +1760,14 @@ const styles = StyleSheet.create({
     height: 112,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
     backgroundColor: '#202020'
+  },
+  mapIdeaImageEmptyText: {
+    color: 'rgba(255,255,255,0.45)',
+    fontFamily: fonts.bodyMedium,
+    fontSize: 11,
+    fontWeight: '600'
   },
   mapIdeaTitle: {
     color: '#ffffff',
