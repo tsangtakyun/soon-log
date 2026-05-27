@@ -414,6 +414,86 @@ function BoardPickerSheet({
   );
 }
 
+function FilterSheet({
+  visible,
+  boards,
+  boardFilter,
+  regionFilter,
+  viewMode,
+  onBoardChange,
+  onRegionChange,
+  onViewModeChange,
+  onClose
+}: {
+  visible: boolean;
+  boards: string[];
+  boardFilter: string | null;
+  regionFilter: RegionKey | null;
+  viewMode: 'list' | 'map';
+  onBoardChange: (board: string | null) => void;
+  onRegionChange: (region: RegionKey | null) => void;
+  onViewModeChange: (mode: 'list' | 'map') => void;
+  onClose: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.filterSheet, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>篩選顯示</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Feather name="x" size={22} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.fieldLabel}>顯示方式</Text>
+          <View style={styles.selectorRow}>
+            <Chip label="清單" active={viewMode === 'list'} onPress={() => onViewModeChange('list')} />
+            <Chip label="地圖" active={viewMode === 'map'} onPress={() => onViewModeChange('map')} />
+          </View>
+
+          <Text style={styles.fieldLabel}>地區</Text>
+          <View style={styles.selectorRow}>
+            <Chip label="全部地區" active={!regionFilter} onPress={() => onRegionChange(null)} />
+            {REGIONS.map((region) => (
+              <Chip
+                key={region.key}
+                label={region.label}
+                active={regionFilter === region.key}
+                onPress={() => onRegionChange(region.key)}
+              />
+            ))}
+          </View>
+
+          {boards.length > 0 ? (
+            <>
+              <Text style={styles.fieldLabel}>分類</Text>
+              <View style={styles.selectorRow}>
+                <Chip label="全部" active={!boardFilter} onPress={() => onBoardChange(null)} />
+                {boards.map((board) => (
+                  <Chip
+                    key={board}
+                    label={board}
+                    active={boardFilter === board}
+                    onPress={() => onBoardChange(board)}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+
+          <TouchableOpacity onPress={onClose} style={styles.saveButton}>
+            <Text style={styles.saveButtonText}>完成</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function IdeaDetailSheet({
   idea,
   onClose,
@@ -611,6 +691,7 @@ export default function ToolsIdeaLibraryScreen() {
   const [searchText, setSearchText] = useState('');
   const [boardFilter, setBoardFilter] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedIdea, setSelectedIdea] = useState<IdeaRecord | null>(null);
   const [editingIdea, setEditingIdea] = useState<IdeaRecord | null>(null);
@@ -877,6 +958,13 @@ export default function ToolsIdeaLibraryScreen() {
       <Pressable onPress={() => openDetailModal(item)} style={({ pressed }) => [styles.ideaCard, pressed && styles.pressed]}>
         {previewImage ? (
           <Image source={{ uri: previewImage }} style={styles.cardImage} resizeMode="cover" />
+        ) : item.video_url ? (
+          <ClipPlayer
+            clip={{ id: item.id, video_url: item.video_url, media_urls: [] }}
+            width={screenWidth - 32}
+            height={ideaCardImageHeight}
+            thumbnail
+          />
         ) : (
           <View style={styles.cardImageEmpty}>
             <Feather name="bookmark" size={28} color="#c7b8ad" />
@@ -910,6 +998,13 @@ export default function ToolsIdeaLibraryScreen() {
       <Pressable key={item.id} onPress={() => openDetailModal(item)} style={({ pressed }) => [styles.mapIdeaCard, pressed && styles.pressed]}>
         {previewImage ? (
           <Image source={{ uri: previewImage }} style={styles.mapIdeaImage} resizeMode="cover" />
+        ) : item.video_url ? (
+          <ClipPlayer
+            clip={{ id: item.id, video_url: item.video_url, media_urls: [] }}
+            width={170}
+            height={112}
+            thumbnail
+          />
         ) : (
           <View style={styles.mapIdeaImageEmpty}>
             <Feather name="bookmark" size={20} color="#c7b8ad" />
@@ -1005,56 +1100,36 @@ export default function ToolsIdeaLibraryScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-        <View style={styles.viewToggle}>
-          <TouchableOpacity
-            onPress={() => setViewMode('list')}
-            style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleButtonActive]}
+        <View style={styles.controlRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.typeFilterScroll}
+            contentContainerStyle={styles.typeFilterContent}
           >
-            <Feather name="grid" size={15} color={viewMode === 'list' ? '#ffffff' : colors.textMuted} />
-            <Text style={[styles.viewToggleText, viewMode === 'list' && styles.viewToggleTextActive]}>清單</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setViewMode('map')}
-            style={[styles.viewToggleButton, viewMode === 'map' && styles.viewToggleButtonActive]}
-          >
-            <Feather name="map" size={15} color={viewMode === 'map' ? '#ffffff' : colors.textMuted} />
-            <Text style={[styles.viewToggleText, viewMode === 'map' && styles.viewToggleTextActive]}>地圖</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+            {TYPE_FILTERS.map((filter) => (
+              <Chip
+                key={filter.key}
+                label={filter.label}
+                active={typeFilter === filter.key}
+                onPress={() => setTypeFilter(filter.key)}
+              />
+            ))}
+          </ScrollView>
 
-      <View style={styles.filterWrap}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
-          <Chip label="全部分類" active={!boardFilter} onPress={() => setBoardFilter(null)} />
-          {boardOptions.map((board) => (
-            <Chip
-              key={board}
-              label={board}
-              active={boardFilter === board}
-              onPress={() => setBoardFilter((current) => current === board ? null : board)}
-            />
-          ))}
-        </ScrollView>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
-          {TYPE_FILTERS.map((filter) => (
-            <Chip
-              key={filter.key}
-              label={filter.label}
-              active={typeFilter === filter.key}
-              onPress={() => setTypeFilter(filter.key)}
-            />
-          ))}
-        </ScrollView>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
-          {REGIONS.map((region) => (
-            <Chip
-              key={region.key}
-              label={region.label}
-              active={regionFilter === region.key}
-              onPress={() => setRegionFilter((current) => current === region.key ? null : region.key)}
-            />
-          ))}
-        </ScrollView>
+          <View style={styles.controlButtons}>
+            <TouchableOpacity onPress={() => setShowFilterSheet(true)} style={styles.controlButton}>
+              <Feather name="sliders" size={15} color={colors.primary} />
+              <Text style={styles.controlButtonText}>
+                {regionFilter ? REGIONS.find((region) => region.key === regionFilter)?.label : '地區'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setViewMode((current) => current === 'list' ? 'map' : 'list')} style={styles.controlButton}>
+              <Feather name={viewMode === 'list' ? 'grid' : 'map'} size={15} color={colors.primary} />
+              <Text style={styles.controlButtonText}>{viewMode === 'list' ? '清單' : '地圖'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       {loading ? (
@@ -1116,6 +1191,18 @@ export default function ToolsIdeaLibraryScreen() {
         onNewBoardNameChange={setNewBoardName}
         onClose={() => setBoardIdea(null)}
         onSave={saveIdeaBoards}
+      />
+
+      <FilterSheet
+        visible={showFilterSheet}
+        boards={boardOptions}
+        boardFilter={boardFilter}
+        regionFilter={regionFilter}
+        viewMode={viewMode}
+        onBoardChange={setBoardFilter}
+        onRegionChange={setRegionFilter}
+        onViewModeChange={setViewMode}
+        onClose={() => setShowFilterSheet(false)}
       />
     </View>
   );
@@ -1388,6 +1475,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f3f4f6'
+  },
+  controlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  typeFilterScroll: {
+    flex: 1
+  },
+  typeFilterContent: {
+    gap: 8,
+    paddingRight: 4
+  },
+  controlButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  controlButton: {
+    minHeight: 38,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+    backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 11
+  },
+  controlButtonText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    fontWeight: '700'
   },
   viewToggle: {
     alignSelf: 'flex-start',
@@ -1676,6 +1797,14 @@ const styles = StyleSheet.create({
   },
   sheet: {
     maxHeight: '86%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingTop: 10
+  },
+  filterSheet: {
+    maxHeight: '72%',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     backgroundColor: '#ffffff',
