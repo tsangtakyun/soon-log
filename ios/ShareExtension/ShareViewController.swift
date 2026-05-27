@@ -30,6 +30,10 @@ class ShareViewController: UIViewController {
   private let statusLabel = UILabel()
   private let saveButton = UIButton(type: .system)
   private let linkPreviewLabel = UILabel()
+  private let boardListStack = UIStackView()
+  private var boardCheckmarks: [String: UIImageView] = [:]
+  private var selectedBoard = "Recents"
+  private let boardsKey = "soonlogIdeaBoards"
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -103,7 +107,7 @@ class ShareViewController: UIViewController {
       if let item = try! await attachment.loadItem(forTypeIdentifier: self.urlContentType) as? URL {
         Task { @MainActor in
 
-          self.sharedWebUrl.append(WebUrl(url: item.absoluteString, meta: ""))
+          self.sharedWebUrl.append(WebUrl(url: item.absoluteString, meta: self.metaWithSelectedBoard()))
           // If this is the last item, save sharedText in userDefaults and redirect to host app
           if index == (content.attachments?.count)! - 1 {
             let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
@@ -139,7 +143,7 @@ class ShareViewController: UIViewController {
               "[DEBUG] NSExtensionJavaScriptPreprocessingResultsKey \(String(describing: results))"
             )
             self.sharedWebUrl.append(
-              WebUrl(url: results["baseURI"] as! String, meta: results["meta"] as! String))
+              WebUrl(url: results["baseURI"] as! String, meta: self.metaWithSelectedBoard(existingMeta: results["meta"] as? String)))
             // If this is the last item, save sharedText in userDefaults and redirect to host app
             if index == (content.attachments?.count)! - 1 {
               let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
@@ -418,59 +422,32 @@ class ShareViewController: UIViewController {
     titleLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
     titleLabel.textAlignment = .center
 
-    let spacer = UIView()
-    spacer.widthAnchor.constraint(equalToConstant: 64).isActive = true
+    let newBoardButton = UIButton(type: .system)
+    newBoardButton.setTitle("New Board", for: .normal)
+    newBoardButton.setTitleColor(UIColor(red: 0.82, green: 0.31, blue: 0.49, alpha: 1), for: .normal)
+    newBoardButton.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .regular)
+    newBoardButton.addTarget(self, action: #selector(showNewBoardPrompt), for: .touchUpInside)
 
     header.addArrangedSubview(cancelButton)
     header.addArrangedSubview(titleLabel)
-    header.addArrangedSubview(spacer)
+    header.addArrangedSubview(newBoardButton)
 
     let contentStack = UIStackView()
     contentStack.axis = .vertical
-    contentStack.spacing = 18
+    contentStack.spacing = 14
     contentStack.translatesAutoresizingMaskIntoConstraints = false
 
-    let recentsRow = UIView()
-    recentsRow.translatesAutoresizingMaskIntoConstraints = false
-    recentsRow.backgroundColor = UIColor(white: 1, alpha: 0.08)
-    recentsRow.layer.cornerRadius = 18
+    let recentsRow = makeBoardRow(
+      id: "Recents",
+      title: "Save to Recents",
+      subtitle: "Save it to your recents list",
+      systemIcon: "bookmark"
+    )
 
-    let iconBox = UIView()
-    iconBox.translatesAutoresizingMaskIntoConstraints = false
-    iconBox.backgroundColor = UIColor(white: 1, alpha: 0.12)
-    iconBox.layer.cornerRadius = 12
-
-    let icon = UIImageView(image: UIImage(systemName: "bookmark"))
-    icon.translatesAutoresizingMaskIntoConstraints = false
-    icon.tintColor = .white
-    icon.contentMode = .scaleAspectFit
-
-    let rowTextStack = UIStackView()
-    rowTextStack.axis = .vertical
-    rowTextStack.spacing = 2
-    rowTextStack.translatesAutoresizingMaskIntoConstraints = false
-
-    let rowTitle = UILabel()
-    rowTitle.text = "Save to 題材庫"
-    rowTitle.textColor = .white
-    rowTitle.font = UIFont.systemFont(ofSize: 20, weight: .semibold)
-
-    statusLabel.text = "讀取分享內容..."
-    statusLabel.textColor = UIColor(white: 1, alpha: 0.55)
-    statusLabel.font = UIFont.systemFont(ofSize: 14, weight: .regular)
-
-    rowTextStack.addArrangedSubview(rowTitle)
-    rowTextStack.addArrangedSubview(statusLabel)
-
-    let check = UIImageView(image: UIImage(systemName: "checkmark"))
-    check.translatesAutoresizingMaskIntoConstraints = false
-    check.tintColor = UIColor(red: 0.82, green: 0.31, blue: 0.49, alpha: 1)
-    check.contentMode = .scaleAspectFit
-
-    recentsRow.addSubview(iconBox)
-    iconBox.addSubview(icon)
-    recentsRow.addSubview(rowTextStack)
-    recentsRow.addSubview(check)
+    boardListStack.axis = .vertical
+    boardListStack.spacing = 10
+    boardListStack.translatesAutoresizingMaskIntoConstraints = false
+    reloadBoardRows()
 
     linkPreviewLabel.text = ""
     linkPreviewLabel.textColor = UIColor(white: 1, alpha: 0.45)
@@ -486,7 +463,13 @@ class ShareViewController: UIViewController {
     saveButton.isEnabled = false
     saveButton.addTarget(self, action: #selector(saveToHostApp), for: .touchUpInside)
 
+    statusLabel.text = "讀取分享內容..."
+    statusLabel.textColor = UIColor(white: 1, alpha: 0.55)
+    statusLabel.font = UIFont.systemFont(ofSize: 14, weight: .regular)
+
+    contentStack.addArrangedSubview(statusLabel)
     contentStack.addArrangedSubview(recentsRow)
+    contentStack.addArrangedSubview(boardListStack)
     contentStack.addArrangedSubview(linkPreviewLabel)
 
     view.addSubview(header)
@@ -499,24 +482,7 @@ class ShareViewController: UIViewController {
       header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
       header.heightAnchor.constraint(equalToConstant: 44),
 
-      recentsRow.heightAnchor.constraint(equalToConstant: 86),
-      iconBox.leadingAnchor.constraint(equalTo: recentsRow.leadingAnchor, constant: 18),
-      iconBox.centerYAnchor.constraint(equalTo: recentsRow.centerYAnchor),
-      iconBox.widthAnchor.constraint(equalToConstant: 46),
-      iconBox.heightAnchor.constraint(equalToConstant: 46),
-      icon.centerXAnchor.constraint(equalTo: iconBox.centerXAnchor),
-      icon.centerYAnchor.constraint(equalTo: iconBox.centerYAnchor),
-      icon.widthAnchor.constraint(equalToConstant: 24),
-      icon.heightAnchor.constraint(equalToConstant: 24),
-
-      rowTextStack.leadingAnchor.constraint(equalTo: iconBox.trailingAnchor, constant: 14),
-      rowTextStack.centerYAnchor.constraint(equalTo: recentsRow.centerYAnchor),
-      rowTextStack.trailingAnchor.constraint(lessThanOrEqualTo: check.leadingAnchor, constant: -12),
-
-      check.trailingAnchor.constraint(equalTo: recentsRow.trailingAnchor, constant: -18),
-      check.centerYAnchor.constraint(equalTo: recentsRow.centerYAnchor),
-      check.widthAnchor.constraint(equalToConstant: 28),
-      check.heightAnchor.constraint(equalToConstant: 28),
+      recentsRow.heightAnchor.constraint(equalToConstant: 78),
 
       contentStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 28),
       contentStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -28),
@@ -529,6 +495,149 @@ class ShareViewController: UIViewController {
     ])
   }
 
+  private func makeBoardRow(id: String, title: String, subtitle: String, systemIcon: String) -> UIView {
+    let row = UIControl()
+    row.translatesAutoresizingMaskIntoConstraints = false
+    row.backgroundColor = UIColor(white: 1, alpha: 0.08)
+    row.layer.cornerRadius = 18
+    row.accessibilityIdentifier = id
+    row.addTarget(self, action: #selector(selectBoard(_:)), for: .touchUpInside)
+
+    let iconBox = UIView()
+    iconBox.translatesAutoresizingMaskIntoConstraints = false
+    iconBox.backgroundColor = UIColor(white: 1, alpha: 0.12)
+    iconBox.layer.cornerRadius = 12
+    iconBox.isUserInteractionEnabled = false
+
+    let icon = UIImageView(image: UIImage(systemName: systemIcon))
+    icon.translatesAutoresizingMaskIntoConstraints = false
+    icon.tintColor = .white
+    icon.contentMode = .scaleAspectFit
+
+    let rowTextStack = UIStackView()
+    rowTextStack.axis = .vertical
+    rowTextStack.spacing = 2
+    rowTextStack.translatesAutoresizingMaskIntoConstraints = false
+    rowTextStack.isUserInteractionEnabled = false
+
+    let rowTitle = UILabel()
+    rowTitle.text = title
+    rowTitle.textColor = .white
+    rowTitle.font = UIFont.systemFont(ofSize: 19, weight: .semibold)
+    rowTitle.numberOfLines = 1
+
+    let rowSubtitle = UILabel()
+    rowSubtitle.text = subtitle
+    rowSubtitle.textColor = UIColor(white: 1, alpha: 0.55)
+    rowSubtitle.font = UIFont.systemFont(ofSize: 13, weight: .regular)
+    rowSubtitle.numberOfLines = 1
+
+    rowTextStack.addArrangedSubview(rowTitle)
+    rowTextStack.addArrangedSubview(rowSubtitle)
+
+    let check = UIImageView(image: UIImage(systemName: "checkmark"))
+    check.translatesAutoresizingMaskIntoConstraints = false
+    check.tintColor = UIColor(red: 0.82, green: 0.31, blue: 0.49, alpha: 1)
+    check.contentMode = .scaleAspectFit
+    check.isHidden = id != selectedBoard
+    check.isUserInteractionEnabled = false
+    boardCheckmarks[id] = check
+
+    row.addSubview(iconBox)
+    iconBox.addSubview(icon)
+    row.addSubview(rowTextStack)
+    row.addSubview(check)
+
+    NSLayoutConstraint.activate([
+      iconBox.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 16),
+      iconBox.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+      iconBox.widthAnchor.constraint(equalToConstant: 46),
+      iconBox.heightAnchor.constraint(equalToConstant: 46),
+      icon.centerXAnchor.constraint(equalTo: iconBox.centerXAnchor),
+      icon.centerYAnchor.constraint(equalTo: iconBox.centerYAnchor),
+      icon.widthAnchor.constraint(equalToConstant: 24),
+      icon.heightAnchor.constraint(equalToConstant: 24),
+
+      rowTextStack.leadingAnchor.constraint(equalTo: iconBox.trailingAnchor, constant: 14),
+      rowTextStack.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+      rowTextStack.trailingAnchor.constraint(lessThanOrEqualTo: check.leadingAnchor, constant: -12),
+
+      check.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -18),
+      check.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+      check.widthAnchor.constraint(equalToConstant: 28),
+      check.heightAnchor.constraint(equalToConstant: 28)
+    ])
+
+    return row
+  }
+
+  private func reloadBoardRows() {
+    boardListStack.arrangedSubviews.forEach { view in
+      boardListStack.removeArrangedSubview(view)
+      view.removeFromSuperview()
+    }
+
+    let boards = storedBoards()
+    for board in boards {
+      let row = makeBoardRow(id: board, title: board, subtitle: "Save it to this board", systemIcon: "folder")
+      boardListStack.addArrangedSubview(row)
+      row.heightAnchor.constraint(equalToConstant: 78).isActive = true
+    }
+    updateBoardSelection()
+  }
+
+  private func storedBoards() -> [String] {
+    let userDefaults = UserDefaults(suiteName: hostAppGroupIdentifier)
+    return userDefaults?.stringArray(forKey: boardsKey) ?? []
+  }
+
+  private func saveBoards(_ boards: [String]) {
+    var cleaned: [String] = []
+    for board in boards.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) }).filter({ !$0.isEmpty }) {
+      if !cleaned.contains(board) {
+        cleaned.append(board)
+      }
+    }
+    let userDefaults = UserDefaults(suiteName: hostAppGroupIdentifier)
+    userDefaults?.set(cleaned, forKey: boardsKey)
+    userDefaults?.synchronize()
+  }
+
+  private func updateBoardSelection() {
+    boardCheckmarks.forEach { key, checkmark in
+      checkmark.isHidden = key != selectedBoard
+    }
+  }
+
+  private func metaWithSelectedBoard(existingMeta: String? = nil) -> String {
+    var meta: [String: Any] = [:]
+
+    if let existingMeta,
+      let data = existingMeta.data(using: .utf8),
+      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+      meta = json
+    }
+
+    meta["soonBoard"] = selectedBoard == "Recents" ? "" : selectedBoard
+
+    guard let data = try? JSONSerialization.data(withJSONObject: meta),
+      let string = String(data: data, encoding: .utf8)
+    else {
+      let escapedBoard = selectedBoard.replacingOccurrences(of: "\"", with: "\\\"")
+      return selectedBoard == "Recents" ? "{}" : "{\"soonBoard\":\"\(escapedBoard)\"}"
+    }
+
+    return string
+  }
+
+  private func persistSelectedBoardToSharedPayload() {
+    guard !sharedWebUrl.isEmpty else { return }
+    sharedWebUrl = sharedWebUrl.map { WebUrl(url: $0.url, meta: metaWithSelectedBoard(existingMeta: $0.meta)) }
+    let userDefaults = UserDefaults(suiteName: hostAppGroupIdentifier)
+    userDefaults?.set(toData(data: sharedWebUrl), forKey: sharedKey)
+    userDefaults?.synchronize()
+  }
+
   private func finishLoading(type: RedirectType) {
     pendingRedirectType = type
     statusLabel.text = "已準備好儲存"
@@ -538,9 +647,35 @@ class ShareViewController: UIViewController {
 
   @objc private func saveToHostApp() {
     guard let type = pendingRedirectType else { return }
+    persistSelectedBoardToSharedPayload()
     saveButton.isEnabled = false
     saveButton.setTitle("Saving...", for: .normal)
     redirectToHostApp(type: type)
+  }
+
+  @objc private func selectBoard(_ sender: UIControl) {
+    selectedBoard = sender.accessibilityIdentifier ?? "Recents"
+    updateBoardSelection()
+  }
+
+  @objc private func showNewBoardPrompt() {
+    let alert = UIAlertController(title: "New Board", message: "Create a board for this idea", preferredStyle: .alert)
+    alert.addTextField { textField in
+      textField.placeholder = "Board name"
+      textField.autocapitalizationType = .words
+    }
+    alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+    alert.addAction(UIAlertAction(title: "Create", style: .default) { _ in
+      guard let name = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+        return
+      }
+      var boards = self.storedBoards()
+      boards.append(name)
+      self.saveBoards(boards)
+      self.selectedBoard = name
+      self.reloadBoardRows()
+    })
+    present(alert, animated: true)
   }
 
   @objc private func cancelShare() {

@@ -66,6 +66,7 @@ export default function IdeaShareScreen() {
   const router = useRouter();
   const [status, setStatus] = useState<Status>('idle');
   const [url, setUrl] = useState('');
+  const [selectedBoard, setSelectedBoard] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   const analyzeUrl = useCallback(async (targetUrl: string): Promise<AnalysisResult> => {
@@ -106,17 +107,21 @@ export default function IdeaShareScreen() {
       return;
     }
 
+    const board = typeof shareIntent.meta?.soonBoard === 'string' ? shareIntent.meta.soonBoard.trim() : '';
+    setSelectedBoard(board);
     setUrl(sharedUrl);
     setStatus('ready');
   }, [hasShareIntent, shareIntent, status]);
 
-  async function enrichIdea(ideaId: string, targetUrl: string) {
+  async function enrichIdea(ideaId: string, targetUrl: string, boardCategories: string[]) {
     try {
       const result = await analyzeUrl(targetUrl);
       const blockedTitle = result.title === 'Instagram' || result.title === 'TikTok' || !result.title;
       const title = blockedTitle ? 'Instagram Reel 靈感' : result.title;
       const placeQuery = result.placeName || result.placeAddress || '';
       const coords = placeQuery ? await geocodePlace(placeQuery, result.country || 'HK') : null;
+
+      const mergedCategories = Array.from(new Set([...(result.categories ?? []), ...boardCategories].filter(Boolean)));
 
       await supabase
         .from('ideas')
@@ -129,7 +134,7 @@ export default function IdeaShareScreen() {
           country: result.country ?? 'HK',
           platform: result.platform ?? 'instagram',
           tags: result.tags?.length ? result.tags : ['instagram'],
-          categories: result.categories ?? [],
+          categories: mergedCategories,
           place_name: result.placeName ?? '',
           place_address: result.placeAddress ?? '',
           lat: coords?.lat ?? null,
@@ -150,6 +155,7 @@ export default function IdeaShareScreen() {
 
     setStatus('saving');
     try {
+      const boardCategories = selectedBoard ? [selectedBoard] : [];
       const { data, error } = await supabase.from('ideas').insert({
         user_id: user.id,
         url,
@@ -161,7 +167,7 @@ export default function IdeaShareScreen() {
         country: 'HK',
         platform: 'instagram',
         tags: ['instagram', '待分析'],
-        categories: [],
+        categories: boardCategories,
         place_name: '',
         place_address: '',
         viral_score: 0,
@@ -182,7 +188,7 @@ export default function IdeaShareScreen() {
       setStatus('saved');
       resetShareIntent();
       if (data?.id) {
-        enrichIdea(data.id, url);
+        enrichIdea(data.id, url, boardCategories);
       }
       setTimeout(() => router.replace('/(app)/idea/library'), 1200);
     } catch (err: unknown) {
@@ -238,6 +244,12 @@ export default function IdeaShareScreen() {
             <View style={styles.quickCopy}>
               <Text style={styles.quickTitle}>Save to 題材庫</Text>
               <Text style={styles.quickDescription}>先儲存連結，AI 之後自動補充標題、Hook 同標籤。</Text>
+              {selectedBoard ? (
+                <View style={styles.boardPill}>
+                  <Feather name="folder" size={13} color={colors.primary} />
+                  <Text style={styles.boardPillText}>{selectedBoard}</Text>
+                </View>
+              ) : null}
             </View>
             <Pressable disabled={status === 'saving'} onPress={saveIdea} style={({ pressed }) => [styles.saveButton, (pressed || status === 'saving') && styles.pressed]}>
               {status === 'saving' ? (
@@ -382,6 +394,22 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 15,
     lineHeight: 22
+  },
+  boardPill: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    borderRadius: 999,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  boardPillText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
   },
   card: {
     borderRadius: 18,
