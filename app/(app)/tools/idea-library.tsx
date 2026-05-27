@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackHeader } from '@/components/BackHeader';
 import ClipPlayer from '@/components/ClipPlayer';
 import { useAuth } from '@/hooks/useAuth';
+import { enrichIdeaFromUrl } from '@/lib/ideaEnrichment';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
@@ -90,6 +91,7 @@ const emptyDraft: IdeaDraft = {
 };
 
 const screenWidth = Dimensions.get('window').width;
+const enrichingIdeaIds = new Set<string>();
 
 function normalizeType(value?: string | null): Exclude<IdeaType, 'all'> {
   const lower = (value ?? '').toLowerCase();
@@ -132,6 +134,23 @@ function draftFromIdea(idea: IdeaRecord): IdeaDraft {
     regions: ideaRegions(idea),
     notes: idea.notes ?? idea.summary ?? ''
   };
+}
+
+function ideaSourceUrl(idea: IdeaRecord) {
+  return idea.source_url || idea.url || '';
+}
+
+function ideaNeedsEnrichment(idea: IdeaRecord) {
+  const sourceUrl = ideaSourceUrl(idea);
+  if (!sourceUrl) return false;
+  if (enrichingIdeaIds.has(idea.id)) return false;
+
+  const tags = Array.isArray(idea.tags) ? idea.tags : [];
+  const hasPendingTag = tags.includes('待分析');
+  const hasGenericTitle = !idea.title || idea.title === 'IG Reel 靈感' || idea.title === 'Instagram Reel 靈感';
+  const missingUsefulPreview = !idea.thumb && !idea.summary && !idea.description;
+
+  return hasPendingTag || hasGenericTitle || missingUsefulPreview;
 }
 
 function Chip({
@@ -493,7 +512,7 @@ export default function ToolsIdeaLibraryScreen() {
     return created.id as string;
   }, [user]);
 
-  const loadIdeas = useCallback(async (showLoader = true) => {
+  const loadIdeas = useCallback(async (showLoader = true, autoEnrich = true) => {
     if (!user) return;
     if (showLoader) setLoading(true);
 
@@ -510,7 +529,21 @@ export default function ToolsIdeaLibraryScreen() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setIdeas((data ?? []) as IdeaRecord[]);
+      const nextIdeas = (data ?? []) as IdeaRecord[];
+      setIdeas(nextIdeas);
+
+      if (autoEnrich) {
+        const pending = nextIdeas.filter(ideaNeedsEnrichment).slice(0, 4);
+        if (pending.length > 0) {
+          pending.forEach((idea) => enrichingIdeaIds.add(idea.id));
+          Promise.allSettled(
+            pending.map((idea) =>
+              enrichIdeaFromUrl(idea.id, ideaSourceUrl(idea), Array.isArray(idea.categories) ? idea.categories : [])
+                .finally(() => enrichingIdeaIds.delete(idea.id))
+            )
+          ).then(() => loadIdeas(false, false));
+        }
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '載入失敗';
       Alert.alert('題材庫載入失敗', message);

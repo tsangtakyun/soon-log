@@ -1,0 +1,116 @@
+import { supabase } from '@/lib/supabase';
+import type { ViralPotential } from '@/types';
+
+const AUTOFILL_API = 'https://idea-brainstorm.vercel.app/api/autofill-link';
+
+type AnalysisResult = {
+  title: string;
+  topic?: string;
+  description?: string;
+  desc?: string;
+  hook?: string;
+  script_hook?: string;
+  region?: string;
+  country?: string;
+  viral_potential: ViralPotential;
+  tags: string[];
+  platform: string;
+  image?: string;
+  videoUrl?: string;
+  video_url?: string;
+  placeName?: string;
+  placeAddress?: string;
+  categories?: string[];
+};
+
+function asStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item).trim()).filter(Boolean);
+}
+
+async function analyzeUrl(targetUrl: string): Promise<AnalysisResult> {
+  const response = await fetch(AUTOFILL_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: targetUrl })
+  });
+
+  if (!response.ok) throw new Error(`API error ${response.status}`);
+
+  const data = await response.json();
+  return {
+    title: data.title || 'IG Reel 靈感',
+    topic: data.title || '',
+    description: data.desc || data.metadataDescription || '',
+    desc: data.desc || '',
+    hook: data.hook || '',
+    script_hook: data.script_hook || '',
+    country: data.country || 'HK',
+    region: data.country || 'HK',
+    viral_potential: data.viral_potential || 'medium',
+    tags: asStringArray(data.tags),
+    platform: data.platform || 'instagram',
+    image: data.image || data.thumbnail || '',
+    videoUrl: data.videoUrl || '',
+    video_url: data.video_url || '',
+    placeName: data.placeName || data.place_name || '',
+    placeAddress: data.placeAddress || data.place_address || '',
+    categories: asStringArray(data.categories)
+  };
+}
+
+async function geocodePlace(placeName: string, country: string) {
+  const key = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!key || !placeName.trim()) return null;
+
+  const query = encodeURIComponent(`${placeName}, ${country}`);
+  const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${key}`);
+  const data = await response.json();
+  const location = data.results?.[0]?.geometry?.location;
+
+  if (typeof location?.lat === 'number' && typeof location?.lng === 'number') {
+    return {
+      lat: location.lat,
+      lng: location.lng
+    };
+  }
+
+  return null;
+}
+
+export async function enrichIdeaFromUrl(ideaId: string, targetUrl: string, boardCategories: string[] = []) {
+  const result = await analyzeUrl(targetUrl);
+  const blockedTitle = result.title === 'Instagram' || result.title === 'TikTok' || !result.title;
+  const title = blockedTitle ? 'Instagram Reel 靈感' : result.title;
+  const placeQuery = result.placeName || result.placeAddress || '';
+  const coords = placeQuery ? await geocodePlace(placeQuery, result.country || 'HK') : null;
+  const mergedCategories = Array.from(new Set([...(result.categories ?? []), ...boardCategories].filter(Boolean)));
+  const description = result.description ?? result.desc ?? '';
+  const videoUrl = result.video_url || result.videoUrl || null;
+
+  const { error } = await supabase
+    .from('ideas')
+    .update({
+      thumb: result.image || null,
+      video_url: videoUrl,
+      title,
+      topic: result.topic || title,
+      summary: description,
+      script_hook: result.script_hook ?? result.hook ?? '',
+      country: result.country ?? 'HK',
+      platform: result.platform ?? 'instagram',
+      tags: result.tags?.length ? result.tags : ['instagram'],
+      categories: mergedCategories,
+      place_name: result.placeName ?? '',
+      place_address: result.placeAddress ?? '',
+      lat: coords?.lat ?? null,
+      lng: coords?.lng ?? null,
+      description: result.desc ?? result.description ?? '',
+      hook: result.hook ?? '',
+      region: result.country ?? 'HK',
+      viral_potential: result.viral_potential ?? 'medium'
+    })
+    .eq('id', ideaId);
+
+  if (error) throw error;
+}
