@@ -3,21 +3,27 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   FlatList,
+  Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackHeader } from '@/components/BackHeader';
+import ClipPlayer from '@/components/ClipPlayer';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
@@ -37,6 +43,16 @@ type IdeaRecord = {
   country: string | null;
   notes: string | null;
   summary?: string | null;
+  description?: string | null;
+  url?: string | null;
+  source_url?: string | null;
+  thumb?: string | null;
+  video_url?: string | null;
+  place_name?: string | null;
+  place_address?: string | null;
+  shop_name?: string | null;
+  lat?: number | null;
+  lng?: number | null;
   tags: string[] | null;
   categories?: string[] | null;
   created_at: string;
@@ -72,6 +88,8 @@ const emptyDraft: IdeaDraft = {
   regions: ['HK'],
   notes: ''
 };
+
+const screenWidth = Dimensions.get('window').width;
 
 function normalizeType(value?: string | null): Exclude<IdeaType, 'all'> {
   const lower = (value ?? '').toLowerCase();
@@ -237,6 +255,188 @@ function FormSheet({
   );
 }
 
+function IdeaDetailSheet({
+  idea,
+  onClose,
+  onEdit
+}: {
+  idea: IdeaRecord | null;
+  onClose: () => void;
+  onEdit: (idea: IdeaRecord) => void;
+}) {
+  const insets = useSafeAreaInsets();
+  if (!idea) return null;
+
+  const currentIdea = idea;
+  const sourceUrl = currentIdea.source_url || currentIdea.url || '';
+  const imageUrl = currentIdea.thumb || '';
+  const videoUrl = currentIdea.video_url || '';
+  const placeName = currentIdea.place_name || currentIdea.shop_name || '';
+  const description = currentIdea.notes || currentIdea.summary || currentIdea.description || '';
+  const hasMap = typeof currentIdea.lat === 'number' && typeof currentIdea.lng === 'number';
+  const categories = Array.isArray(currentIdea.categories) ? currentIdea.categories : [];
+  const heroHeight = Math.round(screenWidth * 1.18);
+
+  async function openSource() {
+    if (!sourceUrl) return;
+    await Linking.openURL(sourceUrl);
+  }
+
+  async function openMap() {
+    if (!hasMap) return;
+    const label = encodeURIComponent(placeName || currentIdea.title || 'Saved idea');
+    const appleUrl = `http://maps.apple.com/?ll=${currentIdea.lat},${currentIdea.lng}&q=${label}`;
+    const googleUrl = `https://www.google.com/maps/search/?api=1&query=${currentIdea.lat},${currentIdea.lng}`;
+    const canOpenApple = await Linking.canOpenURL(appleUrl);
+    await Linking.openURL(canOpenApple ? appleUrl : googleUrl);
+  }
+
+  async function shareIdea() {
+    const message = [currentIdea.title, placeName, sourceUrl].filter(Boolean).join('\n');
+    if (message) await Share.share({ message });
+  }
+
+  return (
+    <Modal visible transparent={false} animationType="slide" onRequestClose={onClose}>
+      <View style={styles.detailScreen}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.detailContent, { paddingBottom: insets.bottom + 42 }]}
+        >
+          <View style={[styles.detailHero, { height: heroHeight }]}>
+            {videoUrl ? (
+              <ClipPlayer
+                clip={{
+                  id: idea.id,
+                  video_url: videoUrl,
+                  media_urls: imageUrl ? [imageUrl] : []
+                }}
+                width={screenWidth}
+                height={heroHeight}
+              />
+            ) : imageUrl ? (
+              <Image source={{ uri: imageUrl }} style={styles.detailHeroImage} resizeMode="cover" />
+            ) : (
+              <View style={styles.detailHeroEmpty}>
+                <Feather name="bookmark" size={42} color="rgba(255,255,255,0.45)" />
+                <Text style={styles.detailHeroEmptyText}>{idea.title || 'IG Reel 靈感'}</Text>
+              </View>
+            )}
+
+            <View style={[styles.detailTopNav, { paddingTop: insets.top + 10 }]}>
+              <TouchableOpacity onPress={onClose} style={styles.detailRoundButton}>
+                <Feather name="chevron-left" size={30} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.detailBody}>
+            <View style={styles.detailActions}>
+              <TouchableOpacity onPress={openSource} disabled={!sourceUrl} style={styles.detailIconButton}>
+                <Feather name={normalizeType(idea.platform) === 'instagram' ? 'instagram' : 'external-link'} size={24} color="#111827" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => onEdit(idea)} style={styles.detailIconButton}>
+                <Feather name="more-horizontal" size={25} color="#111827" />
+              </TouchableOpacity>
+              <View style={styles.detailActionSpacer} />
+              <TouchableOpacity onPress={() => onEdit(idea)} style={styles.addToBoardButton}>
+                <Feather name="plus" size={19} color="#111827" />
+                <Text style={styles.addToBoardText}>加入分類</Text>
+              </TouchableOpacity>
+            </View>
+
+            {placeName ? (
+              <View style={styles.placeRow}>
+                <Text style={styles.placePin}>📍</Text>
+                <Text style={styles.placeName}>{placeName}</Text>
+              </View>
+            ) : null}
+
+            <Text style={styles.detailTitle}>{idea.title || '未命名題材'}</Text>
+
+            {description ? <Text style={styles.detailDescription}>{description}</Text> : null}
+
+            {categories.length > 0 ? (
+              <View style={styles.detailCategories}>
+                {categories.map((category) => (
+                  <Text key={category} style={styles.detailCategoryPill}>{category}</Text>
+                ))}
+              </View>
+            ) : null}
+
+            <View style={styles.detailMetaCard}>
+              <Text style={styles.detailMetaLabel}>題材資料</Text>
+              <Text style={styles.detailMetaText}>類型：{typeLabel(idea.platform)}</Text>
+              <Text style={styles.detailMetaText}>地區：{ideaRegions(idea).join(' / ')}</Text>
+              <Text style={styles.detailMetaText}>建立：{formatDate(idea.created_at)}</Text>
+              {sourceUrl ? (
+                <TouchableOpacity onPress={openSource} style={styles.sourceLinkRow}>
+                  <Feather name="link" size={15} color="#ffffff" />
+                  <Text numberOfLines={1} style={styles.sourceLinkText}>{sourceUrl}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            <View style={styles.feedbackRow}>
+              <TouchableOpacity style={styles.feedbackButton}>
+                <Feather name="heart" size={24} color="#ffffff" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.feedbackButton}>
+                <Feather name="thumbs-up" size={24} color="#ffffff" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.feedbackButton}>
+                <Feather name="thumbs-down" size={24} color="#ffffff" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={shareIdea} style={styles.feedbackButton}>
+                <Feather name="send" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+
+            {hasMap ? (
+              <View style={styles.mapSection}>
+                <MapView
+                  style={styles.detailMap}
+                  pointerEvents="none"
+                  customMapStyle={darkMapStyle}
+                  initialRegion={{
+                    latitude: idea.lat!,
+                    longitude: idea.lng!,
+                    latitudeDelta: 0.012,
+                    longitudeDelta: 0.012
+                  }}
+                >
+                  <Marker
+                    coordinate={{ latitude: idea.lat!, longitude: idea.lng! }}
+                    title={placeName || idea.title || 'Saved idea'}
+                  />
+                </MapView>
+                <TouchableOpacity onPress={openMap} style={styles.viewMapButton}>
+                  <Text style={styles.viewMapButtonText}>在地圖開啟</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.noMapCard}>
+                <Feather name="map-pin" size={20} color="rgba(255,255,255,0.55)" />
+                <Text style={styles.noMapText}>未有地點資料。你可以編輯題材補充地點，之後就會顯示地圖。</Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+const darkMapStyle = [
+  { elementType: 'geometry', stylers: [{ color: '#17212f' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8ca0b3' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#111827' }] },
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#27364a' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9fb2c8' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f2634' }] }
+];
+
 export default function ToolsIdeaLibraryScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -249,6 +449,7 @@ export default function ToolsIdeaLibraryScreen() {
   const [regionFilter, setRegionFilter] = useState<RegionKey | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedIdea, setSelectedIdea] = useState<IdeaRecord | null>(null);
+  const [editingIdea, setEditingIdea] = useState<IdeaRecord | null>(null);
   const [draft, setDraft] = useState<IdeaDraft>(emptyDraft);
 
   const resolveWorkspace = useCallback(async () => {
@@ -347,7 +548,11 @@ export default function ToolsIdeaLibraryScreen() {
 
   function openDetailModal(idea: IdeaRecord) {
     setSelectedIdea(idea);
+  }
+
+  function openEditModal(idea: IdeaRecord) {
     setDraft(draftFromIdea(idea));
+    setEditingIdea(idea);
   }
 
   async function saveNewIdea() {
@@ -390,7 +595,7 @@ export default function ToolsIdeaLibraryScreen() {
   }
 
   async function saveSelectedIdea() {
-    if (!selectedIdea) return;
+    if (!editingIdea) return;
     if (!draft.title.trim()) {
       Alert.alert('請輸入標題');
       return;
@@ -412,10 +617,10 @@ export default function ToolsIdeaLibraryScreen() {
           tags: draft.regions,
           categories: draft.regions
         })
-        .eq('id', selectedIdea.id);
+        .eq('id', editingIdea.id);
 
       if (error) throw error;
-      setSelectedIdea(null);
+      setEditingIdea(null);
       await loadIdeas(false);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '請稍後再試';
@@ -514,13 +719,19 @@ export default function ToolsIdeaLibraryScreen() {
       />
 
       <FormSheet
-        visible={Boolean(selectedIdea)}
+        visible={Boolean(editingIdea)}
         title="題材詳情"
         draft={draft}
         saving={saving}
         onChange={setDraft}
-        onClose={() => setSelectedIdea(null)}
+        onClose={() => setEditingIdea(null)}
         onSave={saveSelectedIdea}
+      />
+
+      <IdeaDetailSheet
+        idea={selectedIdea}
+        onClose={() => setSelectedIdea(null)}
+        onEdit={openEditModal}
       />
     </View>
   );
@@ -530,6 +741,221 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: '#F7F3EE'
+  },
+  detailScreen: {
+    flex: 1,
+    backgroundColor: '#060606'
+  },
+  detailContent: {
+    backgroundColor: '#060606'
+  },
+  detailHero: {
+    width: '100%',
+    backgroundColor: '#101010'
+  },
+  detailHeroImage: {
+    width: '100%',
+    height: '100%'
+  },
+  detailHeroEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28
+  },
+  detailHeroEmptyText: {
+    marginTop: 14,
+    color: '#ffffff',
+    fontFamily: fonts.bodyBold,
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center'
+  },
+  detailTopNav: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 18
+  },
+  detailRoundButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.18)'
+  },
+  detailBody: {
+    paddingHorizontal: 20,
+    paddingTop: 18
+  },
+  detailActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 22
+  },
+  detailIconButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff'
+  },
+  detailActionSpacer: {
+    flex: 1
+  },
+  addToBoardButton: {
+    minHeight: 52,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 18
+  },
+  addToBoardText: {
+    color: '#111827',
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    fontWeight: '800'
+  },
+  placeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginBottom: 14
+  },
+  placePin: {
+    fontSize: 24
+  },
+  placeName: {
+    flex: 1,
+    color: '#ffffff',
+    fontFamily: fonts.bodyBold,
+    fontSize: 19,
+    fontWeight: '800'
+  },
+  detailTitle: {
+    color: '#ffffff',
+    fontFamily: fonts.bodyBold,
+    fontSize: 23,
+    fontWeight: '800',
+    lineHeight: 31,
+    marginBottom: 12
+  },
+  detailDescription: {
+    color: 'rgba(255,255,255,0.88)',
+    fontFamily: fonts.body,
+    fontSize: 16,
+    lineHeight: 25
+  },
+  detailCategories: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 16
+  },
+  detailCategoryPill: {
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    color: '#ffffff',
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    fontWeight: '700',
+    paddingHorizontal: 10,
+    paddingVertical: 5
+  },
+  detailMetaCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: '#2E0F1F',
+    padding: 16,
+    marginTop: 24
+  },
+  detailMetaLabel: {
+    color: '#ffffff',
+    fontFamily: fonts.bodyBold,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 10
+  },
+  detailMetaText: {
+    color: 'rgba(255,255,255,0.78)',
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 21
+  },
+  sourceLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.18)',
+    marginTop: 14,
+    paddingTop: 12
+  },
+  sourceLinkText: {
+    flex: 1,
+    color: '#ffffff',
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13
+  },
+  feedbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 28,
+    marginTop: 22,
+    marginBottom: 22
+  },
+  feedbackButton: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  mapSection: {
+    marginTop: 6
+  },
+  detailMap: {
+    height: 300,
+    borderRadius: 16,
+    overflow: 'hidden'
+  },
+  viewMapButton: {
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginTop: 14
+  },
+  viewMapButtonText: {
+    color: '#111827',
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    fontWeight: '800'
+  },
+  noMapCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 14,
+    marginTop: 6
+  },
+  noMapText: {
+    flex: 1,
+    color: 'rgba(255,255,255,0.68)',
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 19
   },
   hero: {
     paddingHorizontal: 20,
