@@ -412,18 +412,18 @@ class ShareViewController: UIViewController {
     header.translatesAutoresizingMaskIntoConstraints = false
 
     let cancelButton = UIButton(type: .system)
-    cancelButton.setTitle("Cancel", for: .normal)
+    cancelButton.setTitle("取消", for: .normal)
     cancelButton.setTitleColor(.systemBlue, for: .normal)
     cancelButton.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .regular)
     cancelButton.addTarget(self, action: #selector(cancelShare), for: .touchUpInside)
 
-    titleLabel.text = "Save to EGG"
+    titleLabel.text = "儲存到 EGG"
     titleLabel.textColor = .white
     titleLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
     titleLabel.textAlignment = .center
 
     let newBoardButton = UIButton(type: .system)
-    newBoardButton.setTitle("New Board", for: .normal)
+    newBoardButton.setTitle("新增分類", for: .normal)
     newBoardButton.setTitleColor(UIColor(red: 0.82, green: 0.31, blue: 0.49, alpha: 1), for: .normal)
     newBoardButton.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .regular)
     newBoardButton.addTarget(self, action: #selector(showNewBoardPrompt), for: .touchUpInside)
@@ -439,8 +439,8 @@ class ShareViewController: UIViewController {
 
     let recentsRow = makeBoardRow(
       id: "Recents",
-      title: "Save to Recents",
-      subtitle: "Save it to your recents list",
+      title: "儲存到最近項目",
+      subtitle: "快速保存到最近靈感",
       systemIcon: "bookmark"
     )
 
@@ -455,7 +455,7 @@ class ShareViewController: UIViewController {
     linkPreviewLabel.numberOfLines = 1
 
     saveButton.translatesAutoresizingMaskIntoConstraints = false
-    saveButton.setTitle("Save", for: .normal)
+    saveButton.setTitle("儲存", for: .normal)
     saveButton.setTitleColor(.white, for: .normal)
     saveButton.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
     saveButton.backgroundColor = UIColor(red: 0.82, green: 0.31, blue: 0.49, alpha: 0.45)
@@ -579,7 +579,7 @@ class ShareViewController: UIViewController {
 
     let boards = storedBoards()
     for board in boards {
-      let row = makeBoardRow(id: board, title: board, subtitle: "Save it to this board", systemIcon: "folder")
+      let row = makeBoardRow(id: board, title: board, subtitle: "儲存到此分類", systemIcon: "folder")
       boardListStack.addArrangedSubview(row)
       row.heightAnchor.constraint(equalToConstant: 78).isActive = true
     }
@@ -649,7 +649,7 @@ class ShareViewController: UIViewController {
     guard pendingRedirectType != nil else { return }
     persistSelectedBoardToSharedPayload()
     saveButton.isEnabled = false
-    saveButton.setTitle("Saved", for: .normal)
+    saveButton.setTitle("已儲存", for: .normal)
 
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
       self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
@@ -662,13 +662,13 @@ class ShareViewController: UIViewController {
   }
 
   @objc private func showNewBoardPrompt() {
-    let alert = UIAlertController(title: "New Board", message: "Create a board for this idea", preferredStyle: .alert)
+    let alert = UIAlertController(title: "新增分類", message: "為呢個靈感建立一個分類", preferredStyle: .alert)
     alert.addTextField { textField in
-      textField.placeholder = "Board name"
+      textField.placeholder = "分類名稱"
       textField.autocapitalizationType = .words
     }
-    alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-    alert.addAction(UIAlertAction(title: "Create", style: .default) { _ in
+    alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+    alert.addAction(UIAlertAction(title: "建立", style: .default) { _ in
       guard let name = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
         return
       }
