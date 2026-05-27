@@ -50,9 +50,9 @@ async function analyzeUrl(targetUrl: string): Promise<AnalysisResult> {
     viral_potential: data.viral_potential || 'medium',
     tags: asStringArray(data.tags),
     platform: data.platform || 'instagram',
-    image: data.image || data.thumbnail || '',
-    videoUrl: data.videoUrl || '',
-    video_url: data.video_url || '',
+    image: data.image || data.image_url || data.thumbnail || data.thumbnail_url || data.ogImage || data.og_image || data.media?.thumbnail_url || '',
+    videoUrl: data.videoUrl || data.video || data.media_url || data.media?.video_url || '',
+    video_url: data.video_url || data.videoUrl || data.video || data.media_url || data.media?.video_url || '',
     placeName: data.placeName || data.place_name || '',
     placeAddress: data.placeAddress || data.place_address || '',
     categories: asStringArray(data.categories)

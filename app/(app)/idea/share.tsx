@@ -49,13 +49,67 @@ export default function IdeaShareScreen() {
     }
   }
 
+  async function resolveWorkspaceId() {
+    if (!user) return null;
+
+    const { data: member } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (member?.workspace_id) return member.workspace_id as string;
+
+    const { data: existing } = await supabase
+      .from('workspaces')
+      .select('id')
+      .eq('owner_id', user.id)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (existing?.id) return existing.id as string;
+
+    const { data: created, error } = await supabase
+      .from('workspaces')
+      .insert({
+        name: 'SOON-LOG',
+        type: 'mixed',
+        owner: user.email ?? null,
+        owner_id: user.id
+      })
+      .select('id')
+      .maybeSingle();
+
+    if (error || !created?.id) return null;
+
+    await supabase
+      .from('workspace_members')
+      .insert({
+        workspace_id: created.id,
+        user_id: user.id,
+        email: user.email ?? null,
+        display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'SOON',
+        role: 'owner',
+        status: 'active',
+        invited_by: user.id
+      });
+
+    return created.id as string;
+  }
+
   async function saveIdea() {
     if (!url || !user) return;
 
     setStatus('saving');
     try {
       const boardCategories = selectedBoard ? [selectedBoard] : [];
+      const workspaceId = await resolveWorkspaceId();
       const { data, error } = await supabase.from('ideas').insert({
+        workspace_id: workspaceId,
         user_id: user.id,
         url,
         thumb: null,

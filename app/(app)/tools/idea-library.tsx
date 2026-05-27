@@ -759,7 +759,7 @@ export default function ToolsIdeaLibraryScreen() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      query = id ? query.eq('workspace_id', id) : query.eq('user_id', user.id);
+      query = id ? query.or(`workspace_id.eq.${id},user_id.eq.${user.id}`) : query.eq('user_id', user.id);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -1127,6 +1127,14 @@ export default function ToolsIdeaLibraryScreen() {
             <Text style={styles.controlButtonText}>{viewMode === 'list' ? '清單' : '地圖'}</Text>
           </TouchableOpacity>
         </View>
+        {boardOptions.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.boardFilterContent}>
+            <Chip label="全部" active={!boardFilter} onPress={() => setBoardFilter(null)} />
+            {boardOptions.map((board) => (
+              <Chip key={board} label={board} active={boardFilter === board} onPress={() => setBoardFilter(board)} />
+            ))}
+          </ScrollView>
+        ) : null}
       </View>
 
       {loading ? (
@@ -1495,6 +1503,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 13,
     fontWeight: '700'
+  },
+  boardFilterContent: {
+    gap: 8,
+    paddingTop: 2,
+    paddingRight: 4
   },
   viewToggle: {
     alignSelf: 'flex-start',
