@@ -91,6 +91,7 @@ const emptyDraft: IdeaDraft = {
 };
 
 const screenWidth = Dimensions.get('window').width;
+const ideaCardImageHeight = Math.round((screenWidth - 32) * 0.54);
 const enrichingIdeaIds = new Set<string>();
 
 function normalizeType(value?: string | null): Exclude<IdeaType, 'all'> {
@@ -138,6 +139,29 @@ function draftFromIdea(idea: IdeaRecord): IdeaDraft {
 
 function ideaSourceUrl(idea: IdeaRecord) {
   return idea.source_url || idea.url || '';
+}
+
+function ideaPreviewImage(idea: IdeaRecord) {
+  return idea.thumb || '';
+}
+
+function ideaSearchText(idea: IdeaRecord) {
+  return [
+    idea.title,
+    idea.topic,
+    idea.summary,
+    idea.description,
+    idea.notes,
+    idea.place_name,
+    idea.place_address,
+    idea.shop_name,
+    ideaSourceUrl(idea),
+    ...(Array.isArray(idea.tags) ? idea.tags : []),
+    ...(Array.isArray(idea.categories) ? idea.categories : [])
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
 }
 
 function ideaNeedsEnrichment(idea: IdeaRecord) {
@@ -466,6 +490,9 @@ export default function ToolsIdeaLibraryScreen() {
   const [saving, setSaving] = useState(false);
   const [typeFilter, setTypeFilter] = useState<IdeaType>('all');
   const [regionFilter, setRegionFilter] = useState<RegionKey | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [boardFilter, setBoardFilter] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedIdea, setSelectedIdea] = useState<IdeaRecord | null>(null);
   const [editingIdea, setEditingIdea] = useState<IdeaRecord | null>(null);
@@ -557,13 +584,40 @@ export default function ToolsIdeaLibraryScreen() {
     loadIdeas();
   }, [loadIdeas]);
 
+  const boardOptions = useMemo(() => {
+    const categories = new Set<string>();
+    ideas.forEach((idea) => {
+      (Array.isArray(idea.categories) ? idea.categories : []).forEach((category) => {
+        if (category && !REGIONS.some((region) => region.key === category)) categories.add(category);
+      });
+    });
+    return Array.from(categories).sort((a, b) => a.localeCompare(b));
+  }, [ideas]);
+
   const filteredIdeas = useMemo(() => {
+    const query = searchText.trim().toLowerCase();
     return ideas.filter((idea) => {
       const matchesType = typeFilter === 'all' || normalizeType(idea.platform) === typeFilter;
       const matchesRegion = !regionFilter || ideaRegions(idea).includes(regionFilter);
-      return matchesType && matchesRegion;
+      const matchesBoard = !boardFilter || (Array.isArray(idea.categories) && idea.categories.includes(boardFilter));
+      const matchesSearch = !query || ideaSearchText(idea).includes(query);
+      return matchesType && matchesRegion && matchesBoard && matchesSearch;
     });
-  }, [ideas, regionFilter, typeFilter]);
+  }, [boardFilter, ideas, regionFilter, searchText, typeFilter]);
+
+  const mappableIdeas = useMemo(() => {
+    return filteredIdeas.filter((idea) => typeof idea.lat === 'number' && typeof idea.lng === 'number');
+  }, [filteredIdeas]);
+
+  const initialMapRegion = useMemo(() => {
+    const first = mappableIdeas[0];
+    return {
+      latitude: first?.lat ?? 22.3193,
+      longitude: first?.lng ?? 114.1694,
+      latitudeDelta: 0.08,
+      longitudeDelta: 0.08
+    };
+  }, [mappableIdeas]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -665,19 +719,103 @@ export default function ToolsIdeaLibraryScreen() {
 
   function renderIdea({ item }: { item: IdeaRecord }) {
     const regions = ideaRegions(item);
+    const previewImage = ideaPreviewImage(item);
+    const placeName = item.place_name || item.shop_name;
     return (
       <Pressable onPress={() => openDetailModal(item)} style={({ pressed }) => [styles.ideaCard, pressed && styles.pressed]}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle} numberOfLines={2}>{item.title || '未命名題材'}</Text>
-          <Feather name="chevron-right" size={18} color={colors.textMuted} />
+        {previewImage ? (
+          <Image source={{ uri: previewImage }} style={styles.cardImage} resizeMode="cover" />
+        ) : (
+          <View style={styles.cardImageEmpty}>
+            <Feather name="bookmark" size={28} color="#c7b8ad" />
+          </View>
+        )}
+        <View style={styles.cardBody}>
+          {placeName ? (
+            <View style={styles.cardPlaceRow}>
+              <Text style={styles.cardPin}>📍</Text>
+              <Text style={styles.cardPlaceText} numberOfLines={1}>{placeName}</Text>
+            </View>
+          ) : null}
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle} numberOfLines={2}>{item.title || '未命名題材'}</Text>
+            <Feather name="chevron-right" size={18} color={colors.textMuted} />
+          </View>
+          <Text style={styles.cardTopic} numberOfLines={2}>{item.topic || item.summary || '未設定主題'}</Text>
+          <View style={styles.cardTags}>
+            <Text style={styles.typeTag}>{typeLabel(item.platform)}</Text>
+            {regions.map((region) => <Text key={region} style={styles.regionTag}>{region}</Text>)}
+          </View>
+          <Text style={styles.cardDate}>{formatDate(item.created_at)}</Text>
         </View>
-        <Text style={styles.cardTopic} numberOfLines={1}>{item.topic || '未設定主題'}</Text>
-        <View style={styles.cardTags}>
-          <Text style={styles.typeTag}>{typeLabel(item.platform)}</Text>
-          {regions.map((region) => <Text key={region} style={styles.regionTag}>{region}</Text>)}
-        </View>
-        <Text style={styles.cardDate}>{formatDate(item.created_at)}</Text>
       </Pressable>
+    );
+  }
+
+  function renderMapIdeaCard(item: IdeaRecord) {
+    const previewImage = ideaPreviewImage(item);
+    return (
+      <Pressable key={item.id} onPress={() => openDetailModal(item)} style={({ pressed }) => [styles.mapIdeaCard, pressed && styles.pressed]}>
+        {previewImage ? (
+          <Image source={{ uri: previewImage }} style={styles.mapIdeaImage} resizeMode="cover" />
+        ) : (
+          <View style={styles.mapIdeaImageEmpty}>
+            <Feather name="bookmark" size={20} color="#c7b8ad" />
+          </View>
+        )}
+        <Text style={styles.mapIdeaTitle} numberOfLines={2}>{item.title || '未命名題材'}</Text>
+        <Text style={styles.mapIdeaPlace} numberOfLines={1}>{item.place_name || item.shop_name || typeLabel(item.platform)}</Text>
+      </Pressable>
+    );
+  }
+
+  function renderMapContent() {
+    if (filteredIdeas.length === 0) {
+      return (
+        <View style={styles.emptyState}>
+          <Feather name="map-pin" size={36} color="#d1d5db" />
+          <Text style={styles.emptyText}>未有符合條件嘅題材</Text>
+        </View>
+      );
+    }
+
+    if (mappableIdeas.length === 0) {
+      return (
+        <View style={styles.emptyState}>
+          <Feather name="map" size={36} color="#d1d5db" />
+          <Text style={styles.emptyText}>呢批題材未有地點資料。儲存 IG 地點內容後，會自動出現在地圖。</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.libraryMapWrap}>
+        <MapView
+          style={styles.libraryMap}
+          customMapStyle={darkMapStyle}
+          initialRegion={initialMapRegion}
+        >
+          {mappableIdeas.map((idea) => (
+            <Marker
+              key={idea.id}
+              coordinate={{ latitude: idea.lat!, longitude: idea.lng! }}
+              title={idea.place_name || idea.title || 'Saved idea'}
+              description={idea.topic || undefined}
+              onPress={() => setSelectedIdea(idea)}
+            />
+          ))}
+        </MapView>
+        <View style={[styles.mapSheet, { paddingBottom: insets.bottom + 18 }]}>
+          <View style={styles.mapHandle} />
+          <View style={styles.mapSheetHeader}>
+            <Text style={styles.mapSheetTitle}>已儲存地點</Text>
+            <Text style={styles.mapSheetCount}>{mappableIdeas.length} 個</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mapCardsContent}>
+            {mappableIdeas.map(renderMapIdeaCard)}
+          </ScrollView>
+        </View>
+      </View>
     );
   }
 
@@ -698,7 +836,53 @@ export default function ToolsIdeaLibraryScreen() {
         <Text style={styles.subtitle}>IG Reel 靈感</Text>
       </View>
 
+      <View style={styles.searchWrap}>
+        <View style={styles.searchBox}>
+          <Feather name="search" size={18} color={colors.textMuted} />
+          <TextInput
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholder="搜尋題材、地點、分類..."
+            placeholderTextColor="#9ca3af"
+            style={styles.searchInput}
+            returnKeyType="search"
+          />
+          {searchText ? (
+            <TouchableOpacity onPress={() => setSearchText('')} style={styles.searchClear}>
+              <Feather name="x" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <View style={styles.viewToggle}>
+          <TouchableOpacity
+            onPress={() => setViewMode('list')}
+            style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleButtonActive]}
+          >
+            <Feather name="grid" size={15} color={viewMode === 'list' ? '#ffffff' : colors.textMuted} />
+            <Text style={[styles.viewToggleText, viewMode === 'list' && styles.viewToggleTextActive]}>清單</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setViewMode('map')}
+            style={[styles.viewToggleButton, viewMode === 'map' && styles.viewToggleButtonActive]}
+          >
+            <Feather name="map" size={15} color={viewMode === 'map' ? '#ffffff' : colors.textMuted} />
+            <Text style={[styles.viewToggleText, viewMode === 'map' && styles.viewToggleTextActive]}>地圖</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <View style={styles.filterWrap}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
+          <Chip label="全部分類" active={!boardFilter} onPress={() => setBoardFilter(null)} />
+          {boardOptions.map((board) => (
+            <Chip
+              key={board}
+              label={board}
+              active={boardFilter === board}
+              onPress={() => setBoardFilter((current) => current === board ? null : board)}
+            />
+          ))}
+        </ScrollView>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
           {TYPE_FILTERS.map((filter) => (
             <Chip
@@ -726,19 +910,23 @@ export default function ToolsIdeaLibraryScreen() {
           <ActivityIndicator color={colors.primary} />
         </View>
       ) : (
-        <FlatList
-          data={filteredIdeas}
-          keyExtractor={(item) => item.id}
-          renderItem={renderIdea}
-          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 110 }]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Feather name="bookmark" size={36} color="#d1d5db" />
-              <Text style={styles.emptyText}>未有題材，點擊 + 新增你的第一個靈感</Text>
-            </View>
-          }
-        />
+        viewMode === 'map' ? (
+          renderMapContent()
+        ) : (
+          <FlatList
+            data={filteredIdeas}
+            keyExtractor={(item) => item.id}
+            renderItem={renderIdea}
+            contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 110 }]}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Feather name="bookmark" size={36} color="#d1d5db" />
+                <Text style={styles.emptyText}>未有題材，點擊 + 新增你的第一個靈感</Text>
+              </View>
+            }
+          />
+        )
       )}
 
       <FormSheet
@@ -1007,6 +1195,66 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14
   },
+  searchWrap: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 10
+  },
+  searchBox: {
+    minHeight: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+    backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 14
+  },
+  searchInput: {
+    flex: 1,
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    paddingVertical: 10
+  },
+  searchClear: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f3f4f6'
+  },
+  viewToggle: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+    backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    padding: 3
+  },
+  viewToggleButton: {
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 7
+  },
+  viewToggleButtonActive: {
+    backgroundColor: '#8B0000'
+  },
+  viewToggleText: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  viewToggleTextActive: {
+    color: '#ffffff'
+  },
   addButton: {
     borderRadius: 999,
     backgroundColor: colors.primary,
@@ -1062,13 +1310,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E8DED6',
     backgroundColor: '#ffffff',
-    padding: 16,
     marginBottom: 12,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 2
+  },
+  cardImage: {
+    width: '100%',
+    height: ideaCardImageHeight,
+    backgroundColor: '#efe7df'
+  },
+  cardImageEmpty: {
+    height: ideaCardImageHeight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F2ED'
+  },
+  cardBody: {
+    padding: 16
+  },
+  cardPlaceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 9
+  },
+  cardPin: {
+    fontSize: 15
+  },
+  cardPlaceText: {
+    flex: 1,
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    fontWeight: '700'
   },
   cardHeader: {
     flexDirection: 'row',
@@ -1138,6 +1416,91 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
     lineHeight: 22
+  },
+  libraryMapWrap: {
+    flex: 1,
+    marginTop: 8,
+    backgroundColor: '#0b1118'
+  },
+  libraryMap: {
+    flex: 1
+  },
+  mapSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: '#060606',
+    paddingTop: 10
+  },
+  mapHandle: {
+    alignSelf: 'center',
+    width: 52,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    marginBottom: 12
+  },
+  mapSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    marginBottom: 12
+  },
+  mapSheetTitle: {
+    color: '#ffffff',
+    fontFamily: fonts.bodyBold,
+    fontSize: 17,
+    fontWeight: '800'
+  },
+  mapSheetCount: {
+    color: 'rgba(255,255,255,0.55)',
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13,
+    fontWeight: '600'
+  },
+  mapCardsContent: {
+    gap: 12,
+    paddingHorizontal: 18
+  },
+  mapIdeaCard: {
+    width: 170,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#151515',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)'
+  },
+  mapIdeaImage: {
+    width: '100%',
+    height: 112,
+    backgroundColor: '#222'
+  },
+  mapIdeaImageEmpty: {
+    height: 112,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#202020'
+  },
+  mapIdeaTitle: {
+    color: '#ffffff',
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 19,
+    paddingHorizontal: 10,
+    paddingTop: 10
+  },
+  mapIdeaPlace: {
+    color: 'rgba(255,255,255,0.55)',
+    fontFamily: fonts.body,
+    fontSize: 12,
+    paddingHorizontal: 10,
+    paddingTop: 4,
+    paddingBottom: 12
   },
   modalOverlay: {
     flex: 1,
