@@ -2,7 +2,8 @@ import { Stack, router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ShareIntentModule, ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import {
@@ -18,6 +19,7 @@ import {
 import { AppLoadingScreen } from '@/components/AppLoadingScreen';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { registerPushToken } from '@/lib/notifications';
+import { SHARE_INTENT_URL } from '@/lib/shareIdeas';
 import { colors } from '@/theme/colors';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -27,17 +29,33 @@ function RootNavigator() {
   const { session, loading } = useAuth();
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
-  const didCheckPendingShare = useRef(false);
+  const lastShareRouteAt = useRef(0);
 
-  useEffect(() => {
-    if (loading || didCheckPendingShare.current) return;
-
-    didCheckPendingShare.current = true;
-    ShareIntentModule?.getShareIntent('soonlog://dataUrl=soonlogShareKey#weburl');
+  const checkPendingShare = useCallback(() => {
+    if (loading) return;
+    ShareIntentModule?.getShareIntent(SHARE_INTENT_URL);
   }, [loading]);
 
   useEffect(() => {
+    checkPendingShare();
+  }, [checkPendingShare]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        checkPendingShare();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [checkPendingShare]);
+
+  useEffect(() => {
     if (!hasShareIntent || loading) return;
+
+    const now = Date.now();
+    if (now - lastShareRouteAt.current < 1200) return;
+    lastShareRouteAt.current = now;
 
     if (session) {
       router.push('/idea/share');
@@ -114,7 +132,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ShareIntentProvider options={{ scheme: 'soonlog' }}>
+      <ShareIntentProvider options={{ scheme: 'soonlog', resetOnBackground: false }}>
         <AuthProvider>
           <RootNavigator />
         </AuthProvider>

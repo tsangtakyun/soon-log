@@ -1,45 +1,22 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useShareIntentContext } from 'expo-share-intent';
 import { Feather } from '@expo/vector-icons';
 import { Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/lib/supabase';
-import { enrichIdeaFromUrl } from '@/lib/ideaEnrichment';
 import { mergeLocalIdeaBoards } from '@/lib/ideaBoards';
+import { boardsFromShareMeta, extractSharedUrl, saveSharedIdea } from '@/lib/shareIdeas';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 
 type Status = 'idle' | 'ready' | 'saving' | 'saved' | 'error';
 
-function extractUrl(text?: string | null) {
-  return text?.match(/https?:\/\/[^\s]+/)?.[0]?.replace(/[),.]+$/, '') ?? '';
-}
-
-function boardsFromShareMeta(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item).trim()).filter(Boolean);
-  }
-
-  if (typeof value === 'string') {
-    const text = value.trim();
-    if (!text) return [];
-
-    try {
-      return boardsFromShareMeta(JSON.parse(text));
-    } catch {
-      return text.split(',').map((item) => item.trim()).filter(Boolean);
-    }
-  }
-
-  return [];
-}
-
 export default function IdeaShareScreen() {
   const { shareIntent, hasShareIntent, resetShareIntent } = useShareIntentContext();
   const { user } = useAuth();
   const router = useRouter();
+  const autoSaveStarted = useRef(false);
   const [status, setStatus] = useState<Status>('idle');
   const [url, setUrl] = useState('');
   const [selectedBoard, setSelectedBoard] = useState('');
@@ -48,7 +25,7 @@ export default function IdeaShareScreen() {
   useEffect(() => {
     if (!hasShareIntent || !shareIntent || status !== 'idle') return;
 
-    const sharedUrl = shareIntent.webUrl || extractUrl(shareIntent.text);
+    const sharedUrl = shareIntent.webUrl || extractSharedUrl(shareIntent.text);
     if (!sharedUrl) {
       setStatus('error');
       setErrorMsg('無法讀取分享連結');
@@ -69,112 +46,21 @@ export default function IdeaShareScreen() {
     setStatus('ready');
   }, [hasShareIntent, shareIntent, status]);
 
-  async function enrichIdea(ideaId: string, targetUrl: string, boardCategories: string[]) {
-    try {
-      await enrichIdeaFromUrl(ideaId, targetUrl, boardCategories);
-    } catch (error) {
-      console.warn('[share-idea] background enrich failed', error);
-    }
-  }
-
-  async function resolveWorkspaceId() {
-    if (!user) return null;
-
-    const { data: member } = await supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (member?.workspace_id) return member.workspace_id as string;
-
-    const { data: existing } = await supabase
-      .from('workspaces')
-      .select('id')
-      .eq('owner_id', user.id)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (existing?.id) return existing.id as string;
-
-    const { data: created, error } = await supabase
-      .from('workspaces')
-      .insert({
-        name: 'SOON-LOG',
-        type: 'mixed',
-        owner: user.email ?? null,
-        owner_id: user.id
-      })
-      .select('id')
-      .maybeSingle();
-
-    if (error || !created?.id) return null;
-
-    await supabase
-      .from('workspace_members')
-      .insert({
-        workspace_id: created.id,
-        user_id: user.id,
-        email: user.email ?? null,
-        display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'SOON',
-        role: 'owner',
-        status: 'active',
-        invited_by: user.id
-      });
-
-    return created.id as string;
-  }
-
   async function saveIdea() {
     if (!url || !user) return;
 
     setStatus('saving');
     try {
-      const boardCategories = selectedBoard ? [selectedBoard] : [];
       const sharedBoards = boardsFromShareMeta(shareIntent?.meta?.soonBoards);
-      if (sharedBoards.length > 0 || selectedBoard) {
-        await mergeLocalIdeaBoards([...sharedBoards, selectedBoard]);
-      }
-      const workspaceId = await resolveWorkspaceId();
-      const { data, error } = await supabase.from('ideas').insert({
-        workspace_id: workspaceId,
-        user_id: user.id,
+      await saveSharedIdea({
+        user,
         url,
-        thumb: null,
-        title: 'IG Reel 靈感',
-        topic: 'IG Reel 靈感',
-        summary: '已由 Instagram 儲存，AI 會稍後補充題材資料。',
-        script_hook: '',
-        country: 'HK',
-        platform: 'instagram',
-        tags: ['instagram', '待分析'],
-        categories: boardCategories,
-        place_name: '',
-        place_address: '',
-        viral_score: 0,
-        ai_viral_base: 0,
-        date: new Date().toISOString(),
-        notes: '',
-        lat: null,
-        lng: null,
-        description: '',
-        hook: '',
-        region: 'HK',
-        viral_potential: 'medium',
-        source_url: url
-      }).select('id').single();
-
-      if (error) throw error;
+        selectedBoard,
+        sharedBoards
+      });
 
       setStatus('saved');
       resetShareIntent();
-      if (data?.id) {
-        enrichIdea(data.id, url, boardCategories);
-      }
       setTimeout(() => router.replace('/(app)/tools/idea-library'), 1200);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '請稍後再試';
@@ -182,6 +68,13 @@ export default function IdeaShareScreen() {
       setStatus('ready');
     }
   }
+
+  useEffect(() => {
+    if (status !== 'ready' || !url || !user || autoSaveStarted.current) return;
+
+    autoSaveStarted.current = true;
+    saveIdea();
+  }, [status, url, user]);
 
   function dismiss() {
     resetShareIntent();
