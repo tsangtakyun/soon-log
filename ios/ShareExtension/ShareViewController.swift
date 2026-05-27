@@ -5,6 +5,7 @@
  *  - https://ajith-ab.github.io/react-native-receive-sharing-intent/docs/ios#create-share-extension
  */
 import MobileCoreServices
+import LinkPresentation
 import Photos
 import Social
 import UIKit
@@ -105,9 +106,10 @@ class ShareViewController: UIViewController {
   private func handleUrl(content: NSExtensionItem, attachment: NSItemProvider, index: Int) async {
     Task.detached {
       if let item = try! await attachment.loadItem(forTypeIdentifier: self.urlContentType) as? URL {
+        let previewImage = await self.fetchLinkPreviewImage(for: item)
         Task { @MainActor in
 
-          self.sharedWebUrl.append(WebUrl(url: item.absoluteString, meta: self.metaWithSelectedBoard()))
+          self.sharedWebUrl.append(WebUrl(url: item.absoluteString, meta: self.metaWithSelectedBoard(previewImage: previewImage)))
           // If this is the last item, save sharedText in userDefaults and redirect to host app
           if index == (content.attachments?.count)! - 1 {
             let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
@@ -134,30 +136,32 @@ class ShareViewController: UIViewController {
         forTypeIdentifier: self.propertyListType, options: nil)
         as? NSDictionary
       {
-        Task { @MainActor in
+        if let results = item[NSExtensionJavaScriptPreprocessingResultsKey] as? NSDictionary {
+          NSLog(
+            "[DEBUG] NSExtensionJavaScriptPreprocessingResultsKey \(String(describing: results))"
+          )
+          let baseURI = results["baseURI"] as! String
+          var previewImage: String? = nil
+          if let url = URL(string: baseURI) {
+            previewImage = await self.fetchLinkPreviewImage(for: url)
+          }
 
-          if let results = item[NSExtensionJavaScriptPreprocessingResultsKey]
-            as? NSDictionary
-          {
-            NSLog(
-              "[DEBUG] NSExtensionJavaScriptPreprocessingResultsKey \(String(describing: results))"
-            )
+          Task { @MainActor in
             self.sharedWebUrl.append(
-              WebUrl(url: results["baseURI"] as! String, meta: self.metaWithSelectedBoard(existingMeta: results["meta"] as? String)))
+              WebUrl(url: baseURI, meta: self.metaWithSelectedBoard(existingMeta: results["meta"] as? String, previewImage: previewImage)))
             // If this is the last item, save sharedText in userDefaults and redirect to host app
             if index == (content.attachments?.count)! - 1 {
               let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
               userDefaults?.set(self.toData(data: self.sharedWebUrl), forKey: self.sharedKey)
               userDefaults?.synchronize()
-              self.linkPreviewLabel.text = results["baseURI"] as? String
+              self.linkPreviewLabel.text = baseURI
               self.finishLoading(type: .weburl)
             }
-          } else {
-            NSLog("[ERROR] Cannot load preprocessing results !\(String(describing: content))")
-            self.dismissWithError(
-              message: "Cannot load preprocessing results \(String(describing: content))")
           }
-
+        } else {
+          NSLog("[ERROR] Cannot load preprocessing results !\(String(describing: content))")
+          await self.dismissWithError(
+            message: "Cannot load preprocessing results \(String(describing: content))")
         }
       } else {
         NSLog("[ERROR] Cannot load preprocessing content !\(String(describing: content))")
@@ -610,7 +614,7 @@ class ShareViewController: UIViewController {
     }
   }
 
-  private func metaWithSelectedBoard(existingMeta: String? = nil) -> String {
+  private func metaWithSelectedBoard(existingMeta: String? = nil, previewImage: String? = nil) -> String {
     var meta: [String: Any] = [:]
 
     if let existingMeta,
@@ -621,6 +625,9 @@ class ShareViewController: UIViewController {
 
     meta["soonBoard"] = selectedBoard == "Recents" ? "" : selectedBoard
     meta["soonBoards"] = storedBoards()
+    if let previewImage, !previewImage.isEmpty {
+      meta["soonThumbnail"] = previewImage
+    }
 
     guard let data = try? JSONSerialization.data(withJSONObject: meta),
       let string = String(data: data, encoding: .utf8)
@@ -832,6 +839,44 @@ class ShareViewController: UIViewController {
       .containerURL(forSecurityApplicationGroupIdentifier: self.hostAppGroupIdentifier)!
       .appendingPathComponent("\(fileName).jpg")
     return path
+  }
+
+  private func fetchLinkPreviewImage(for url: URL) async -> String? {
+    if #available(iOS 13.0, *) {
+      return await withCheckedContinuation { continuation in
+        let provider = LPMetadataProvider()
+        provider.timeout = 4
+        provider.startFetchingMetadata(for: url) { metadata, _ in
+          guard let imageProvider = metadata?.imageProvider ?? metadata?.iconProvider,
+            imageProvider.canLoadObject(ofClass: UIImage.self)
+          else {
+            continuation.resume(returning: nil)
+            return
+          }
+
+          imageProvider.loadObject(ofClass: UIImage.self) { object, _ in
+            guard let image = object as? UIImage,
+              let data = image.jpegData(compressionQuality: 0.82),
+              let container = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: self.hostAppGroupIdentifier)
+            else {
+              continuation.resume(returning: nil)
+              return
+            }
+
+            let previewURL = container.appendingPathComponent("link-preview-\(UUID().uuidString).jpg")
+            do {
+              try data.write(to: previewURL)
+              continuation.resume(returning: previewURL.absoluteString)
+            } catch {
+              continuation.resume(returning: nil)
+            }
+          }
+        }
+      }
+    }
+
+    return nil
   }
 
   class WebUrl: Codable {

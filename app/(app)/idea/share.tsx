@@ -20,6 +20,7 @@ export default function IdeaShareScreen() {
   const [status, setStatus] = useState<Status>('idle');
   const [url, setUrl] = useState('');
   const [selectedBoard, setSelectedBoard] = useState('');
+  const [previewImage, setPreviewImage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
@@ -33,6 +34,7 @@ export default function IdeaShareScreen() {
     }
 
     const board = typeof shareIntent.meta?.soonBoard === 'string' ? shareIntent.meta.soonBoard.trim() : '';
+    const thumbnail = typeof shareIntent.meta?.soonThumbnail === 'string' ? shareIntent.meta.soonThumbnail.trim() : '';
     const boards = boardsFromShareMeta(shareIntent.meta?.soonBoards);
     if (board) boards.push(board);
     if (boards.length > 0) {
@@ -42,6 +44,7 @@ export default function IdeaShareScreen() {
     }
 
     setSelectedBoard(board);
+    setPreviewImage(thumbnail);
     setUrl(sharedUrl);
     setStatus('ready');
   }, [hasShareIntent, shareIntent, status]);
@@ -56,7 +59,8 @@ export default function IdeaShareScreen() {
         user,
         url,
         selectedBoard,
-        sharedBoards
+        sharedBoards,
+        previewImage
       });
 
       setStatus('saved');
@@ -74,7 +78,7 @@ export default function IdeaShareScreen() {
 
     autoSaveStarted.current = true;
     saveIdea();
-  }, [status, url, user]);
+  }, [status, url, user, previewImage]);
 
   function dismiss() {
     resetShareIntent();

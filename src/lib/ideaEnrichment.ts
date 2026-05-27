@@ -23,6 +23,8 @@ type AnalysisResult = {
   categories?: string[];
 };
 
+type IdeaUpdate = Record<string, unknown>;
+
 function asStringArray(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.map((item) => String(item).trim()).filter(Boolean);
@@ -78,6 +80,60 @@ async function geocodePlace(placeName: string, country: string) {
   return null;
 }
 
+function missingColumnName(error: unknown) {
+  const message = typeof error === 'object' && error && 'message' in error
+    ? String((error as { message?: unknown }).message ?? '')
+    : String(error ?? '');
+
+  if (!message.includes('schema cache') && !message.includes('Could not find')) return '';
+  return message.match(/'([^']+)' column/)?.[1] ?? '';
+}
+
+async function updateIdeaWithFallback(ideaId: string, update: IdeaUpdate) {
+  let payload = { ...update };
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { error } = await supabase.from('ideas').update(payload).eq('id', ideaId);
+    if (!error) return;
+
+    lastError = error;
+    const column = missingColumnName(error);
+    if (!column) break;
+
+    const beforeKeys = Object.keys(payload).length;
+    delete payload[column];
+    delete payload[`${column}s`];
+    if (column.endsWith('s')) {
+      delete payload[column.slice(0, -1)];
+    }
+
+    if (Object.keys(payload).length === beforeKeys || Object.keys(payload).length === 0) break;
+  }
+
+  const safePayload: IdeaUpdate = {};
+  [
+    'title',
+    'description',
+    'hook',
+    'region',
+    'viral_potential',
+    'source_url',
+    'platform',
+    'tags'
+  ].forEach((key) => {
+    if (key in update) safePayload[key] = update[key];
+  });
+
+  if (Object.keys(safePayload).length > 0) {
+    const { error } = await supabase.from('ideas').update(safePayload).eq('id', ideaId);
+    if (!error) return;
+    lastError = error;
+  }
+
+  throw lastError;
+}
+
 export async function enrichIdeaFromUrl(ideaId: string, targetUrl: string, boardCategories: string[] = []) {
   const result = await analyzeUrl(targetUrl);
   const blockedTitle = result.title === 'Instagram' || result.title === 'TikTok' || !result.title;
@@ -87,30 +143,32 @@ export async function enrichIdeaFromUrl(ideaId: string, targetUrl: string, board
   const mergedCategories = Array.from(new Set([...(result.categories ?? []), ...boardCategories].filter(Boolean)));
   const description = result.description ?? result.desc ?? '';
   const videoUrl = result.video_url || result.videoUrl || null;
+  const update: IdeaUpdate = {
+    title,
+    topic: result.topic || title,
+    summary: description,
+    script_hook: result.script_hook ?? result.hook ?? '',
+    country: result.country ?? 'HK',
+    platform: result.platform ?? 'instagram',
+    tags: result.tags?.length ? result.tags : ['instagram'],
+    categories: mergedCategories,
+    place_name: result.placeName ?? '',
+    place_address: result.placeAddress ?? '',
+    lat: coords?.lat ?? null,
+    lng: coords?.lng ?? null,
+    description: result.desc ?? result.description ?? '',
+    hook: result.hook ?? '',
+    region: result.country ?? 'HK',
+    viral_potential: result.viral_potential ?? 'medium',
+    source_url: targetUrl
+  };
 
-  const { error } = await supabase
-    .from('ideas')
-    .update({
-      thumb: result.image || null,
-      video_url: videoUrl,
-      title,
-      topic: result.topic || title,
-      summary: description,
-      script_hook: result.script_hook ?? result.hook ?? '',
-      country: result.country ?? 'HK',
-      platform: result.platform ?? 'instagram',
-      tags: result.tags?.length ? result.tags : ['instagram'],
-      categories: mergedCategories,
-      place_name: result.placeName ?? '',
-      place_address: result.placeAddress ?? '',
-      lat: coords?.lat ?? null,
-      lng: coords?.lng ?? null,
-      description: result.desc ?? result.description ?? '',
-      hook: result.hook ?? '',
-      region: result.country ?? 'HK',
-      viral_potential: result.viral_potential ?? 'medium'
-    })
-    .eq('id', ideaId);
+  if (result.image) {
+    update.thumb = result.image;
+  }
+  if (videoUrl) {
+    update.video_url = videoUrl;
+  }
 
-  if (error) throw error;
+  await updateIdeaWithFallback(ideaId, update);
 }

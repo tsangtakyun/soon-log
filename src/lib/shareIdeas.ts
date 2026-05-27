@@ -98,28 +98,52 @@ export async function resolveWorkspaceId(user: AuthUser) {
   return created.id as string;
 }
 
-async function findExistingIdea(userId: string, url: string) {
+type ExistingIdea = {
+  id: string;
+  categories?: string[] | null;
+  thumb?: string | null;
+};
+
+async function findExistingIdea(userId: string, url: string): Promise<ExistingIdea | null> {
   const { data: bySource } = await supabase
     .from('ideas')
-    .select('id')
+    .select('id, categories, thumb')
     .eq('user_id', userId)
     .eq('source_url', url)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (bySource?.id) return bySource.id as string;
+  if (bySource?.id) return bySource as ExistingIdea;
 
   const { data: byUrl } = await supabase
     .from('ideas')
-    .select('id')
+    .select('id, categories, thumb')
     .eq('user_id', userId)
     .eq('url', url)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  return byUrl?.id ? byUrl.id as string : null;
+  return byUrl?.id ? byUrl as ExistingIdea : null;
+}
+
+async function updateExistingSharedIdea(existing: ExistingIdea, boardCategories: string[], previewImage: string) {
+  const nextCategories = unique([...(Array.isArray(existing.categories) ? existing.categories : []), ...boardCategories]);
+  const update: Record<string, unknown> = {
+    categories: nextCategories
+  };
+
+  if (previewImage && !existing.thumb) {
+    update.thumb = previewImage;
+  }
+
+  const { error } = await supabase
+    .from('ideas')
+    .update(update)
+    .eq('id', existing.id);
+
+  if (error) throw error;
 }
 
 export async function saveSharedIdea(params: {
@@ -127,8 +151,9 @@ export async function saveSharedIdea(params: {
   url: string;
   selectedBoard?: string;
   sharedBoards?: string[];
+  previewImage?: string;
 }) {
-  const { user, url, selectedBoard = '', sharedBoards = [] } = params;
+  const { user, url, selectedBoard = '', sharedBoards = [], previewImage = '' } = params;
   const boardCategories = unique(selectedBoard ? [selectedBoard] : []);
   const allBoards = unique([...sharedBoards, selectedBoard]);
 
@@ -136,9 +161,10 @@ export async function saveSharedIdea(params: {
     await mergeLocalIdeaBoards(allBoards);
   }
 
-  const existingId = await findExistingIdea(user.id, url);
-  if (existingId) {
-    return { id: existingId, existing: true };
+  const existingIdea = await findExistingIdea(user.id, url);
+  if (existingIdea) {
+    await updateExistingSharedIdea(existingIdea, boardCategories, previewImage);
+    return { id: existingIdea.id, existing: true };
   }
 
   const workspaceId = await resolveWorkspaceId(user);
@@ -148,7 +174,7 @@ export async function saveSharedIdea(params: {
       workspace_id: workspaceId,
       user_id: user.id,
       url,
-      thumb: null,
+      thumb: previewImage || null,
       title: 'IG Reel 靈感',
       topic: 'IG Reel 靈感',
       summary: '已由 Instagram 儲存，AI 會稍後補充題材資料。',
@@ -178,7 +204,7 @@ export async function saveSharedIdea(params: {
 
   if (data?.id) {
     enrichIdeaFromUrl(data.id, url, boardCategories).catch((error) => {
-      console.warn('[share-idea] background enrich failed', error);
+      console.log('[share-idea] background enrich skipped', error);
     });
   }
 
