@@ -92,7 +92,8 @@ const emptyDraft: IdeaDraft = {
 };
 
 const screenWidth = Dimensions.get('window').width;
-const ideaCardImageHeight = Math.round((screenWidth - 32) * 0.54);
+const ideaCardPreviewWidth = Math.min(152, Math.round((screenWidth - 32) * 0.38));
+const ideaCardPreviewHeight = Math.round((ideaCardPreviewWidth * 9) / 16);
 const enrichingIdeaIds = new Set<string>();
 
 function normalizeType(value?: string | null): Exclude<IdeaType, 'all'> {
@@ -970,23 +971,32 @@ export default function ToolsIdeaLibraryScreen() {
     const placeName = item.place_name || item.shop_name;
     return (
       <Pressable onPress={() => openDetailModal(item)} style={({ pressed }) => [styles.ideaCard, pressed && styles.pressed]}>
-        {playableVideoUrl ? (
-          <ClipPlayer
-            clip={{ id: item.id, video_url: playableVideoUrl, media_urls: previewImage ? [previewImage] : [] }}
-            width={screenWidth - 32}
-            height={ideaCardImageHeight}
-            thumbnail
-          />
-        ) : previewImage ? (
-          <Image source={{ uri: previewImage }} style={styles.cardImage} resizeMode="cover" />
-        ) : (
-          <View style={styles.cardImageEmpty}>
-            <Feather name={sourceUrl ? 'instagram' : 'bookmark'} size={28} color="#c7b8ad" />
-            <Text style={styles.cardImageEmptyText}>
-              {sourceUrl ? '未能預覽原片' : '未有預覽'}
-            </Text>
-          </View>
-        )}
+        <View style={styles.cardMedia}>
+          {playableVideoUrl ? (
+            <ClipPlayer
+              clip={{ id: item.id, video_url: playableVideoUrl, media_urls: previewImage ? [previewImage] : [] }}
+              width={ideaCardPreviewWidth}
+              height={ideaCardPreviewHeight}
+              thumbnail
+            />
+          ) : previewImage ? (
+            <>
+              <Image source={{ uri: previewImage }} style={styles.cardImage} resizeMode="cover" />
+              {sourceUrl ? (
+                <View pointerEvents="none" style={styles.cardPlayBadge}>
+                  <Feather name="play" size={13} color="#ffffff" />
+                </View>
+              ) : null}
+            </>
+          ) : (
+            <View style={styles.cardImageEmpty}>
+              <Feather name={sourceUrl ? 'instagram' : 'bookmark'} size={22} color="#c7b8ad" />
+              <Text style={styles.cardImageEmptyText}>
+                {sourceUrl ? '未能預覽原片' : '未有預覽'}
+              </Text>
+            </View>
+          )}
+        </View>
         <View style={styles.cardBody}>
           {placeName ? (
             <View style={styles.cardPlaceRow}>
@@ -998,7 +1008,7 @@ export default function ToolsIdeaLibraryScreen() {
             <Text style={styles.cardTitle} numberOfLines={2}>{item.title || '未命名題材'}</Text>
             <Feather name="chevron-right" size={18} color={colors.textMuted} />
           </View>
-          <Text style={styles.cardTopic} numberOfLines={2}>{item.topic || item.summary || '未設定主題'}</Text>
+          <Text style={styles.cardTopic} numberOfLines={1}>{item.topic || item.summary || '未設定主題'}</Text>
           <View style={styles.cardTags}>
             <Text style={styles.typeTag}>{typeLabel(item.platform)}</Text>
             {regions.map((region) => <Text key={region} style={styles.regionTag}>{region}</Text>)}
@@ -1596,53 +1606,78 @@ const styles = StyleSheet.create({
     paddingTop: 8
   },
   ideaCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E8DED6',
     backgroundColor: '#ffffff',
     marginBottom: 12,
-    overflow: 'hidden',
+    padding: 10,
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 2
   },
+  cardMedia: {
+    width: ideaCardPreviewWidth,
+    height: ideaCardPreviewHeight,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#F5F2ED'
+  },
   cardImage: {
     width: '100%',
-    height: ideaCardImageHeight,
+    height: '100%',
     backgroundColor: '#efe7df'
   },
-  cardImageEmpty: {
-    height: ideaCardImageHeight,
+  cardPlayBadge: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    width: 32,
+    height: 32,
+    marginLeft: -16,
+    marginTop: -16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    paddingLeft: 2
+  },
+  cardImageEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     backgroundColor: '#F5F2ED'
   },
   cardImageEmptyText: {
     color: '#a89b92',
     fontFamily: fonts.bodyMedium,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600'
   },
   cardBody: {
-    padding: 16
+    flex: 1,
+    justifyContent: 'center',
+    paddingLeft: 12
   },
   cardPlaceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    marginBottom: 9
+    marginBottom: 5
   },
   cardPin: {
-    fontSize: 15
+    fontSize: 13
   },
   cardPlaceText: {
     flex: 1,
     color: colors.primary,
     fontFamily: fonts.bodyBold,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700'
   },
   cardHeader: {
@@ -1654,21 +1689,21 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.text,
     fontFamily: fonts.bodyBold,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
-    lineHeight: 23
+    lineHeight: 21
   },
   cardTopic: {
-    marginTop: 7,
+    marginTop: 5,
     color: colors.textMuted,
     fontFamily: fonts.body,
-    fontSize: 14
+    fontSize: 13
   },
   cardTags: {
-    marginTop: 12,
+    marginTop: 8,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 7
+    gap: 5
   },
   typeTag: {
     overflow: 'hidden',
@@ -1692,7 +1727,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4
   },
   cardDate: {
-    marginTop: 12,
+    marginTop: 8,
     color: '#9ca3af',
     fontFamily: fonts.body,
     fontSize: 12
