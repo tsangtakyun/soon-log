@@ -102,13 +102,17 @@ type ExistingIdea = {
   id: string;
   categories?: string[] | null;
   thumb?: string | null;
-  video_url?: string | null;
 };
+
+function isMissingColumnError(error: unknown, column: string) {
+  const text = JSON.stringify(error).toLowerCase();
+  return text.includes(column.toLowerCase()) && (text.includes('schema cache') || text.includes('column'));
+}
 
 async function findExistingIdea(userId: string, url: string): Promise<ExistingIdea | null> {
   const { data: bySource } = await supabase
     .from('ideas')
-    .select('id, categories, thumb, video_url')
+    .select('id, categories, thumb')
     .eq('user_id', userId)
     .eq('source_url', url)
     .order('created_at', { ascending: false })
@@ -119,7 +123,7 @@ async function findExistingIdea(userId: string, url: string): Promise<ExistingId
 
   const { data: byUrl } = await supabase
     .from('ideas')
-    .select('id, categories, thumb, video_url')
+    .select('id, categories, thumb')
     .eq('user_id', userId)
     .eq('url', url)
     .order('created_at', { ascending: false })
@@ -139,7 +143,7 @@ async function updateExistingSharedIdea(existing: ExistingIdea, boardCategories:
     update.thumb = previewImage;
   }
 
-  if (videoUrl && !existing.video_url) {
+  if (videoUrl) {
     update.video_url = videoUrl;
   }
 
@@ -148,7 +152,17 @@ async function updateExistingSharedIdea(existing: ExistingIdea, boardCategories:
     .update(update)
     .eq('id', existing.id);
 
-  if (error) throw error;
+  if (error && isMissingColumnError(error, 'video_url') && 'video_url' in update) {
+    delete update.video_url;
+    const { error: retryError } = await supabase
+      .from('ideas')
+      .update(update)
+      .eq('id', existing.id);
+
+    if (retryError) throw retryError;
+  } else if (error) {
+    throw error;
+  }
 
   return nextCategories;
 }
@@ -179,46 +193,62 @@ export async function saveSharedIdea(params: {
   }
 
   const workspaceId = await resolveWorkspaceId(user);
+  const insertPayload: Record<string, unknown> = {
+    workspace_id: workspaceId,
+    user_id: user.id,
+    url,
+    thumb: previewImage || null,
+    video_url: videoUrl || null,
+    title: 'IG Reel 靈感',
+    topic: 'IG Reel 靈感',
+    summary: '已由 Instagram 儲存，AI 會稍後補充題材資料。',
+    script_hook: '',
+    country: 'HK',
+    platform: 'instagram',
+    tags: ['instagram', '待分析'],
+    categories: boardCategories,
+    place_name: '',
+    place_address: '',
+    viral_score: 0,
+    ai_viral_base: 0,
+    date: new Date().toISOString(),
+    notes: '',
+    lat: null,
+    lng: null,
+    description: '',
+    hook: '',
+    region: 'HK',
+    viral_potential: 'medium',
+    source_url: url
+  };
+
   const { data, error } = await supabase
     .from('ideas')
-    .insert({
-      workspace_id: workspaceId,
-      user_id: user.id,
-      url,
-      thumb: previewImage || null,
-      video_url: videoUrl || null,
-      title: 'IG Reel 靈感',
-      topic: 'IG Reel 靈感',
-      summary: '已由 Instagram 儲存，AI 會稍後補充題材資料。',
-      script_hook: '',
-      country: 'HK',
-      platform: 'instagram',
-      tags: ['instagram', '待分析'],
-      categories: boardCategories,
-      place_name: '',
-      place_address: '',
-      viral_score: 0,
-      ai_viral_base: 0,
-      date: new Date().toISOString(),
-      notes: '',
-      lat: null,
-      lng: null,
-      description: '',
-      hook: '',
-      region: 'HK',
-      viral_potential: 'medium',
-      source_url: url
-    })
+    .insert(insertPayload)
     .select('id')
     .single();
 
-  if (error) throw error;
+  let savedId = data?.id as string | undefined;
 
-  if (data?.id) {
-    enrichIdeaFromUrl(data.id, url, boardCategories).catch((error) => {
+  if (error && isMissingColumnError(error, 'video_url')) {
+    delete insertPayload.video_url;
+    const { data: retryData, error: retryError } = await supabase
+      .from('ideas')
+      .insert(insertPayload)
+      .select('id')
+      .single();
+
+    if (retryError) throw retryError;
+    savedId = retryData?.id as string | undefined;
+  } else if (error) {
+    throw error;
+  }
+
+  if (savedId) {
+    enrichIdeaFromUrl(savedId, url, boardCategories).catch((error) => {
       console.log('[share-idea] background enrich skipped', error);
     });
   }
 
-  return { id: data?.id as string, existing: false };
+  return { id: savedId as string, existing: false };
 }

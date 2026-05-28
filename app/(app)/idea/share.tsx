@@ -12,6 +12,21 @@ import { colors } from '@/theme/colors';
 
 type Status = 'idle' | 'ready' | 'saving' | 'saved' | 'error';
 
+function formatSaveError(err: unknown) {
+  if (err instanceof Error) return err.message;
+
+  if (err && typeof err === 'object') {
+    const record = err as Record<string, unknown>;
+    const parts = [record.message, record.details, record.hint, record.code]
+      .filter(Boolean)
+      .map(String);
+
+    if (parts.length > 0) return parts.join('\n');
+  }
+
+  return '請稍後再試';
+}
+
 export default function IdeaShareScreen() {
   const { shareIntent, hasShareIntent, resetShareIntent } = useShareIntentContext();
   const { user } = useAuth();
@@ -84,7 +99,8 @@ export default function IdeaShareScreen() {
       resetShareIntent();
       setTimeout(() => router.replace('/(app)/tools/idea-library'), 1200);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '請稍後再試';
+      console.warn('[share-idea] save failed', err);
+      const message = formatSaveError(err);
       Alert.alert('儲存失敗', message);
       setStatus('ready');
     }
