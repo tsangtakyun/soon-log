@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -160,13 +161,15 @@ function ideaPreviewImage(idea: IdeaRecord) {
 
 function isPlayableVideoUrl(value?: string | null) {
   if (!value) return false;
-  const url = value.toLowerCase();
+  const url = value.trim().toLowerCase();
   return (
     url.startsWith('file:') ||
     url.startsWith('content:') ||
     url.startsWith('ph:') ||
+    url.startsWith('assets-library:') ||
     url.includes('.mp4') ||
     url.includes('.mov') ||
+    url.includes('.m4v') ||
     url.includes('.m3u8') ||
     url.includes('supabase') ||
     url.includes('cloudinary') ||
@@ -176,6 +179,18 @@ function isPlayableVideoUrl(value?: string | null) {
     url.includes('akamai') ||
     url.includes('/video/')
   );
+}
+
+function normalizeVideoUrl(value?: string | null) {
+  const raw = value?.trim();
+  if (!raw) return '';
+  if (raw.startsWith('/')) return `file://${raw}`;
+  return raw;
+}
+
+function playableVideoUrl(value?: string | null) {
+  const normalized = normalizeVideoUrl(value);
+  return isPlayableVideoUrl(normalized) ? normalized : '';
 }
 
 function ideaSearchText(idea: IdeaRecord) {
@@ -542,7 +557,7 @@ function IdeaDetailSheet({
   const currentIdea = idea;
   const sourceUrl = currentIdea.source_url || currentIdea.url || '';
   const imageUrl = currentIdea.thumb || '';
-  const videoUrl = isPlayableVideoUrl(currentIdea.video_url) ? currentIdea.video_url || '' : '';
+  const videoUrl = playableVideoUrl(currentIdea.video_url);
   const placeName = currentIdea.place_name || currentIdea.shop_name || '';
   const description = currentIdea.notes || currentIdea.summary || currentIdea.description || '';
   const hasMap = typeof currentIdea.lat === 'number' && typeof currentIdea.lng === 'number';
@@ -553,7 +568,7 @@ function IdeaDetailSheet({
 
   async function openSource() {
     if (!sourceUrl) return;
-    await Linking.openURL(sourceUrl);
+    await WebBrowser.openBrowserAsync(sourceUrl);
   }
 
   async function openMap() {
@@ -589,7 +604,19 @@ function IdeaDetailSheet({
                 height={heroHeight}
               />
             ) : imageUrl ? (
-              <Image source={{ uri: imageUrl }} style={styles.detailHeroImage} resizeMode="cover" />
+              <Pressable
+                disabled={!sourceUrl}
+                onPress={openSource}
+                style={styles.detailHeroImageButton}
+              >
+                <Image source={{ uri: imageUrl }} style={styles.detailHeroImage} resizeMode="cover" />
+                {sourceUrl ? (
+                  <View pointerEvents="none" style={styles.detailSourcePlayBadge}>
+                    <Feather name="play" size={34} color="#ffffff" />
+                    <Text style={styles.detailSourcePlayText}>在 Instagram 播放</Text>
+                  </View>
+                ) : null}
+              </Pressable>
             ) : (
               <View style={styles.detailHeroEmpty}>
                 <Feather name="bookmark" size={42} color="rgba(255,255,255,0.45)" />
@@ -992,15 +1019,15 @@ export default function ToolsIdeaLibraryScreen() {
   function renderIdea({ item }: { item: IdeaRecord }) {
     const regions = ideaRegions(item);
     const previewImage = ideaPreviewImage(item);
-    const playableVideoUrl = isPlayableVideoUrl(item.video_url) ? item.video_url : null;
+    const playableVideo = playableVideoUrl(item.video_url);
     const sourceUrl = ideaSourceUrl(item);
     const placeName = item.place_name || item.shop_name;
     return (
       <Pressable onPress={() => openDetailModal(item)} style={({ pressed }) => [styles.ideaCard, pressed && styles.pressed]}>
         <View style={styles.cardMedia}>
-          {playableVideoUrl ? (
+          {playableVideo ? (
             <ClipPlayer
-              clip={{ id: item.id, video_url: playableVideoUrl, media_urls: previewImage ? [previewImage] : [] }}
+              clip={{ id: item.id, video_url: playableVideo, media_urls: previewImage ? [previewImage] : [] }}
               width={ideaGridCardWidth}
               height={ideaCardPreviewHeight}
               thumbnail
@@ -1047,13 +1074,13 @@ export default function ToolsIdeaLibraryScreen() {
 
   function renderMapIdeaCard(item: IdeaRecord) {
     const previewImage = ideaPreviewImage(item);
-    const playableVideoUrl = isPlayableVideoUrl(item.video_url) ? item.video_url : null;
+    const playableVideo = playableVideoUrl(item.video_url);
     const sourceUrl = ideaSourceUrl(item);
     return (
       <Pressable key={item.id} onPress={() => openDetailModal(item)} style={({ pressed }) => [styles.mapIdeaCard, pressed && styles.pressed]}>
-        {playableVideoUrl ? (
+        {playableVideo ? (
           <ClipPlayer
-            clip={{ id: item.id, video_url: playableVideoUrl, media_urls: previewImage ? [previewImage] : [] }}
+            clip={{ id: item.id, video_url: playableVideo, media_urls: previewImage ? [previewImage] : [] }}
             width={170}
             height={112}
             thumbnail
@@ -1277,6 +1304,31 @@ const styles = StyleSheet.create({
   detailHeroImage: {
     width: '100%',
     height: '100%'
+  },
+  detailHeroImageButton: {
+    width: '100%',
+    height: '100%'
+  },
+  detailSourcePlayBadge: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    minWidth: 154,
+    height: 74,
+    marginLeft: -77,
+    marginTop: -37,
+    borderRadius: 37,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    gap: 4
+  },
+  detailSourcePlayText: {
+    color: '#ffffff',
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    fontWeight: '700'
   },
   detailHeroEmpty: {
     flex: 1,
