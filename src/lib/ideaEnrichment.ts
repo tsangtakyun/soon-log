@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import type { ViralPotential } from '@/types';
 
 const AUTOFILL_API = 'https://idea-brainstorm.vercel.app/api/autofill-link';
+const VIDEO_RESOLVE_API = 'https://idea-brainstorm.vercel.app/api/resolve-video';
 
 type AnalysisResult = {
   title: string;
@@ -25,9 +26,23 @@ type AnalysisResult = {
 
 type IdeaUpdate = Record<string, unknown>;
 
+type VideoResolveResult = {
+  title?: string;
+  description?: string;
+  image?: string;
+  videoUrl?: string;
+};
+
 function asStringArray(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.map((item) => String(item).trim()).filter(Boolean);
+}
+
+function firstString(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
 }
 
 async function analyzeUrl(targetUrl: string): Promise<AnalysisResult> {
@@ -53,12 +68,35 @@ async function analyzeUrl(targetUrl: string): Promise<AnalysisResult> {
     tags: asStringArray(data.tags),
     platform: data.platform || 'instagram',
     image: data.image || data.image_url || data.thumbnail || data.thumbnail_url || data.ogImage || data.og_image || data.media?.thumbnail_url || '',
-    videoUrl: data.videoUrl || data.video || data.media_url || data.media?.video_url || '',
-    video_url: data.video_url || data.videoUrl || data.video || data.media_url || data.media?.video_url || '',
+    videoUrl: data.videoUrl || data.video_url || data.video || data.media_url || data.playback_url || data.hls_url || data.media?.video_url || data.media?.playback_url || '',
+    video_url: data.video_url || data.videoUrl || data.video || data.media_url || data.playback_url || data.hls_url || data.media?.video_url || data.media?.playback_url || '',
     placeName: data.placeName || data.place_name || '',
     placeAddress: data.placeAddress || data.place_address || '',
     categories: asStringArray(data.categories)
   };
+}
+
+async function resolveVideoFromUrl(targetUrl: string): Promise<VideoResolveResult | null> {
+  try {
+    const response = await fetch(VIDEO_RESOLVE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: targetUrl })
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    return {
+      title: firstString(data.title),
+      description: firstString(data.description, data.desc, data.metadataDescription),
+      image: firstString(data.image, data.image_url, data.thumbnail, data.thumbnail_url, data.ogImage, data.og_image, data.media?.thumbnail_url),
+      videoUrl: firstString(data.video_url, data.videoUrl, data.video, data.media_url, data.playback_url, data.hls_url, data.media?.video_url, data.media?.playback_url)
+    };
+  } catch (error) {
+    console.log('[idea-enrich] video resolver skipped', error);
+    return null;
+  }
 }
 
 async function geocodePlace(placeName: string, country: string) {
@@ -136,13 +174,16 @@ async function updateIdeaWithFallback(ideaId: string, update: IdeaUpdate) {
 
 export async function enrichIdeaFromUrl(ideaId: string, targetUrl: string, boardCategories: string[] = []) {
   const result = await analyzeUrl(targetUrl);
+  const resolved = result.video_url || result.videoUrl ? null : await resolveVideoFromUrl(targetUrl);
+  const resolvedVideoUrl = result.video_url || result.videoUrl || resolved?.videoUrl || null;
+  const resolvedImage = result.image || resolved?.image || '';
+  const resolvedDescription = firstString(result.description, result.desc, resolved?.description);
   const blockedTitle = result.title === 'Instagram' || result.title === 'TikTok' || !result.title;
-  const title = blockedTitle ? 'Instagram Reel 靈感' : result.title;
+  const title = blockedTitle ? (resolved?.title || 'Instagram Reel 靈感') : result.title;
   const placeQuery = result.placeName || result.placeAddress || '';
   const coords = placeQuery ? await geocodePlace(placeQuery, result.country || 'HK') : null;
   const mergedCategories = Array.from(new Set([...(result.categories ?? []), ...boardCategories].filter(Boolean)));
-  const description = result.description ?? result.desc ?? '';
-  const videoUrl = result.video_url || result.videoUrl || null;
+  const description = resolvedDescription;
   const update: IdeaUpdate = {
     title,
     topic: result.topic || title,
@@ -163,11 +204,11 @@ export async function enrichIdeaFromUrl(ideaId: string, targetUrl: string, board
     source_url: targetUrl
   };
 
-  if (result.image) {
-    update.thumb = result.image;
+  if (resolvedImage) {
+    update.thumb = resolvedImage;
   }
-  if (videoUrl) {
-    update.video_url = videoUrl;
+  if (resolvedVideoUrl) {
+    update.video_url = resolvedVideoUrl;
   }
 
   await updateIdeaWithFallback(ideaId, update);

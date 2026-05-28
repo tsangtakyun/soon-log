@@ -160,7 +160,18 @@ function ideaPreviewImage(idea: IdeaRecord) {
 function isPlayableVideoUrl(value?: string | null) {
   if (!value) return false;
   const url = value.toLowerCase();
-  return url.includes('.mp4') || url.includes('.mov') || url.includes('.m3u8') || url.includes('supabase') || url.includes('cloudinary') || url.includes('mux');
+  return (
+    url.includes('.mp4') ||
+    url.includes('.mov') ||
+    url.includes('.m3u8') ||
+    url.includes('supabase') ||
+    url.includes('cloudinary') ||
+    url.includes('mux') ||
+    url.includes('cdninstagram') ||
+    url.includes('fbcdn') ||
+    url.includes('akamai') ||
+    url.includes('/video/')
+  );
 }
 
 function ideaSearchText(idea: IdeaRecord) {
