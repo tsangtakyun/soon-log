@@ -92,6 +92,7 @@ const emptyDraft: IdeaDraft = {
 };
 
 const screenWidth = Dimensions.get('window').width;
+const screenHeight = Dimensions.get('window').height;
 const ideaGridCardWidth = Math.floor((screenWidth - 44) / 2);
 const ideaCardPreviewHeight = Math.round((ideaGridCardWidth * 16) / 9);
 const enrichingIdeaIds = new Set<string>();
@@ -200,11 +201,18 @@ function ideaNeedsEnrichment(idea: IdeaRecord) {
 
   const tags = Array.isArray(idea.tags) ? idea.tags : [];
   const hasPendingTag = tags.includes('待分析');
-  const hasGenericTitle = !idea.title || idea.title === 'IG Reel 靈感' || idea.title === 'Instagram Reel 靈感';
+  const hasGenericTitle =
+    (!idea.title || idea.title === 'IG Reel 靈感' || idea.title === 'Instagram Reel 靈感') &&
+    (!idea.thumb && !idea.summary && !idea.description);
   const missingUsefulPreview = !idea.thumb && !idea.summary && !idea.description;
   const missingMediaPreview = !idea.thumb && !idea.video_url;
+  const isInstagramSource = /instagram\.com/i.test(sourceUrl);
+  const missingInstagramDetails =
+    isInstagramSource &&
+    hasPendingTag &&
+    (!idea.video_url || !idea.place_name || (!idea.summary && !idea.description));
 
-  return hasPendingTag || hasGenericTitle || missingUsefulPreview || missingMediaPreview;
+  return hasPendingTag || hasGenericTitle || missingUsefulPreview || missingMediaPreview || missingInstagramDetails;
 }
 
 function Chip({
@@ -536,7 +544,9 @@ function IdeaDetailSheet({
   const description = currentIdea.notes || currentIdea.summary || currentIdea.description || '';
   const hasMap = typeof currentIdea.lat === 'number' && typeof currentIdea.lng === 'number';
   const categories = Array.isArray(currentIdea.categories) ? currentIdea.categories : [];
-  const heroHeight = Math.round(screenWidth * 1.18);
+  const heroHeight = Math.min(Math.round(screenWidth * 16 / 9), Math.round(screenHeight * 0.72));
+  const genericTitles = ['IG Reel 靈感', 'Instagram Reel 靈感', 'Instagram'];
+  const shouldShowTitle = Boolean(currentIdea.title && !genericTitles.includes(currentIdea.title));
 
   async function openSource() {
     if (!sourceUrl) return;
@@ -613,7 +623,9 @@ function IdeaDetailSheet({
               </View>
             ) : null}
 
-            <Text style={styles.detailTitle}>{idea.title || '未命名題材'}</Text>
+            {shouldShowTitle ? (
+              <Text style={styles.detailTitle}>{idea.title || '未命名題材'}</Text>
+            ) : null}
 
             {description ? <Text style={styles.detailDescription}>{description}</Text> : null}
 

@@ -144,6 +144,8 @@ async function updateExistingSharedIdea(existing: ExistingIdea, boardCategories:
     .eq('id', existing.id);
 
   if (error) throw error;
+
+  return nextCategories;
 }
 
 export async function saveSharedIdea(params: {
@@ -163,7 +165,10 @@ export async function saveSharedIdea(params: {
 
   const existingIdea = await findExistingIdea(user.id, url);
   if (existingIdea) {
-    await updateExistingSharedIdea(existingIdea, boardCategories, previewImage);
+    const nextCategories = await updateExistingSharedIdea(existingIdea, boardCategories, previewImage);
+    enrichIdeaFromUrl(existingIdea.id, url, nextCategories).catch((error) => {
+      console.log('[share-idea] existing background enrich skipped', error);
+    });
     return { id: existingIdea.id, existing: true };
   }
 

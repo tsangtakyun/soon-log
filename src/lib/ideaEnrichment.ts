@@ -31,6 +31,9 @@ type VideoResolveResult = {
   description?: string;
   image?: string;
   videoUrl?: string;
+  placeName?: string;
+  placeAddress?: string;
+  country?: string;
 };
 
 function asStringArray(value: unknown) {
@@ -91,7 +94,10 @@ async function resolveVideoFromUrl(targetUrl: string): Promise<VideoResolveResul
       title: firstString(data.title),
       description: firstString(data.description, data.desc, data.metadataDescription),
       image: firstString(data.image, data.image_url, data.thumbnail, data.thumbnail_url, data.ogImage, data.og_image, data.media?.thumbnail_url),
-      videoUrl: firstString(data.video_url, data.videoUrl, data.video, data.media_url, data.playback_url, data.hls_url, data.media?.video_url, data.media?.playback_url)
+      videoUrl: firstString(data.video_url, data.videoUrl, data.video, data.media_url, data.playback_url, data.hls_url, data.media?.video_url, data.media?.playback_url),
+      placeName: firstString(data.placeName, data.place_name, data.location_name, data.location?.name, data.place?.name),
+      placeAddress: firstString(data.placeAddress, data.place_address, data.location_address, data.location?.address, data.place?.address),
+      country: firstString(data.country, data.region, data.location?.country, data.place?.country)
     };
   } catch (error) {
     console.log('[idea-enrich] video resolver skipped', error);
@@ -174,14 +180,22 @@ async function updateIdeaWithFallback(ideaId: string, update: IdeaUpdate) {
 
 export async function enrichIdeaFromUrl(ideaId: string, targetUrl: string, boardCategories: string[] = []) {
   const result = await analyzeUrl(targetUrl);
-  const resolved = result.video_url || result.videoUrl ? null : await resolveVideoFromUrl(targetUrl);
-  const resolvedVideoUrl = result.video_url || result.videoUrl || resolved?.videoUrl || null;
-  const resolvedImage = result.image || resolved?.image || '';
+  const needsResolver =
+    !firstString(result.video_url, result.videoUrl) ||
+    !result.image ||
+    !firstString(result.description, result.desc) ||
+    !result.placeName;
+  const resolved = needsResolver ? await resolveVideoFromUrl(targetUrl) : null;
+  const resolvedVideoUrl = firstString(result.video_url, result.videoUrl, resolved?.videoUrl) || null;
+  const resolvedImage = firstString(result.image, resolved?.image);
   const resolvedDescription = firstString(result.description, result.desc, resolved?.description);
   const blockedTitle = result.title === 'Instagram' || result.title === 'TikTok' || !result.title;
   const title = blockedTitle ? (resolved?.title || 'Instagram Reel 靈感') : result.title;
-  const placeQuery = result.placeName || result.placeAddress || '';
-  const coords = placeQuery ? await geocodePlace(placeQuery, result.country || 'HK') : null;
+  const country = firstString(result.country, result.region, resolved?.country) || 'HK';
+  const placeName = firstString(result.placeName, resolved?.placeName);
+  const placeAddress = firstString(result.placeAddress, resolved?.placeAddress);
+  const placeQuery = placeName || placeAddress || '';
+  const coords = placeQuery ? await geocodePlace(placeQuery, country) : null;
   const mergedCategories = Array.from(new Set([...(result.categories ?? []), ...boardCategories].filter(Boolean)));
   const description = resolvedDescription;
   const update: IdeaUpdate = {
@@ -189,17 +203,17 @@ export async function enrichIdeaFromUrl(ideaId: string, targetUrl: string, board
     topic: result.topic || title,
     summary: description,
     script_hook: result.script_hook ?? result.hook ?? '',
-    country: result.country ?? 'HK',
+    country,
     platform: result.platform ?? 'instagram',
     tags: result.tags?.length ? result.tags : ['instagram'],
     categories: mergedCategories,
-    place_name: result.placeName ?? '',
-    place_address: result.placeAddress ?? '',
+    place_name: placeName,
+    place_address: placeAddress,
     lat: coords?.lat ?? null,
     lng: coords?.lng ?? null,
-    description: result.desc ?? result.description ?? '',
+    description,
     hook: result.hook ?? '',
-    region: result.country ?? 'HK',
+    region: country,
     viral_potential: result.viral_potential ?? 'medium',
     source_url: targetUrl
   };
