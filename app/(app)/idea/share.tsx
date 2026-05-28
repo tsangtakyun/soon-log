@@ -21,20 +21,35 @@ export default function IdeaShareScreen() {
   const [url, setUrl] = useState('');
   const [selectedBoard, setSelectedBoard] = useState('');
   const [previewImage, setPreviewImage] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     if (!hasShareIntent || !shareIntent || status !== 'idle') return;
 
-    const sharedUrl = shareIntent.webUrl || extractSharedUrl(shareIntent.text);
+    const meta = shareIntent.meta;
+    const metaString = (key: string) => {
+      const value = meta?.[key];
+      return typeof value === 'string' ? value.trim() : '';
+    };
+    const files = Array.isArray((shareIntent as any).files) ? (shareIntent as any).files : [];
+    const firstFile = files[0] as Record<string, unknown> | undefined;
+    const filePath = typeof firstFile?.path === 'string' ? firstFile.path.trim() : '';
+    const fileMime = typeof firstFile?.mimeType === 'string' ? firstFile.mimeType : '';
+    const fileType = fileMime.startsWith('video/') ? 'video' : fileMime.startsWith('image/') ? 'image' : '';
+    const localMediaPath = metaString('soonLocalMediaPath') || filePath;
+    const localMediaType = metaString('soonLocalMediaType') || fileType;
+    const localThumbnail = metaString('soonLocalThumbnail');
+    const thumbnail = metaString('soonThumbnail') || localThumbnail || (localMediaType === 'image' ? localMediaPath : '');
+    const sharedVideoUrl = localMediaType === 'video' ? localMediaPath : '';
+    const sharedUrl = shareIntent.webUrl || extractSharedUrl(shareIntent.text) || localMediaPath;
     if (!sharedUrl) {
       setStatus('error');
       setErrorMsg('無法讀取分享連結');
       return;
     }
 
-    const board = typeof shareIntent.meta?.soonBoard === 'string' ? shareIntent.meta.soonBoard.trim() : '';
-    const thumbnail = typeof shareIntent.meta?.soonThumbnail === 'string' ? shareIntent.meta.soonThumbnail.trim() : '';
+    const board = metaString('soonBoard');
     const boards = boardsFromShareMeta(shareIntent.meta?.soonBoards);
     if (board) boards.push(board);
     if (boards.length > 0) {
@@ -45,6 +60,7 @@ export default function IdeaShareScreen() {
 
     setSelectedBoard(board);
     setPreviewImage(thumbnail);
+    setVideoUrl(sharedVideoUrl);
     setUrl(sharedUrl);
     setStatus('ready');
   }, [hasShareIntent, shareIntent, status]);
@@ -60,7 +76,8 @@ export default function IdeaShareScreen() {
         url,
         selectedBoard,
         sharedBoards,
-        previewImage
+        previewImage,
+        videoUrl
       });
 
       setStatus('saved');
@@ -78,7 +95,7 @@ export default function IdeaShareScreen() {
 
     autoSaveStarted.current = true;
     saveIdea();
-  }, [status, url, user, previewImage]);
+  }, [status, url, user, previewImage, videoUrl]);
 
   function dismiss() {
     resetShareIntent();

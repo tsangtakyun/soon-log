@@ -27,6 +27,9 @@ class ShareViewController: UIViewController {
   let pdfContentType: String = UTType.pdf.identifier
   private var didStartProcessing = false
   private var pendingRedirectType: RedirectType?
+  private var expectedAttachmentCount = 0
+  private var processedAttachmentIndexes = Set<Int>()
+  private var didPrepareSharedPayload = false
   private let titleLabel = UILabel()
   private let statusLabel = UILabel()
   private let saveButton = UIButton(type: .system)
@@ -53,6 +56,7 @@ class ShareViewController: UIViewController {
         dismissWithError(message: "No content found")
         return
       }
+      self.expectedAttachmentCount = attachments.count
       for (index, attachment) in (attachments).enumerated() {
         if attachment.hasItemConformingToTypeIdentifier(imageContentType) {
           await handleImages(content: content, attachment: attachment, index: index)
@@ -72,7 +76,9 @@ class ShareViewController: UIViewController {
           await handleText(content: content, attachment: attachment, index: index)
         } else {
           NSLog("[ERROR] content type not handle !\(String(describing: content))")
-          dismissWithError(message: "content type not handle \(String(describing: content)))")
+          await MainActor.run {
+            self.markAttachmentProcessed(index: index)
+          }
         }
       }
     }
@@ -86,19 +92,14 @@ class ShareViewController: UIViewController {
         Task { @MainActor in
 
           self.sharedText.append(item)
-          // If this is the last item, save sharedText in userDefaults and redirect to host app
-          if index == (content.attachments?.count)! - 1 {
-            let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
-            userDefaults?.set(self.sharedText, forKey: self.sharedKey)
-            userDefaults?.synchronize()
-            self.finishLoading(type: .text)
-          }
+          self.markAttachmentProcessed(index: index)
 
         }
       } else {
         NSLog("[ERROR] Cannot load text content !\(String(describing: content))")
-        await self.dismissWithError(
-          message: "Cannot load text content \(String(describing: content))")
+        await MainActor.run {
+          self.markAttachmentProcessed(index: index)
+        }
       }
     }
   }
@@ -110,20 +111,15 @@ class ShareViewController: UIViewController {
         Task { @MainActor in
 
           self.sharedWebUrl.append(WebUrl(url: item.absoluteString, meta: self.metaWithSelectedBoard(previewImage: previewImage)))
-          // If this is the last item, save sharedText in userDefaults and redirect to host app
-          if index == (content.attachments?.count)! - 1 {
-            let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
-            userDefaults?.set(self.toData(data: self.sharedWebUrl), forKey: self.sharedKey)
-            userDefaults?.synchronize()
-            self.linkPreviewLabel.text = item.absoluteString
-            self.finishLoading(type: .weburl)
-          }
+          self.linkPreviewLabel.text = item.absoluteString
+          self.markAttachmentProcessed(index: index)
 
         }
       } else {
         NSLog("[ERROR] Cannot load url content !\(String(describing: content))")
-        await self.dismissWithError(
-          message: "Cannot load url content \(String(describing: content))")
+        await MainActor.run {
+          self.markAttachmentProcessed(index: index)
+        }
       }
     }
   }
@@ -149,24 +145,20 @@ class ShareViewController: UIViewController {
           Task { @MainActor in
             self.sharedWebUrl.append(
               WebUrl(url: baseURI, meta: self.metaWithSelectedBoard(existingMeta: results["meta"] as? String, previewImage: previewImage)))
-            // If this is the last item, save sharedText in userDefaults and redirect to host app
-            if index == (content.attachments?.count)! - 1 {
-              let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
-              userDefaults?.set(self.toData(data: self.sharedWebUrl), forKey: self.sharedKey)
-              userDefaults?.synchronize()
-              self.linkPreviewLabel.text = baseURI
-              self.finishLoading(type: .weburl)
-            }
+            self.linkPreviewLabel.text = baseURI
+            self.markAttachmentProcessed(index: index)
           }
         } else {
           NSLog("[ERROR] Cannot load preprocessing results !\(String(describing: content))")
-          await self.dismissWithError(
-            message: "Cannot load preprocessing results \(String(describing: content))")
+          await MainActor.run {
+            self.markAttachmentProcessed(index: index)
+          }
         }
       } else {
         NSLog("[ERROR] Cannot load preprocessing content !\(String(describing: content))")
-        await self.dismissWithError(
-          message: "Cannot load preprocessing content \(String(describing: content))")
+        await MainActor.run {
+          self.markAttachmentProcessed(index: index)
+        }
       }
     }
   }
@@ -199,7 +191,7 @@ class ShareViewController: UIViewController {
                   NSLog("[ERROR] Cannot load pkpass content: Item was neither URL nor Data for type \(self.pkpassContentType). Attachment: \(attachment)")
                   // Ensure dismissWithError runs on the main thread if it interacts with UI
                   Task { @MainActor in
-                      self.dismissWithError(message: "Cannot load pkpass content (unexpected data type).")
+                      self.markAttachmentProcessed(index: index)
                   }
               }
           } catch {
@@ -207,7 +199,7 @@ class ShareViewController: UIViewController {
               NSLog("[ERROR] Exception when handling pkpass: \(error.localizedDescription)")
               // Ensure dismissWithError runs on the main thread if it interacts with UI
               Task { @MainActor in
-                  self.dismissWithError(message: "Error processing pkpass: \(error.localizedDescription)")
+                  self.markAttachmentProcessed(index: index)
               }
           }
       }
@@ -227,9 +219,14 @@ class ShareViewController: UIViewController {
             url = self.saveScreenshot(imageData)
           }
 
+          guard let resolvedUrl = url else {
+            self.markAttachmentProcessed(index: index)
+            return
+          }
+
           var pixelWidth: Int? = nil
           var pixelHeight: Int? = nil
-          if let imageSource = CGImageSourceCreateWithURL(url! as CFURL, nil) {
+          if let imageSource = CGImageSourceCreateWithURL(resolvedUrl as CFURL, nil) {
             if let imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil)
               as Dictionary?
             {
@@ -250,16 +247,16 @@ class ShareViewController: UIViewController {
           }
 
           // Always copy
-          let fileName = self.getFileName(from: url!, type: .image)
-          let fileExtension = self.getExtension(from: url!, type: .image)
-          let fileSize = self.getFileSize(from: url!)
-          let mimeType = url!.mimeType(ext: fileExtension)
+          let fileName = self.getFileName(from: resolvedUrl, type: .image)
+          let fileExtension = self.getExtension(from: resolvedUrl, type: .image)
+          let fileSize = self.getFileSize(from: resolvedUrl)
+          let mimeType = resolvedUrl.mimeType(ext: fileExtension)
           let newName = "\(UUID().uuidString).\(fileExtension)"
           let newPath = FileManager.default
             .containerURL(
               forSecurityApplicationGroupIdentifier: self.hostAppGroupIdentifier)!
             .appendingPathComponent(newName)
-          let copied = self.copyFile(at: url!, to: newPath)
+          let copied = self.copyFile(at: resolvedUrl, to: newPath)
           if copied {
             self.sharedMedia.append(
               SharedMediaFile(
@@ -268,19 +265,14 @@ class ShareViewController: UIViewController {
                 mimeType: mimeType, type: .image))
           }
 
-          // If this is the last item, save imagesData in userDefaults and redirect to host app
-          if index == (content.attachments?.count)! - 1 {
-            let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
-            userDefaults?.set(self.toData(data: self.sharedMedia), forKey: self.sharedKey)
-            userDefaults?.synchronize()
-            self.finishLoading(type: .media)
-          }
+          self.markAttachmentProcessed(index: index)
 
         }
       } else {
         NSLog("[ERROR] Cannot load image content !\(String(describing: content))")
-        await self.dismissWithError(
-          message: "Cannot load image content \(String(describing: content))")
+        await MainActor.run {
+          self.markAttachmentProcessed(index: index)
+        }
       }
     }
   }
@@ -320,28 +312,21 @@ class ShareViewController: UIViewController {
             .appendingPathComponent(newName)
           let copied = self.copyFile(at: url, to: newPath)
           if copied {
-            guard
-              let sharedFile = self.getSharedMediaFile(
-                forVideo: newPath, fileName: fileName, fileSize: fileSize, mimeType: mimeType)
-            else {
-              return
+            if let sharedFile = self.getSharedMediaFile(
+              forVideo: newPath, fileName: fileName, fileSize: fileSize, mimeType: mimeType)
+            {
+              self.sharedMedia.append(sharedFile)
             }
-            self.sharedMedia.append(sharedFile)
           }
 
-          // If this is the last item, save imagesData in userDefaults and redirect to host app
-          if index == (content.attachments?.count)! - 1 {
-            let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
-            userDefaults?.set(self.toData(data: self.sharedMedia), forKey: self.sharedKey)
-            userDefaults?.synchronize()
-            self.finishLoading(type: .media)
-          }
+          self.markAttachmentProcessed(index: index)
 
         }
       } else {
         NSLog("[ERROR] Cannot load video content !\(String(describing: content))")
-        await self.dismissWithError(
-          message: "Cannot load video content \(String(describing: content))")
+        await MainActor.run {
+          self.markAttachmentProcessed(index: index)
+        }
       }
     }
   }
@@ -356,8 +341,9 @@ class ShareViewController: UIViewController {
         }
       } else {
         NSLog("[ERROR] Cannot load pdf content !\(String(describing: content))")
-        await self.dismissWithError(
-          message: "Cannot load pdf content \(String(describing: content))")
+        await MainActor.run {
+          self.markAttachmentProcessed(index: index)
+        }
       }
     }
   }
@@ -372,8 +358,9 @@ class ShareViewController: UIViewController {
         }
       } else {
         NSLog("[ERROR] Cannot load file content !\(String(describing: content))")
-        await self.dismissWithError(
-          message: "Cannot load file content \(String(describing: content))")
+        await MainActor.run {
+          self.markAttachmentProcessed(index: index)
+        }
       }
     }
   }
@@ -398,12 +385,59 @@ class ShareViewController: UIViewController {
           type: .file))
     }
 
-    if index == (content.attachments?.count)! - 1 {
-      let userDefaults = UserDefaults(suiteName: self.hostAppGroupIdentifier)
-      userDefaults?.set(self.toData(data: self.sharedMedia), forKey: self.sharedKey)
-      userDefaults?.synchronize()
-      self.finishLoading(type: .file)
+    self.markAttachmentProcessed(index: index)
+  }
+
+  @MainActor
+  private func markAttachmentProcessed(index: Int) {
+    processedAttachmentIndexes.insert(index)
+    guard expectedAttachmentCount > 0,
+      processedAttachmentIndexes.count >= expectedAttachmentCount
+    else {
+      return
     }
+
+    prepareSharedPayload()
+  }
+
+  @MainActor
+  private func prepareSharedPayload() {
+    guard !didPrepareSharedPayload else { return }
+    didPrepareSharedPayload = true
+
+    let userDefaults = UserDefaults(suiteName: hostAppGroupIdentifier)
+
+    if !sharedWebUrl.isEmpty {
+      sharedWebUrl = sharedWebUrl.map {
+        WebUrl(
+          url: $0.url,
+          meta: metaWithSelectedBoard(existingMeta: $0.meta, previewImage: bestPreviewImage())
+        )
+      }
+      userDefaults?.set(toData(data: sharedWebUrl), forKey: sharedKey)
+      userDefaults?.synchronize()
+      if linkPreviewLabel.text?.isEmpty ?? true {
+        linkPreviewLabel.text = sharedWebUrl.first?.url ?? ""
+      }
+      finishLoading(type: .weburl)
+      return
+    }
+
+    if !sharedMedia.isEmpty {
+      userDefaults?.set(toData(data: sharedMedia), forKey: sharedKey)
+      userDefaults?.synchronize()
+      finishLoading(type: sharedMedia.contains(where: { $0.type == .file }) ? .file : .media)
+      return
+    }
+
+    if !sharedText.isEmpty {
+      userDefaults?.set(sharedText, forKey: sharedKey)
+      userDefaults?.synchronize()
+      finishLoading(type: .text)
+      return
+    }
+
+    dismissWithError(message: "Cannot load shared content.")
   }
 
   private func setupMinimalSaveUI() {
@@ -625,8 +659,28 @@ class ShareViewController: UIViewController {
 
     meta["soonBoard"] = selectedBoard == "Recents" ? "" : selectedBoard
     meta["soonBoards"] = storedBoards()
-    if let previewImage, !previewImage.isEmpty {
-      meta["soonThumbnail"] = previewImage
+
+    let media = primarySharedMedia()
+    let mediaThumbnail = media?.thumbnail ?? (media?.type == .image ? media?.path : nil)
+    let resolvedPreviewImage = firstNonEmpty(previewImage, mediaThumbnail)
+    if let resolvedPreviewImage {
+      meta["soonThumbnail"] = resolvedPreviewImage
+    }
+
+    if let media {
+      meta["soonLocalMediaPath"] = media.path
+      meta["soonLocalMediaType"] = media.type == .video ? "video" : (media.type == .image ? "image" : "file")
+      meta["soonLocalThumbnail"] = media.thumbnail ?? (media.type == .image ? media.path : "")
+      meta["soonMimeType"] = media.mimeType
+      if let width = media.width {
+        meta["soonMediaWidth"] = String(width)
+      }
+      if let height = media.height {
+        meta["soonMediaHeight"] = String(height)
+      }
+      if let duration = media.duration {
+        meta["soonMediaDuration"] = String(duration)
+      }
     }
 
     guard let data = try? JSONSerialization.data(withJSONObject: meta),
@@ -637,6 +691,25 @@ class ShareViewController: UIViewController {
     }
 
     return string
+  }
+
+  private func firstNonEmpty(_ values: String?...) -> String? {
+    for value in values {
+      if let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty {
+        return trimmed
+      }
+    }
+    return nil
+  }
+
+  private func primarySharedMedia() -> SharedMediaFile? {
+    return sharedMedia.first(where: { $0.type == .video })
+      ?? sharedMedia.first(where: { $0.type == .image })
+      ?? sharedMedia.first
+  }
+
+  private func bestPreviewImage() -> String? {
+    return firstNonEmpty(primarySharedMedia()?.thumbnail, primarySharedMedia()?.type == .image ? primarySharedMedia()?.path : nil)
   }
 
   private func persistSelectedBoardToSharedPayload() {

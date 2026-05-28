@@ -162,6 +162,9 @@ function isPlayableVideoUrl(value?: string | null) {
   if (!value) return false;
   const url = value.toLowerCase();
   return (
+    url.startsWith('file:') ||
+    url.startsWith('content:') ||
+    url.startsWith('ph:') ||
     url.includes('.mp4') ||
     url.includes('.mov') ||
     url.includes('.m3u8') ||
