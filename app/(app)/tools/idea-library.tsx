@@ -92,8 +92,8 @@ const emptyDraft: IdeaDraft = {
 };
 
 const screenWidth = Dimensions.get('window').width;
-const ideaCardPreviewWidth = Math.min(152, Math.round((screenWidth - 32) * 0.38));
-const ideaCardPreviewHeight = Math.round((ideaCardPreviewWidth * 9) / 16);
+const ideaGridCardWidth = Math.floor((screenWidth - 44) / 2);
+const ideaCardPreviewHeight = Math.round((ideaGridCardWidth * 16) / 9);
 const enrichingIdeaIds = new Set<string>();
 
 function normalizeType(value?: string | null): Exclude<IdeaType, 'all'> {
@@ -975,7 +975,7 @@ export default function ToolsIdeaLibraryScreen() {
           {playableVideoUrl ? (
             <ClipPlayer
               clip={{ id: item.id, video_url: playableVideoUrl, media_urls: previewImage ? [previewImage] : [] }}
-              width={ideaCardPreviewWidth}
+              width={ideaGridCardWidth}
               height={ideaCardPreviewHeight}
               thumbnail
             />
@@ -1166,6 +1166,8 @@ export default function ToolsIdeaLibraryScreen() {
             data={filteredIdeas}
             keyExtractor={(item) => item.id}
             renderItem={renderIdea}
+            numColumns={2}
+            columnWrapperStyle={styles.listColumn}
             contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 110 }]}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
             ListEmptyComponent={
@@ -1605,15 +1607,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8
   },
+  listColumn: {
+    gap: 12
+  },
   ideaCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: ideaGridCardWidth,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E8DED6',
     backgroundColor: '#ffffff',
     marginBottom: 12,
-    padding: 10,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowRadius: 10,
@@ -1621,9 +1625,8 @@ const styles = StyleSheet.create({
     elevation: 2
   },
   cardMedia: {
-    width: ideaCardPreviewWidth,
+    width: ideaGridCardWidth,
     height: ideaCardPreviewHeight,
-    borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: '#F5F2ED'
   },
@@ -1660,9 +1663,9 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
   cardBody: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingLeft: 12
+    minHeight: 130,
+    paddingHorizontal: 12,
+    paddingVertical: 12
   },
   cardPlaceRow: {
     flexDirection: 'row',
