@@ -405,6 +405,83 @@ function patchExpoImageLoaderReactImport() {
   console.log('Patched expo-image-loader React module import');
 }
 
+function patchExpoRouterRootUrlScheme() {
+  const linkingFile = path.join(
+    __dirname,
+    '..',
+    'node_modules',
+    'expo-router',
+    'build',
+    'link',
+    'linking.js'
+  );
+
+  if (!fs.existsSync(linkingFile)) {
+    return;
+  }
+
+  const source = fs.readFileSync(linkingFile, 'utf8');
+
+  if (source.includes("Linking.createURL('/', { scheme: 'soonlog' })")) {
+    return;
+  }
+
+  const original = `_rootURL = Linking.createURL('/');`;
+  const patched = `_rootURL = Linking.createURL('/', { scheme: 'soonlog' });`;
+
+  if (!source.includes(original)) {
+    console.warn('expo-router root URL scheme patch skipped: expected source not found');
+    return;
+  }
+
+  fs.writeFileSync(linkingFile, source.replace(original, patched));
+  console.log('Patched expo-router root URL scheme');
+}
+
+function patchExpoLinkingManifestFallback() {
+  const schemesFile = path.join(
+    __dirname,
+    '..',
+    'node_modules',
+    'expo-linking',
+    'build',
+    'Schemes.js'
+  );
+
+  if (!fs.existsSync(schemesFile)) {
+    return;
+  }
+
+  const source = fs.readFileSync(schemesFile, 'utf8');
+
+  if (source.includes('SOON-LOG manifest fallback scheme')) {
+    return;
+  }
+
+  const original = `export function resolveScheme(options) {
+    if (Constants.executionEnvironment !== ExecutionEnvironment.StoreClient &&
+        !hasConstantsManifest()) {
+        throw new Error(\`expo-linking needs access to the expo-constants manifest (app.json or app.config.js) to determine what URI scheme to use. Setup the manifest and rebuild: https://github.com/expo/expo/blob/main/packages/expo-constants/README.md\`);
+    }`;
+
+  const patched = `export function resolveScheme(options) {
+    if (Constants.executionEnvironment !== ExecutionEnvironment.StoreClient &&
+        !hasConstantsManifest()) {
+        // SOON-LOG manifest fallback scheme:
+        // Development builds can briefly expose an empty expo-constants manifest
+        // while still having the native URL scheme embedded in Info.plist.
+        return options.scheme || 'soonlog';
+    }`;
+
+  if (!source.includes(original)) {
+    console.warn('expo-linking manifest fallback patch skipped: expected source not found');
+    return;
+  }
+
+  fs.writeFileSync(schemesFile, source.replace(original, patched));
+  console.log('Patched expo-linking manifest fallback scheme');
+}
+
 removeMacDuplicateFiles();
 patchExpoAutolinking();
 patchExpoDevMenuSwiftImport();
@@ -413,3 +490,5 @@ patchExpoIosBinaryPath();
 patchExpoIosEstimatedBinaryPath();
 patchReactNativeMapsGoogleManager();
 patchExpoImageLoaderReactImport();
+patchExpoRouterRootUrlScheme();
+patchExpoLinkingManifestFallback();
