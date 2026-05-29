@@ -23,6 +23,7 @@ import {
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import { BackHeader } from '@/components/BackHeader';
 import ClipPlayer from '@/components/ClipPlayer';
 import { useAuth } from '@/hooks/useAuth';
@@ -162,11 +163,14 @@ function ideaPreviewImage(idea: IdeaRecord) {
 function isPlayableVideoUrl(value?: string | null) {
   if (!value) return false;
   const url = value.trim().toLowerCase();
+  if (/instagram\.com\/(reel|p|tv)\//.test(url)) return false;
   return (
     url.startsWith('file:') ||
     url.startsWith('content:') ||
     url.startsWith('ph:') ||
     url.startsWith('assets-library:') ||
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
     url.includes('.mp4') ||
     url.includes('.mov') ||
     url.includes('.m4v') ||
@@ -552,6 +556,7 @@ function IdeaDetailSheet({
   onManageBoards: (idea: IdeaRecord) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const [showSourceWebView, setShowSourceWebView] = useState(false);
   if (!idea) return null;
 
   const currentIdea = idea;
@@ -566,17 +571,82 @@ function IdeaDetailSheet({
   const genericTitles = ['IG Reel 靈感', 'Instagram Reel 靈感', 'Instagram'];
   const shouldShowTitle = Boolean(currentIdea.title && !genericTitles.includes(currentIdea.title));
 
-  async function openSource() {
+  function openSource() {
+    if (!sourceUrl) return;
+    setShowSourceWebView(true);
+  }
+
+  async function openSourceExternally() {
     if (!sourceUrl) return;
     try {
-      await WebBrowser.openBrowserAsync(sourceUrl, {
-        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-        controlsColor: '#5C2A22',
-        dismissButtonStyle: 'close',
-      });
-    } catch {
       await Linking.openURL(sourceUrl);
+    } catch {
+      try {
+        await WebBrowser.openBrowserAsync(sourceUrl, {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+          controlsColor: '#5C2A22',
+          dismissButtonStyle: 'close',
+        });
+      } catch {
+        Alert.alert('未能開啟 Instagram');
+      }
     }
+  }
+
+  function shouldOpenInWebView(requestUrl: string) {
+    if (
+      requestUrl.startsWith('instagram://') ||
+      requestUrl.startsWith('itms-apps://') ||
+      requestUrl.startsWith('itms-appss://')
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  function renderSourceWebView() {
+    return (
+      <Modal
+        visible={showSourceWebView}
+        transparent={false}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setShowSourceWebView(false)}
+      >
+        <View style={styles.sourceWebViewScreen}>
+          <View style={[styles.sourceWebViewHeader, { paddingTop: insets.top + 8 }]}>
+            <TouchableOpacity
+              onPress={() => setShowSourceWebView(false)}
+              style={styles.sourceWebViewHeaderButton}
+            >
+              <Feather name="x" size={24} color="#111827" />
+            </TouchableOpacity>
+            <Text style={styles.sourceWebViewTitle}>Instagram</Text>
+            <TouchableOpacity onPress={openSourceExternally} style={styles.sourceWebViewHeaderButton}>
+              <Feather name="external-link" size={21} color="#5C2A22" />
+            </TouchableOpacity>
+          </View>
+          {sourceUrl ? (
+            <WebView
+              source={{ uri: sourceUrl }}
+              style={styles.sourceWebView}
+              startInLoadingState
+              javaScriptEnabled
+              domStorageEnabled
+              allowsInlineMediaPlayback
+              allowsFullscreenVideo
+              mediaPlaybackRequiresUserAction={false}
+              sharedCookiesEnabled
+              setSupportMultipleWindows={false}
+              originWhitelist={['*']}
+              allowsBackForwardNavigationGestures
+              userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+              onShouldStartLoadWithRequest={(request) => shouldOpenInWebView(request.url || '')}
+            />
+          ) : null}
+        </View>
+      </Modal>
+    );
   }
 
   async function openMap() {
@@ -733,6 +803,7 @@ function IdeaDetailSheet({
             )}
           </View>
         </ScrollView>
+        {renderSourceWebView()}
       </View>
     </Modal>
   );
@@ -1301,6 +1372,38 @@ const styles = StyleSheet.create({
   detailScreen: {
     flex: 1,
     backgroundColor: '#060606'
+  },
+  sourceWebViewScreen: {
+    flex: 1,
+    backgroundColor: '#ffffff'
+  },
+  sourceWebViewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    backgroundColor: '#ffffff'
+  },
+  sourceWebViewHeaderButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  sourceWebViewTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: '#111827',
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    fontWeight: '800'
+  },
+  sourceWebView: {
+    flex: 1,
+    backgroundColor: '#000000'
   },
   detailContent: {
     backgroundColor: '#060606'
