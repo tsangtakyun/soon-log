@@ -316,7 +316,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "set -e\nGOOGLE_MAPS_BUNDLE=\"${PODS_ROOT}/GoogleMaps/Maps/Resources/GoogleMapsResources/GoogleMaps.bundle\"\nDESTINATION=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleMaps.bundle\"\nif [ -d \"$GOOGLE_MAPS_BUNDLE\" ]; then\n  rm -rf \"$DESTINATION\"\n  cp -R \"$GOOGLE_MAPS_BUNDLE\" \"$DESTINATION\"\nfi\n";
+			shellScript = "set -e\nGOOGLE_MAPS_BUNDLE=\"${PODS_ROOT}/GoogleMaps/Maps/Resources/GoogleMapsResources/GoogleMaps.bundle\"\nDESTINATION=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleMaps.bundle\"\nif [ -d \"$GOOGLE_MAPS_BUNDLE\" ]; then\n  rm -rf \"$DESTINATION\"\n  cp -RX \"$GOOGLE_MAPS_BUNDLE\" \"$DESTINATION\"\nfi\nxattr -cr \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\" 2>/dev/null || true\n";
 		};
 		CF59A2A3D9C6A30DA1CF5DAC /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -384,7 +384,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "set -e\nGOOGLE_MAPS_BUNDLE=\"${PODS_ROOT}/GoogleMaps/Maps/Resources/GoogleMapsResources/GoogleMaps.bundle\"\nDESTINATION=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleMaps.bundle\"\nif [ -d \"$GOOGLE_MAPS_BUNDLE\" ]; then\n  rm -rf \"$DESTINATION\"\n  cp -R \"$GOOGLE_MAPS_BUNDLE\" \"$DESTINATION\"\nfi\n";
+			shellScript = "set -e\nGOOGLE_MAPS_BUNDLE=\"${PODS_ROOT}/GoogleMaps/Maps/Resources/GoogleMapsResources/GoogleMaps.bundle\"\nDESTINATION=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleMaps.bundle\"\nif [ -d \"$GOOGLE_MAPS_BUNDLE\" ]; then\n  rm -rf \"$DESTINATION\"\n  cp -RX \"$GOOGLE_MAPS_BUNDLE\" \"$DESTINATION\"\nfi\nxattr -cr \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\" 2>/dev/null || true\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

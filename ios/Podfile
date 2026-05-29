@@ -259,8 +259,9 @@ post_integrate do |installer|
         DESTINATION="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleMaps.bundle"
         if [ -d "$GOOGLE_MAPS_BUNDLE" ]; then
           rm -rf "$DESTINATION"
-          cp -R "$GOOGLE_MAPS_BUNDLE" "$DESTINATION"
+          cp -RX "$GOOGLE_MAPS_BUNDLE" "$DESTINATION"
         fi
+        xattr -cr "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}" 2>/dev/null || true
       SH
     end
     aggregate_target.user_project.save
