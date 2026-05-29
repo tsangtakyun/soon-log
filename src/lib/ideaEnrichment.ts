@@ -9,6 +9,8 @@ type AnalysisResult = {
   topic?: string;
   description?: string;
   desc?: string;
+  caption?: string;
+  metadataDescription?: string;
   hook?: string;
   script_hook?: string;
   region?: string;
@@ -48,11 +50,12 @@ function firstString(...values: unknown[]) {
   return '';
 }
 
-async function analyzeUrl(targetUrl: string): Promise<AnalysisResult> {
+async function analyzeUrl(targetUrl: string, sharedText = ''): Promise<AnalysisResult> {
+  const caption = sharedText.trim();
   const response = await fetch(AUTOFILL_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url: targetUrl })
+    body: JSON.stringify(caption ? { url: targetUrl, caption } : { url: targetUrl })
   });
 
   if (!response.ok) throw new Error(`API error ${response.status}`);
@@ -61,8 +64,10 @@ async function analyzeUrl(targetUrl: string): Promise<AnalysisResult> {
   return {
     title: data.title || 'IG Reel 靈感',
     topic: data.title || '',
-    description: data.desc || data.metadataDescription || '',
-    desc: data.desc || '',
+    description: data.desc || data.caption || data.metadataDescription || data.description || '',
+    desc: data.desc || data.caption || '',
+    caption: data.caption || '',
+    metadataDescription: data.metadataDescription || '',
     hook: data.hook || '',
     script_hook: data.script_hook || '',
     country: data.country || 'HK',
@@ -178,8 +183,8 @@ async function updateIdeaWithFallback(ideaId: string, update: IdeaUpdate) {
   throw lastError;
 }
 
-export async function enrichIdeaFromUrl(ideaId: string, targetUrl: string, boardCategories: string[] = []) {
-  const result = await analyzeUrl(targetUrl);
+export async function enrichIdeaFromUrl(ideaId: string, targetUrl: string, boardCategories: string[] = [], sharedText = '') {
+  const result = await analyzeUrl(targetUrl, sharedText);
   const needsResolver =
     !firstString(result.video_url, result.videoUrl) ||
     !result.image ||
@@ -188,7 +193,7 @@ export async function enrichIdeaFromUrl(ideaId: string, targetUrl: string, board
   const resolved = needsResolver ? await resolveVideoFromUrl(targetUrl) : null;
   const resolvedVideoUrl = firstString(result.video_url, result.videoUrl, resolved?.videoUrl) || null;
   const resolvedImage = firstString(result.image, resolved?.image);
-  const resolvedDescription = firstString(result.description, result.desc, resolved?.description);
+  const resolvedDescription = firstString(result.description, result.desc, sharedText, resolved?.description);
   const blockedTitle = result.title === 'Instagram' || result.title === 'TikTok' || !result.title;
   const title = blockedTitle ? (resolved?.title || 'Instagram Reel 靈感') : result.title;
   const country = firstString(result.country, result.region, resolved?.country) || 'HK';

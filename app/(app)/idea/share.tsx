@@ -27,6 +27,12 @@ function formatSaveError(err: unknown) {
   return '請稍後再試';
 }
 
+function normalizeSharedPayloadText(value: string, sharedUrl: string) {
+  const text = value.trim();
+  if (!text || text === sharedUrl || /^https?:\/\/\S+$/i.test(text)) return '';
+  return text;
+}
+
 export default function IdeaShareScreen() {
   const { shareIntent, hasShareIntent, resetShareIntent } = useShareIntentContext();
   const { user } = useAuth();
@@ -37,6 +43,7 @@ export default function IdeaShareScreen() {
   const [selectedBoard, setSelectedBoard] = useState('');
   const [previewImage, setPreviewImage] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
+  const [sharedText, setSharedText] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
@@ -63,6 +70,8 @@ export default function IdeaShareScreen() {
       setErrorMsg('無法讀取分享連結');
       return;
     }
+    const payloadText = metaString('soonSharedText') || (typeof shareIntent.text === 'string' ? shareIntent.text.trim() : '');
+    const sharedCaption = normalizeSharedPayloadText(payloadText, sharedUrl);
 
     const board = metaString('soonBoard');
     const boards = boardsFromShareMeta(shareIntent.meta?.soonBoards);
@@ -76,6 +85,7 @@ export default function IdeaShareScreen() {
     setSelectedBoard(board);
     setPreviewImage(thumbnail);
     setVideoUrl(sharedVideoUrl);
+    setSharedText(sharedCaption);
     setUrl(sharedUrl);
     setStatus('ready');
   }, [hasShareIntent, shareIntent, status]);
@@ -92,7 +102,8 @@ export default function IdeaShareScreen() {
         selectedBoard,
         sharedBoards,
         previewImage,
-        videoUrl
+        videoUrl,
+        sharedText
       });
 
       setStatus('saved');
@@ -111,7 +122,7 @@ export default function IdeaShareScreen() {
 
     autoSaveStarted.current = true;
     saveIdea();
-  }, [status, url, user, previewImage, videoUrl]);
+  }, [status, url, user, previewImage, videoUrl, sharedText]);
 
   function dismiss() {
     resetShareIntent();

@@ -174,8 +174,10 @@ export async function saveSharedIdea(params: {
   sharedBoards?: string[];
   previewImage?: string;
   videoUrl?: string;
+  sharedText?: string;
 }) {
-  const { user, url, selectedBoard = '', sharedBoards = [], previewImage = '', videoUrl = '' } = params;
+  const { user, url, selectedBoard = '', sharedBoards = [], previewImage = '', videoUrl = '', sharedText = '' } = params;
+  const initialDescription = sharedText.trim();
   const boardCategories = unique(selectedBoard ? [selectedBoard] : []);
   const allBoards = unique([...sharedBoards, selectedBoard]);
 
@@ -186,7 +188,7 @@ export async function saveSharedIdea(params: {
   const existingIdea = await findExistingIdea(user.id, url);
   if (existingIdea) {
     const nextCategories = await updateExistingSharedIdea(existingIdea, boardCategories, previewImage, videoUrl);
-    enrichIdeaFromUrl(existingIdea.id, url, nextCategories).catch((error) => {
+    enrichIdeaFromUrl(existingIdea.id, url, nextCategories, sharedText).catch((error) => {
       console.log('[share-idea] existing background enrich skipped', error);
     });
     return { id: existingIdea.id, existing: true };
@@ -201,7 +203,7 @@ export async function saveSharedIdea(params: {
     video_url: videoUrl || null,
     title: 'IG Reel 靈感',
     topic: 'IG Reel 靈感',
-    summary: '已由 Instagram 儲存，AI 會稍後補充題材資料。',
+    summary: initialDescription || '已由 Instagram 儲存，AI 會稍後補充題材資料。',
     script_hook: '',
     country: 'HK',
     platform: 'instagram',
@@ -212,10 +214,10 @@ export async function saveSharedIdea(params: {
     viral_score: 0,
     ai_viral_base: 0,
     date: new Date().toISOString(),
-    notes: '',
+    notes: initialDescription ? '由分享 payload 自動帶入。' : '',
     lat: null,
     lng: null,
-    description: '',
+    description: initialDescription,
     hook: '',
     region: 'HK',
     viral_potential: 'medium',
@@ -245,7 +247,7 @@ export async function saveSharedIdea(params: {
   }
 
   if (savedId) {
-    enrichIdeaFromUrl(savedId, url, boardCategories).catch((error) => {
+    enrichIdeaFromUrl(savedId, url, boardCategories, sharedText).catch((error) => {
       console.log('[share-idea] background enrich skipped', error);
     });
   }

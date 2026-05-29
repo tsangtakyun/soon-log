@@ -38,6 +38,7 @@ class ShareViewController: UIViewController {
   private var boardCheckmarks: [String: UIImageView] = [:]
   private var selectedBoard = "Recents"
   private let boardsKey = "soonlogIdeaBoards"
+  private var extensionContentText: String?
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -56,6 +57,8 @@ class ShareViewController: UIViewController {
         dismissWithError(message: "No content found")
         return
       }
+      self.captureExtensionContentText(content)
+      self.debugLogSharePayload(content: content, attachments: attachments)
       self.expectedAttachmentCount = attachments.count
       for (index, attachment) in (attachments).enumerated() {
         if attachment.hasItemConformingToTypeIdentifier(imageContentType) {
@@ -84,6 +87,36 @@ class ShareViewController: UIViewController {
     }
   }
 
+  private func captureExtensionContentText(_ content: NSExtensionItem) {
+    let title = content.attributedTitle?.string
+    let text = content.attributedContentText?.string
+    extensionContentText = firstNonEmpty(text, title)
+
+    if let extensionContentText {
+      NSLog("[ShareExtension] extension text captured=\(debugSnippet(extensionContentText))")
+    }
+  }
+
+  private func debugLogSharePayload(content: NSExtensionItem, attachments: [NSItemProvider]) {
+    NSLog("[ShareExtension] attributedTitle=\(debugSnippet(content.attributedTitle?.string))")
+    NSLog("[ShareExtension] attributedContentText=\(debugSnippet(content.attributedContentText?.string))")
+    if let userInfo = content.userInfo {
+      NSLog("[ShareExtension] userInfo keys=\(userInfo.keys.map { String(describing: $0) }.joined(separator: ", "))")
+    }
+    for (index, attachment) in attachments.enumerated() {
+      NSLog("[ShareExtension] attachment[\(index)] types=\(attachment.registeredTypeIdentifiers.joined(separator: ", "))")
+    }
+  }
+
+  private func debugSnippet(_ value: String?, limit: Int = 700) -> String {
+    guard let value else { return "(nil)" }
+    let cleaned = value.replacingOccurrences(of: "\n", with: "\\n")
+    if cleaned.count <= limit {
+      return cleaned
+    }
+    return String(cleaned.prefix(limit)) + "..."
+  }
+
   private func handleText(content: NSExtensionItem, attachment: NSItemProvider, index: Int) async {
     Task.detached {
       if let item = try! await attachment.loadItem(forTypeIdentifier: self.textContentType)
@@ -91,6 +124,7 @@ class ShareViewController: UIViewController {
       {
         Task { @MainActor in
 
+          NSLog("[ShareExtension] loaded text=\(self.debugSnippet(item))")
           self.sharedText.append(item)
           self.markAttachmentProcessed(index: index)
 
@@ -107,6 +141,7 @@ class ShareViewController: UIViewController {
   private func handleUrl(content: NSExtensionItem, attachment: NSItemProvider, index: Int) async {
     Task.detached {
       if let item = try! await attachment.loadItem(forTypeIdentifier: self.urlContentType) as? URL {
+        NSLog("[ShareExtension] loaded url=\(item.absoluteString)")
         let previewImage = await self.fetchLinkPreviewImage(for: item)
         Task { @MainActor in
 
@@ -136,7 +171,12 @@ class ShareViewController: UIViewController {
           NSLog(
             "[DEBUG] NSExtensionJavaScriptPreprocessingResultsKey \(String(describing: results))"
           )
+          NSLog("[ShareExtension] preprocessing keys=\(results.allKeys.map { String(describing: $0) }.joined(separator: ", "))")
           let baseURI = results["baseURI"] as! String
+          NSLog("[ShareExtension] preprocessing baseURI=\(baseURI)")
+          if let meta = results["meta"] as? String {
+            NSLog("[ShareExtension] preprocessing meta=\(self.debugSnippet(meta))")
+          }
           var previewImage: String? = nil
           if let url = URL(string: baseURI) {
             previewImage = await self.fetchLinkPreviewImage(for: url)
@@ -659,6 +699,11 @@ class ShareViewController: UIViewController {
 
     meta["soonBoard"] = selectedBoard == "Recents" ? "" : selectedBoard
     meta["soonBoards"] = storedBoards()
+
+    if let sharedPayloadText = firstNonEmpty(extensionContentText, sharedText.first) {
+      meta["soonSharedText"] = sharedPayloadText
+      meta["soonSharedTextSource"] = extensionContentText == nil ? "attachment-text" : "extension-item"
+    }
 
     let media = primarySharedMedia()
     let mediaThumbnail = media?.thumbnail ?? (media?.type == .image ? media?.path : nil)
