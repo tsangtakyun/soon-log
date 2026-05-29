@@ -10,6 +10,12 @@ import { colors } from '@/theme/colors';
 
 const eggsLastSeenKey = (userId: string) => `eggs-last-seen-at:${userId}`;
 const prediktLastSeenKey = (userId: string) => `predikt-last-seen-at:${userId}`;
+let unreadChannelSeq = 0;
+
+function unreadChannelName(prefix: string, userId: string) {
+  unreadChannelSeq += 1;
+  return `${prefix}-${userId}-${Date.now()}-${unreadChannelSeq}`;
+}
 
 function isEggsPath(pathname: string) {
   return pathname === '/log' || pathname.startsWith('/log/room') || pathname.startsWith('/log/clip');
@@ -115,7 +121,7 @@ export default function AppTabs() {
 
     loadUnreadClipCount();
     const channel = supabase
-      .channel(`eggs-unread-clip-count-${user.id}-${Date.now()}`)
+      .channel(unreadChannelName('eggs-unread-clip-count', user.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'topic_clips' }, () => {
         if (isEggsPath(pathname)) {
           markEggsSeen();
@@ -139,7 +145,7 @@ export default function AppTabs() {
 
     loadUnreadTrendCount();
     const channel = supabase
-      .channel(`predikt-unread-trend-count-${user.id}-${Date.now()}`)
+      .channel(unreadChannelName('predikt-unread-trend-count', user.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trends' }, () => {
         if (isPrediktPath(pathname)) {
           markPrediktSeen();
