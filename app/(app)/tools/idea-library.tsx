@@ -1112,14 +1112,7 @@ export default function ToolsIdeaLibraryScreen() {
               thumbnail
             />
           ) : previewImage ? (
-            <>
-              <Image source={{ uri: previewImage }} style={styles.cardImage} resizeMode="cover" />
-              {sourceUrl ? (
-                <View pointerEvents="none" style={styles.cardPlayBadge}>
-                  <Feather name="play" size={13} color="#ffffff" />
-                </View>
-              ) : null}
-            </>
+            <Image source={{ uri: previewImage }} style={styles.cardImage} resizeMode="cover" />
           ) : (
             <View style={styles.cardImageEmpty}>
               <Feather name={sourceUrl ? 'instagram' : 'bookmark'} size={22} color="#c7b8ad" />
@@ -1823,20 +1816,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: '#efe7df'
-  },
-  cardPlayBadge: {
-    position: 'absolute',
-    left: '50%',
-    top: '50%',
-    width: 32,
-    height: 32,
-    marginLeft: -16,
-    marginTop: -16,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingLeft: 2
   },
   cardImageEmpty: {
     flex: 1,
