@@ -568,7 +568,15 @@ function IdeaDetailSheet({
 
   async function openSource() {
     if (!sourceUrl) return;
-    await WebBrowser.openBrowserAsync(sourceUrl);
+    try {
+      await WebBrowser.openBrowserAsync(sourceUrl, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+        controlsColor: '#5C2A22',
+        dismissButtonStyle: 'close',
+      });
+    } catch {
+      await Linking.openURL(sourceUrl);
+    }
   }
 
   async function openMap() {
