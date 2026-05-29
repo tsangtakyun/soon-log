@@ -365,6 +365,46 @@ function patchReactNativeMapsGoogleManager() {
   console.log('Patched react-native-maps AIRGoogleMapManager rogue prefix');
 }
 
+function patchExpoImageLoaderReactImport() {
+  const imageLoaderHeader = path.join(
+    __dirname,
+    '..',
+    'node_modules',
+    'expo-image-loader',
+    'ios',
+    'EXImageLoader',
+    'EXImageLoader.h'
+  );
+
+  if (!fs.existsSync(imageLoaderHeader)) {
+    return;
+  }
+
+  const source = fs.readFileSync(imageLoaderHeader, 'utf8');
+
+  if (source.includes('@import React;')) {
+    return;
+  }
+
+  const original = `#import <ExpoModulesCore/EXInternalModule.h>
+#import <ExpoModulesCore/EXImageLoaderInterface.h>
+#import <React/RCTBridgeModule.h>`;
+
+  const patched = `@import React;
+
+#import <ExpoModulesCore/EXInternalModule.h>
+#import <ExpoModulesCore/EXImageLoaderInterface.h>
+#import <React/RCTBridgeModule.h>`;
+
+  if (!source.includes(original)) {
+    console.warn('expo-image-loader React import patch skipped: expected source not found');
+    return;
+  }
+
+  fs.writeFileSync(imageLoaderHeader, source.replace(original, patched));
+  console.log('Patched expo-image-loader React module import');
+}
+
 removeMacDuplicateFiles();
 patchExpoAutolinking();
 patchExpoDevMenuSwiftImport();
@@ -372,3 +412,4 @@ patchExpoDevMenuAppInfo();
 patchExpoIosBinaryPath();
 patchExpoIosEstimatedBinaryPath();
 patchReactNativeMapsGoogleManager();
+patchExpoImageLoaderReactImport();
