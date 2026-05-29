@@ -12,12 +12,12 @@
 		34B76A09326044BBB7A58CB5 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08EA97E48C5243729DB8EE3B /* ShareViewController.swift */; };
 		3C1C03A00C6946478E12DD89 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+		43A84DBF4CE4CCE35E350F51 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E542E8D3E53F8ED8E4CC5DF /* ExpoModulesProvider.swift */; };
 		55009D25EEBEA6F588CCE93B /* libPods-SOONLOG.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 66708DC70A49CD96870F2473 /* libPods-SOONLOG.a */; };
 		7C04C8EC4B6F4E8E9CE51101 /* IdeaBoardsModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C04C8EA4B6F4E8E9CE51101 /* IdeaBoardsModule.swift */; };
 		7C04C8ED4B6F4E8E9CE51101 /* IdeaBoardsModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 7C04C8EB4B6F4E8E9CE51101 /* IdeaBoardsModule.m */; };
 		A4C8C2C80B24457C92A9D032 /* ShareExtensionPreprocessor.js in Resources */ = {isa = PBXBuildFile; fileRef = A142CE13B04A4693A1D68415 /* ShareExtensionPreprocessor.js */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		BEF79A0AFB9ECF473D0B78A7 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 359CCD053C9268BF580CDB87 /* ExpoModulesProvider.swift */; };
 		DDE089907FF6E03CAF8DF800 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 		F44545A25BA14252BDF72D9E /* ShareExtension.appex in Copy Files */ = {isa = PBXBuildFile; fileRef = 5EEC31ACE11846CA9067CE2F /* ShareExtension.appex */; };
@@ -53,7 +53,7 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = SOONLOG/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = SOONLOG/Info.plist; sourceTree = "<group>"; };
 		15E39999CA92478FB300CA58 /* ShareExtension.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ShareExtension.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
-		359CCD053C9268BF580CDB87 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SOONLOG/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		3E542E8D3E53F8ED8E4CC5DF /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SOONLOG/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = PrivacyInfo.xcprivacy; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		5EEC31ACE11846CA9067CE2F /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = ShareExtension.appex; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		66708DC70A49CD96870F2473 /* libPods-SOONLOG.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-SOONLOG.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -90,6 +90,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0C7011FEC3224E31964D4C5B /* SOONLOG */ = {
+			isa = PBXGroup;
+			children = (
+				3E542E8D3E53F8ED8E4CC5DF /* ExpoModulesProvider.swift */,
+			);
+			name = SOONLOG;
+			sourceTree = "<group>";
+		};
 		13B07FAE1A68108700A75B9A /* SOONLOG */ = {
 			isa = PBXGroup;
 			children = (
@@ -114,14 +122,6 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		6F7513661C7913D88E73CC08 /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				EC51CDB871F66114ADE1D5C3 /* SOONLOG */,
-			);
-			name = ExpoModulesProviders;
-			sourceTree = "<group>";
-		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
 			isa = PBXGroup;
 			children = (
@@ -138,7 +138,7 @@
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				8A9AB26CECBA4511814C4BE0 /* ShareExtension */,
 				C41758055A9CD753A7AEAD08 /* Pods */,
-				6F7513661C7913D88E73CC08 /* ExpoModulesProviders */,
+				8BCD1AC93472CBDDCBF9A348 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -168,6 +168,14 @@
 			path = ShareExtension;
 			sourceTree = "<group>";
 		};
+		8BCD1AC93472CBDDCBF9A348 /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				0C7011FEC3224E31964D4C5B /* SOONLOG */,
+			);
+			name = ExpoModulesProviders;
+			sourceTree = "<group>";
+		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
 			isa = PBXGroup;
 			children = (
@@ -185,14 +193,6 @@
 			);
 			name = Pods;
 			path = Pods;
-			sourceTree = "<group>";
-		};
-		EC51CDB871F66114ADE1D5C3 /* SOONLOG */ = {
-			isa = PBXGroup;
-			children = (
-				359CCD053C9268BF580CDB87 /* ExpoModulesProvider.swift */,
-			);
-			name = SOONLOG;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -396,7 +396,7 @@
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
 				7C04C8EC4B6F4E8E9CE51101 /* IdeaBoardsModule.swift in Sources */,
 				7C04C8ED4B6F4E8E9CE51101 /* IdeaBoardsModule.m in Sources */,
-				BEF79A0AFB9ECF473D0B78A7 /* ExpoModulesProvider.swift in Sources */,
+				43A84DBF4CE4CCE35E350F51 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
