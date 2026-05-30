@@ -13,6 +13,8 @@ type ScriptRecord = {
   id: string;
   title?: string | null;
   content?: string | null;
+  ai_draft?: string | null;
+  qc_final?: string | null;
   topic?: string | null;
   brand?: string | null;
   industry?: string | null;
@@ -62,8 +64,9 @@ export default function ScriptHistoryScreen() {
   }, [loadScripts]);
 
   async function copyScript(script: ScriptRecord) {
-    if (!script.content) return;
-    await Clipboard.setStringAsync(script.content);
+    const content = script.content || script.qc_final || script.ai_draft || '';
+    if (!content) return;
+    await Clipboard.setStringAsync(content);
     Alert.alert('已複製', '劇本已複製到剪貼板。');
   }
 
@@ -108,7 +111,9 @@ export default function ScriptHistoryScreen() {
                   <Feather name="copy" size={16} color={colors.primary} />
                 </TouchableOpacity>
               </View>
-              {item.content ? <Text numberOfLines={5} style={styles.content}>{item.content}</Text> : null}
+              {item.content || item.qc_final || item.ai_draft ? (
+                <Text numberOfLines={5} style={styles.content}>{item.content || item.qc_final || item.ai_draft}</Text>
+              ) : null}
             </View>
           )}
         />

@@ -1,7 +1,6 @@
 import { Feather } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -214,6 +213,7 @@ export default function ScriptGeneratorScreen() {
   const [generatedScript, setGeneratedScript] = useState('');
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
 
   const hook = useMemo(() => selectedOption(HOOK_OPTIONS, draft.hookStyle), [draft.hookStyle]);
   const transition = useMemo(() => selectedOption(TRANSITION_OPTIONS, draft.transitionStyle), [draft.transitionStyle]);
@@ -357,41 +357,39 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
     setSaving(true);
     try {
       const workspaceId = await resolveWorkspaceId(user.id, user.email);
-      const metadata = {
-        brand: draft.brand,
-        industry: draft.industry,
-        topic: draft.topic,
-        background: draft.background,
-        hook_style: draft.hookStyle,
-        hook_description: `${hook.title} - ${hook.description}`,
-        transition_style: draft.transitionStyle,
-        transition_description: `${transition.title} - ${transition.description}`,
-        ending_style: draft.endingStyle,
-        ending_description: `${ending.title} - ${ending.description}`
-      };
-      const basePayload = {
+      const payload = {
         user_id: user.id,
         workspace_id: workspaceId,
         title: draft.topic.trim() || draft.brand.trim() || 'IG Reel 劇本',
-        content: generatedScript.trim()
-      };
-      const fullPayload = {
-        ...basePayload,
         brand: draft.brand.trim() || null,
         industry: draft.industry,
         topic: draft.topic.trim() || null,
         background: draft.background.trim() || null,
-        hook_style: draft.hookStyle,
-        transition_style: draft.transitionStyle,
-        metadata
+        hook_code: draft.hookStyle,
+        trans_code: draft.transitionStyle,
+        ending_code: draft.endingStyle,
+        ai_draft: generatedScript.trim(),
+        qc_final: generatedScript.trim(),
+        model: 'claude-sonnet-4-20250514',
+        generated_at: new Date().toISOString()
       };
 
-      let { error } = await supabase.from('scripts').insert(fullPayload);
+      let { error } = await supabase.from('scripts').insert(payload);
       if (error) {
-        ({ error } = await supabase.from('scripts').insert({ ...basePayload, metadata }));
-      }
-      if (error) {
-        ({ error } = await supabase.from('scripts').insert({ user_id: user.id, title: basePayload.title, content: basePayload.content }));
+        ({ error } = await supabase.from('scripts').insert({
+          user_id: user.id,
+          workspace_id: workspaceId,
+          title: payload.title,
+          brand: payload.brand,
+          industry: payload.industry,
+          topic: payload.topic,
+          background: payload.background,
+          hook_code: payload.hook_code,
+          trans_code: payload.trans_code,
+          ending_code: payload.ending_code,
+          ai_draft: payload.ai_draft,
+          qc_final: payload.qc_final
+        }));
       }
       if (error) throw error;
       Alert.alert('已儲存', '劇本已加入歷史記錄。');
@@ -400,6 +398,64 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
       Alert.alert('儲存失敗', message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function scheduleScript() {
+    if (!user) return;
+    if (!generatedScript.trim()) {
+      Alert.alert('未有劇本', '請先生成劇本。');
+      return;
+    }
+
+    setScheduling(true);
+    try {
+      const workspaceId = await resolveWorkspaceId(user.id, user.email);
+      const title = draft.topic.trim() || draft.brand.trim() || 'IG Reel 劇本';
+      const notes = [
+        draft.brand.trim() ? `品牌 / 店名：${draft.brand.trim()}` : '',
+        draft.background.trim() ? `題材背景：${draft.background.trim()}` : '',
+        '',
+        '劇本：',
+        generatedScript.trim()
+      ].filter((line) => line !== '').join('\n');
+
+      const payload = {
+        workspace_id: workspaceId,
+        user_id: user.id,
+        created_by: user.id,
+        title,
+        category: draft.industry,
+        status: '構思中',
+        current_stage: '構思中',
+        pipeline_step: 'script',
+        type: 'instagram',
+        notes
+      };
+
+      let { error } = await supabase.from('projects').insert(payload);
+      if (error) {
+        ({ error } = await supabase.from('projects').insert({
+          workspace_id: workspaceId,
+          created_by: user.id,
+          title,
+          category: draft.industry,
+          status: '構思中',
+          current_stage: '構思中',
+          pipeline_step: 'script',
+          type: 'instagram',
+          notes
+        }));
+      }
+      if (error) throw error;
+
+      Alert.alert('已加入工作板', '已建立新項目。');
+      router.push('/(app)/tools/work-board' as never);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '請稍後再試';
+      Alert.alert('排程失敗', message);
+    } finally {
+      setScheduling(false);
     }
   }
 
@@ -522,13 +578,11 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
               <Text style={styles.scriptText}>{generatedScript}</Text>
               <View style={styles.actionRow}>
                 <TouchableOpacity
-                  onPress={async () => {
-                    await Clipboard.setStringAsync(generatedScript);
-                    Alert.alert('已複製', '劇本已複製到剪貼板。');
-                  }}
+                  onPress={scheduleScript}
+                  disabled={scheduling}
                   style={styles.secondaryButton}
                 >
-                  <Text style={styles.secondaryButtonText}>複製</Text>
+                  {scheduling ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.secondaryButtonText}>排程</Text>}
                 </TouchableOpacity>
                 <TouchableOpacity onPress={saveScript} disabled={saving} style={styles.secondaryButton}>
                   {saving ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.secondaryButtonText}>儲存</Text>}
