@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   RefreshControl,
   StyleSheet,
   Text,
@@ -40,6 +41,22 @@ type VoteCountRow = {
 
 function normaliseTrend(value: VoteRow['trends']) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
+function isImageIcon(value: string | null | undefined) {
+  return Boolean(value && (/^(https?:|data:image\/)/.test(value)));
+}
+
+function TrendIcon({ value }: { value?: string | null }) {
+  if (isImageIcon(value)) {
+    return <Image source={{ uri: value || '' }} style={styles.trendIconImage} resizeMode="cover" />;
+  }
+
+  return (
+    <View style={styles.trendIconBox}>
+      <Text numberOfLines={1} adjustsFontSizeToFit style={styles.trendIconText}>{value || '🔥'}</Text>
+    </View>
+  );
 }
 
 function resultForTrend(trend: VoteTrend | null, votes: VoteCountRow[]) {
@@ -188,7 +205,7 @@ export default function VoteHistoryScreen() {
             return (
               <View style={styles.voteCard}>
                 <View style={styles.voteHeader}>
-                  <Text style={styles.trendIcon}>{trend?.icon || '🔥'}</Text>
+                  <TrendIcon value={trend?.icon} />
                   <View style={styles.trendTextWrap}>
                     <Text numberOfLines={2} style={styles.trendTitle}>{trend?.topic || '討論話題'}</Text>
                     <Text style={styles.voteTime}>{formatVoteTime(item.created_at)}</Text>
@@ -300,8 +317,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12
   },
-  trendIcon: {
-    fontSize: 30
+  trendIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: colors.bgBodyMuted,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  trendIconText: {
+    color: colors.text,
+    fontSize: 24,
+    textAlign: 'center'
+  },
+  trendIconImage: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: colors.bgBodyMuted
   },
   trendTextWrap: {
     flex: 1
