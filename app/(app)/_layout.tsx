@@ -6,6 +6,7 @@ import { Text, View } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { fonts } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
+import { trendHoldCutoffIso } from '@/lib/trends';
 import { colors } from '@/theme/colors';
 
 const eggsLastSeenKey = (userId: string) => `eggs-last-seen-at:${userId}`;
@@ -96,6 +97,7 @@ export default function AppTabs() {
       .from('trends')
       .select('id', { count: 'exact', head: true })
       .eq('is_active', true)
+      .or(`deadline_at.is.null,deadline_at.gt.${trendHoldCutoffIso()}`)
       .gt('created_at', lastSeenAt);
 
     if (!error) {
@@ -296,6 +298,7 @@ export default function AppTabs() {
       <Tabs.Screen name="idea/script" options={{ href: null }} />
       <Tabs.Screen name="idea/share" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       <Tabs.Screen name="home/trend/[id]" options={{ href: null }} />
+      <Tabs.Screen name="home/vote-history" options={{ href: null }} />
       <Tabs.Screen name="home/referrals" options={{ href: null }} />
       <Tabs.Screen name="home/discover" options={{ href: null }} />
       <Tabs.Screen name="settings/reply" options={{ href: null }} />

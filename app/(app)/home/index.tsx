@@ -23,6 +23,7 @@ import ClipPlayer from '@/components/ClipPlayer';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
+import { isTrendVisibleInResultWindow, trendHoldCutoffIso } from '@/lib/trends';
 import { colors } from '@/theme/colors';
 import { Log } from '@/types';
 
@@ -355,12 +356,13 @@ export default function HomeScreen() {
       .from('trends')
       .select('*')
       .eq('is_active', true)
+      .or(`deadline_at.is.null,deadline_at.gt.${trendHoldCutoffIso()}`)
       .order('heat_score', { ascending: false });
 
     if (error) {
       setTrends([]);
     } else {
-      setTrends((data ?? []) as Trend[]);
+      setTrends(((data ?? []) as Trend[]).filter((trend) => isTrendVisibleInResultWindow(trend)));
     }
     setLoadingTrends(false);
   }, []);

@@ -24,6 +24,7 @@ type CreditRow = {
 type DrawerRoute =
   | '/(app)/profile'
   | '/(app)/log'
+  | '/(app)/home/vote-history'
   | '/(app)/friends'
   | '/(app)/subscribers';
 
@@ -97,6 +98,7 @@ export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: ()
           <View style={styles.menu}>
             <Text style={styles.groupLabel}>我的空間</Text>
             <DrawerItem icon="video" label="我的房間" onPress={() => navigate('/(app)/log')} />
+            <DrawerItem icon="bar-chart-2" label="投票紀錄" onPress={() => navigate('/(app)/home/vote-history')} />
             <DrawerItem icon="user-check" label="好友" onPress={() => navigate('/(app)/friends')} />
             <DrawerItem icon="users" label="訂閱者" onPress={() => navigate('/(app)/subscribers')} />
             <Divider />

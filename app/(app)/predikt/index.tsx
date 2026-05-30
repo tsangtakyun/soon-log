@@ -6,6 +6,7 @@ import { Alert, Animated, FlatList, Image, Modal, Pressable, RefreshControl, Sha
 import * as Clipboard from 'expo-clipboard';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
+import { isTrendClosed, isTrendVisibleInResultWindow, trendHoldCutoffIso } from '@/lib/trends';
 import { colors } from '@/theme/colors';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -209,6 +210,7 @@ function TrendCard({
   onShare: () => void;
 }) {
   const angles = trend.angles ?? [];
+  const closed = isTrendClosed(trend);
   return (
     <Pressable
       onPress={() => openTrendDetail(trend.id)}
@@ -222,8 +224,10 @@ function TrendCard({
         <Text style={styles.heat}>🔥 {trend.heat_score ?? 0}</Text>
       </View>
       <View style={styles.deadlineRow}>
-        <Feather name="clock" size={13} color={colors.textMuted} />
-        <Text style={styles.deadlineText}>{formatDeadline(trend.deadline_at)}</Text>
+        <Feather name={closed ? 'check-circle' : 'clock'} size={13} color={closed ? colors.success : colors.textMuted} />
+        <Text style={[styles.deadlineText, closed && styles.closedDeadlineText]}>
+          {closed ? '已截止・結果保留 24 小時' : formatDeadline(trend.deadline_at)}
+        </Text>
       </View>
       <View style={styles.angles}>
         {angles.slice(0, 4).map((angle) => (
@@ -247,7 +251,7 @@ function TrendCard({
         <TrendAction
           active={hasVoted}
           onPress={onVote}
-          icon={<Feather name="bar-chart-2" size={21} color={hasVoted ? colors.primary : colors.textMuted} />}
+          icon={<Feather name="bar-chart-2" size={21} color={hasVoted || closed ? colors.primary : colors.textMuted} />}
           label={stats.votes}
         />
         <TrendAction
@@ -430,9 +434,10 @@ export default function PrediktScreen() {
     const { data, error } = await supabase
       .from('trends')
       .select('*')
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .or(`deadline_at.is.null,deadline_at.gt.${trendHoldCutoffIso()}`);
 
-    const rows = error ? [] : (data ?? []) as Trend[];
+    const rows = error ? [] : ((data ?? []) as Trend[]).filter((trend) => isTrendVisibleInResultWindow(trend));
     setTrends(rows);
     await loadInteractions(rows.map((trend) => trend.id));
   }, [loadInteractions]);
@@ -519,11 +524,22 @@ export default function PrediktScreen() {
       return;
     }
 
+    if (isTrendClosed(trend)) {
+      Alert.alert('已截止', '呢個話題已經截止，而家可以睇結果。');
+      return;
+    }
+
     setVoteTrend(trend);
   }
 
   async function submitVote(angle: TrendAngle, index: number) {
     if (!user || !voteTrend) return;
+    if (isTrendClosed(voteTrend)) {
+      setVoteTrend(null);
+      Alert.alert('已截止', '呢個話題已經截止，而家可以睇結果。');
+      return;
+    }
+
     const trendId = voteTrend.id;
 
     setVotedTrendIds((current) => new Set(current).add(trendId));
@@ -819,6 +835,10 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: fonts.bodyMedium,
     fontSize: 12
+  },
+  closedDeadlineText: {
+    color: colors.success,
+    fontFamily: fonts.bodyBold
   },
   angles: {
     marginTop: 14,

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
+import { isTrendVisibleInResultWindow, trendHoldCutoffIso } from '@/lib/trends';
 import { colors } from '@/theme/colors';
 
 type TrendAngle = {
@@ -18,6 +19,7 @@ type Trend = {
   icon: string | null;
   heat_score: number | null;
   angles: TrendAngle[] | null;
+  deadline_at?: string | null;
 };
 
 function normaliseAngles(value: unknown): TrendAngle[] {
@@ -86,14 +88,17 @@ export function TrendStrip() {
   useEffect(() => {
     supabase
       .from('trends')
-      .select('id, topic, icon, heat_score, angles')
+      .select('id, topic, icon, heat_score, angles, deadline_at')
       .eq('is_active', true)
+      .or(`deadline_at.is.null,deadline_at.gt.${trendHoldCutoffIso()}`)
       .order('heat_score', { ascending: false })
       .then(({ data }) => {
-        setTrends(((data ?? []) as Array<Trend & { angles: unknown }>).map((trend) => ({
-          ...trend,
-          angles: normaliseAngles(trend.angles)
-        })));
+        setTrends(((data ?? []) as Array<Trend & { angles: unknown }>)
+          .filter((trend) => isTrendVisibleInResultWindow(trend))
+          .map((trend) => ({
+            ...trend,
+            angles: normaliseAngles(trend.angles)
+          })));
       });
   }, []);
 
