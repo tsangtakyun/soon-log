@@ -443,8 +443,7 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
           status: '構思中',
           current_stage: '構思中',
           pipeline_step: 'script',
-          type: 'instagram',
-          notes
+          type: 'instagram'
         }));
       }
       if (error) throw error;
