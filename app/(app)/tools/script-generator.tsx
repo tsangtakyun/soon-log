@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackHeader } from '@/components/BackHeader';
 import { useAuth } from '@/hooks/useAuth';
+import { deductCredits, getCredits } from '@/lib/credits';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
@@ -214,6 +215,7 @@ export default function ScriptGeneratorScreen() {
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [scheduling, setScheduling] = useState(false);
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
 
   const hook = useMemo(() => selectedOption(HOOK_OPTIONS, draft.hookStyle), [draft.hookStyle]);
   const transition = useMemo(() => selectedOption(TRANSITION_OPTIONS, draft.transitionStyle), [draft.transitionStyle]);
@@ -235,6 +237,18 @@ export default function ScriptGeneratorScreen() {
       background: background || prev.background
     }));
   }, [params.background, params.brand, params.industry, params.topic]);
+
+  useEffect(() => {
+    const email = user?.email?.trim().toLowerCase();
+    if (!email) {
+      setCreditBalance(null);
+      return;
+    }
+
+    getCredits(email)
+      .then(setCreditBalance)
+      .catch(() => setCreditBalance(null));
+  }, [user?.email]);
 
   const prompt = useMemo(() => `你係廣東話短片 script 寫手，幫 content creator 寫 IG Reel / YouTube Short。
 廣東話口語，短句，坦白，唔 oversell，每句有目的。
@@ -321,6 +335,17 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
 
     setGenerating(true);
     try {
+      const email = user?.email?.trim().toLowerCase();
+      if (email) {
+        const creditResult = await deductCredits(email, 'ai_generate');
+        setCreditBalance(creditResult.balance);
+
+        if (!creditResult.success && creditResult.error === 'insufficient_credits') {
+          Alert.alert('Credits 不足', '請到 SOON-EGG 購買', [{ text: '了解' }]);
+          return;
+        }
+      }
+
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -477,6 +502,9 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
         >
           <Text style={styles.subtitle}>IG Reel 劇本工作台</Text>
+          <Text style={[styles.creditText, (creditBalance ?? 10) < 3 && styles.creditWarning]}>
+            🪙 {creditBalance ?? '...'} Credits
+          </Text>
 
           <View style={styles.formCard}>
             <FieldLabel>01 品牌 / 個人名稱</FieldLabel>
@@ -611,6 +639,16 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     marginBottom: 12
+  },
+  creditText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    marginTop: -6,
+    marginBottom: 4
+  },
+  creditWarning: {
+    color: '#b45309'
   },
   historyButton: {
     paddingVertical: 6,

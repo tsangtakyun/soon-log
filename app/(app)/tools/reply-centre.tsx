@@ -20,6 +20,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackHeader } from '@/components/BackHeader';
 import { useAuth } from '@/hooks/useAuth';
+import { deductCredits, getCredits } from '@/lib/credits';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
@@ -508,6 +509,7 @@ export default function ReplyCentreToolScreen() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedThread, setSelectedThread] = useState<ReplyThread | null>(null);
   const [draft, setDraft] = useState<MessageDraft>(emptyDraft);
@@ -568,6 +570,18 @@ export default function ReplyCentreToolScreen() {
   useEffect(() => {
     loadThreads();
   }, [loadThreads]);
+
+  useEffect(() => {
+    const email = user?.email?.trim().toLowerCase();
+    if (!email) {
+      setCreditBalance(null);
+      return;
+    }
+
+    getCredits(email)
+      .then(setCreditBalance)
+      .catch(() => setCreditBalance(null));
+  }, [user?.email]);
 
   async function onRefresh() {
     setRefreshing(true);
@@ -664,6 +678,17 @@ export default function ReplyCentreToolScreen() {
 
     setGenerating(true);
     try {
+      const email = user?.email?.trim().toLowerCase();
+      if (email) {
+        const creditResult = await deductCredits(email, 'ai_generate');
+        setCreditBalance(creditResult.balance);
+
+        if (!creditResult.success && creditResult.error === 'insufficient_credits') {
+          Alert.alert('Credits 不足', '請到 SOON-EGG 購買', [{ text: '了解' }]);
+          return;
+        }
+      }
+
       const prompt = `你係一個專業香港創作者助手。以下係一條來自${inboxLabel(draft.inboxType)}嘅訊息，請用廣東話口語幫我生成一個友善、專業嘅回覆。訊息：${draft.originalMessage}`;
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -739,8 +764,13 @@ export default function ReplyCentreToolScreen() {
       />
 
       <View style={styles.headerText}>
-        <Text style={styles.title}>回覆中心</Text>
-        <Text style={styles.subtitle}>AI 幫你覆 fans 同客</Text>
+        <View>
+          <Text style={styles.title}>回覆中心</Text>
+          <Text style={styles.subtitle}>AI 幫你覆 fans 同客</Text>
+        </View>
+        <Text style={[styles.creditText, (creditBalance ?? 10) < 3 && styles.creditWarning]}>
+          🪙 {creditBalance ?? '...'} Credits
+        </Text>
       </View>
 
       <View style={styles.inboxTabs}>
@@ -830,6 +860,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F3EA'
   },
   headerText: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 12,
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12
@@ -845,6 +879,15 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 13
+  },
+  creditText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    paddingBottom: 1
+  },
+  creditWarning: {
+    color: '#b45309'
   },
   addButton: {
     borderRadius: 999,

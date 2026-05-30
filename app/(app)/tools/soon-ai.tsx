@@ -16,6 +16,8 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/hooks/useAuth';
+import { deductCredits, getCredits } from '@/lib/credits';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 
@@ -74,13 +76,15 @@ type AnthropicMessage = {
 
 export default function SoonAiScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
 
-  const canSend = inputText.trim().length > 0 && !isLoading;
+  const canSend = inputText.trim().length > 0 && !isLoading && creditBalance !== 0;
 
   const conversationHistory = useMemo<AnthropicMessage[]>(() => {
     return messages
@@ -97,6 +101,18 @@ export default function SoonAiScreen() {
     });
   }, [isLoading, messages.length]);
 
+  useEffect(() => {
+    const email = user?.email?.trim().toLowerCase();
+    if (!email) {
+      setCreditBalance(null);
+      return;
+    }
+
+    getCredits(email)
+      .then(setCreditBalance)
+      .catch(() => setCreditBalance(null));
+  }, [user?.email]);
+
   const clearMessages = useCallback(() => {
     if (messages.length === 0 || isLoading) return;
     Alert.alert('清除對話？', '呢個動作會清空今次對話內容。', [
@@ -108,6 +124,10 @@ export default function SoonAiScreen() {
   const sendMessage = useCallback(async (text?: string) => {
     const content = (text ?? inputText).trim();
     if (!content || isLoading) return;
+    if (creditBalance === 0) {
+      Alert.alert('Credits 用完了', '請到 egg.sooncreator.network 購買');
+      return;
+    }
     if (!ANTHROPIC_KEY) {
       Alert.alert('未設定 AI Key', '請先設定 EXPO_PUBLIC_ANTHROPIC_KEY。');
       return;
@@ -127,6 +147,18 @@ export default function SoonAiScreen() {
     setIsLoading(true);
 
     try {
+      const email = user?.email?.trim().toLowerCase();
+      if (email) {
+        const creditResult = await deductCredits(email, 'ai_generate');
+        setCreditBalance(creditResult.balance);
+
+        if (!creditResult.success && creditResult.error === 'insufficient_credits') {
+          Alert.alert('Credits 用完了', '請到 egg.sooncreator.network 購買');
+          setMessages((prev) => prev.filter((message) => message.id !== userMessage.id));
+          return;
+        }
+      }
+
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -162,7 +194,7 @@ export default function SoonAiScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [conversationHistory, inputText, isLoading]);
+  }, [conversationHistory, creditBalance, inputText, isLoading, user?.email]);
 
   return (
     <KeyboardAvoidingView
@@ -178,6 +210,9 @@ export default function SoonAiScreen() {
         <View style={styles.headerText}>
           <Text style={styles.title}>SOON AI</Text>
           <Text style={styles.subtitle}>你的 AI 創作夥伴</Text>
+          <Text style={[styles.creditText, (creditBalance ?? 10) < 3 && styles.creditWarning]}>
+            🪙 {creditBalance ?? '...'} Credits
+          </Text>
         </View>
         <TouchableOpacity
           onPress={clearMessages}
@@ -215,6 +250,7 @@ export default function SoonAiScreen() {
       </ScrollView>
 
       <View style={[styles.inputArea, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+        {creditBalance === 0 ? <Text style={styles.noCreditsText}>Credits 用完了，請到 egg.sooncreator.network 購買</Text> : null}
         {messages.length > 0 ? <QuickPromptChips onSelect={sendMessage} compact /> : null}
         <View style={styles.inputBar}>
           <TextInput
@@ -371,6 +407,15 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 12
+  },
+  creditText: {
+    marginTop: 4,
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
+  },
+  creditWarning: {
+    color: '#b45309'
   },
   clearButton: {
     width: 72,
@@ -562,6 +607,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgBody,
     paddingHorizontal: 14,
     paddingTop: 10
+  },
+  noCreditsText: {
+    marginBottom: 8,
+    color: '#b45309',
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    textAlign: 'center'
   },
   inputBar: {
     flexDirection: 'row',
