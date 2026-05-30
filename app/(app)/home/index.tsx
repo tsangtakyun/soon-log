@@ -193,7 +193,15 @@ function TrendCard({ trend }: { trend: Trend }) {
   );
 }
 
-function MiniLogCard({ log, compact = false }: { log: HomeLog; compact?: boolean }) {
+function MiniLogCard({
+  log,
+  compact = false,
+  onOpenSettings
+}: {
+  log: HomeLog;
+  compact?: boolean;
+  onOpenSettings?: (log: HomeLog) => void;
+}) {
   const cover = log.media_urls?.[0] || log.video_url;
   const isVideo = !!cover && (cover.endsWith('.mp4') || cover.includes('video'));
   const username = log.profile?.username || 'soon';
@@ -223,6 +231,18 @@ function MiniLogCard({ log, compact = false }: { log: HomeLog; compact?: boolean
           </Text>
         </View>
       )}
+      {onOpenSettings ? (
+        <Pressable
+          onPress={(event) => {
+            event.stopPropagation();
+            onOpenSettings(log);
+          }}
+          hitSlop={8}
+          style={({ pressed }) => [styles.miniLogSettingsButton, pressed && styles.pressed]}
+        >
+          <Feather name="more-horizontal" size={18} color="#ffffff" />
+        </Pressable>
+      ) : null}
       <View style={[styles.miniLogOverlay, compact && !cover && styles.ownMiniLogOverlay]}>
         <View style={styles.miniLogUserRow}>
           {avatar ? <Image source={{ uri: avatar }} style={styles.miniLogAvatar} /> : null}
@@ -260,7 +280,7 @@ function FollowingDiarySection({ logs }: { logs: HomeLog[]; hasFollowing: boolea
   );
 }
 
-function OwnDiarySection({ logs }: { logs: HomeLog[] }) {
+function OwnDiarySection({ logs, onOpenSettings }: { logs: HomeLog[]; onOpenSettings: (log: HomeLog) => void }) {
   return (
     <View style={styles.diarySection}>
       <Pressable
@@ -271,7 +291,7 @@ function OwnDiarySection({ logs }: { logs: HomeLog[] }) {
       </Pressable>
       {logs.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.diaryStrip}>
-          {logs.map((log) => <MiniLogCard key={log.id} log={log} compact />)}
+          {logs.map((log) => <MiniLogCard key={log.id} log={log} compact onOpenSettings={onOpenSettings} />)}
         </ScrollView>
       ) : (
         <View style={styles.followingEmpty}>
@@ -299,6 +319,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [trendStripRefreshKey, setTrendStripRefreshKey] = useState(0);
   const [credits, setCredits] = useState(30);
+  const [deletingDiaryId, setDeletingDiaryId] = useState<string | null>(null);
   const screenWidth = Dimensions.get('window').width;
   const heroHeight = Math.round(Dimensions.get('window').height * 0.36);
   const eggRotation = useRef(new Animated.Value(0)).current;
@@ -431,6 +452,41 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [loadDiaries, loadProfileSummary, loadTrends]);
 
+  const deleteOwnDiary = useCallback(async (log: HomeLog) => {
+    if (!user || deletingDiaryId) return;
+
+    setDeletingDiaryId(log.id);
+    const previousLogs = ownLogs;
+    setOwnLogs((current) => current.filter((item) => item.id !== log.id));
+
+    const { error } = await supabase
+      .from('topic_clips')
+      .delete()
+      .eq('id', log.id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      setOwnLogs(previousLogs);
+      Alert.alert('刪除失敗', error.message || '請稍後再試');
+    }
+    setDeletingDiaryId(null);
+  }, [deletingDiaryId, ownLogs, user]);
+
+  const openOwnDiarySettings = useCallback((log: HomeLog) => {
+    Alert.alert(
+      '日記設定',
+      log.title || '影片日記',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: deletingDiaryId === log.id ? '刪除中...' : '刪除日記',
+          style: 'destructive',
+          onPress: () => deleteOwnDiary(log)
+        }
+      ]
+    );
+  }, [deleteOwnDiary, deletingDiaryId]);
+
   return (
     <View style={styles.screen}>
       <View style={[styles.hero, { height: heroHeight }]}>
@@ -450,7 +506,9 @@ export default function HomeScreen() {
               <Image source={require('../../../assets/gift.png')} style={styles.topIcon} />
             </Pressable>
             <Pressable onPress={() => setSocialLinksOpen(true)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
-              <Image source={require('../../../assets/save.png')} style={styles.topIcon} />
+              <View style={styles.fileIconCrop}>
+                <Image source={require('../../../assets/save.png')} style={styles.fileTopIcon} />
+              </View>
             </Pressable>
           </View>
         </View>
@@ -495,7 +553,7 @@ export default function HomeScreen() {
 
         <FollowingDiarySection logs={followingLogs} hasFollowing={hasFollowing} />
 
-        <OwnDiarySection logs={ownLogs} />
+        <OwnDiarySection logs={ownLogs} onOpenSettings={openOwnDiarySettings} />
 
         <View style={styles.prediktSection}>
           <View style={styles.sectionBannerWrap}>
@@ -553,6 +611,19 @@ const styles = StyleSheet.create({
   topIcon: {
     width: 20,
     height: 20,
+    resizeMode: 'contain'
+  },
+  fileIconCrop: {
+    width: 20,
+    height: 20,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  fileTopIcon: {
+    width: 22,
+    height: 22,
+    marginRight: 2,
     resizeMode: 'contain'
   },
   creditTiny: {
@@ -693,6 +764,18 @@ const styles = StyleSheet.create({
     bottom: 0,
     padding: 10,
     backgroundColor: 'rgba(0,0,0,0.58)'
+  },
+  miniLogSettingsButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.52)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2
   },
   miniLogUserRow: {
     flexDirection: 'row',
