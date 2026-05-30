@@ -34,6 +34,8 @@ import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 
+const ANTHROPIC_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_KEY;
+
 type IdeaType = 'all' | 'instagram' | 'blog' | 'social';
 type RegionKey = 'HK' | 'TW' | 'JP' | 'KR' | 'US';
 
@@ -70,6 +72,9 @@ type IdeaDraft = {
   type: Exclude<IdeaType, 'all'>;
   regions: RegionKey[];
   notes: string;
+  placeName: string;
+  placeAddress: string;
+  shopHighlights: string;
 };
 
 const TYPE_FILTERS: Array<{ key: IdeaType; label: string }> = [
@@ -92,7 +97,10 @@ const emptyDraft: IdeaDraft = {
   topic: '',
   type: 'instagram',
   regions: ['HK'],
-  notes: ''
+  notes: '',
+  placeName: '',
+  placeAddress: '',
+  shopHighlights: ''
 };
 
 const screenWidth = Dimensions.get('window').width;
@@ -146,8 +154,17 @@ function draftFromIdea(idea: IdeaRecord): IdeaDraft {
     topic: idea.topic ?? '',
     type: normalizeType(idea.platform),
     regions: ideaRegions(idea),
-    notes: idea.notes ?? idea.summary ?? ''
+    notes: idea.notes ?? idea.summary ?? idea.description ?? '',
+    placeName: idea.place_name ?? idea.shop_name ?? '',
+    placeAddress: idea.place_address ?? '',
+    shopHighlights: idea.shop_highlights ?? ''
   };
+}
+
+function containsMeaningfulEnglish(value: string) {
+  const englishLetters = (value.match(/[A-Za-z]/g) ?? []).length;
+  const chineseChars = (value.match(/[\u3400-\u9FFF]/g) ?? []).length;
+  return englishLetters >= 20 && englishLetters > chineseChars * 2;
 }
 
 function mergeRegionsAndBoards(regions: RegionKey[], boards: string[]) {
@@ -342,9 +359,38 @@ function FormSheet({
               <TextInput
                 value={draft.notes}
                 onChangeText={(value) => onChange({ ...draft, notes: value })}
-                placeholder="記低拍法、hook、參考資料..."
+                placeholder="用繁體中文寫低拍法、特色、參考資料..."
                 placeholderTextColor="#9ca3af"
                 style={[styles.input, styles.textarea]}
+                multiline
+                textAlignVertical="top"
+              />
+
+              <Text style={styles.fieldLabel}>店名／地點</Text>
+              <TextInput
+                value={draft.placeName}
+                onChangeText={(value) => onChange({ ...draft, placeName: value })}
+                placeholder="例如：pogmam"
+                placeholderTextColor="#9ca3af"
+                style={styles.input}
+              />
+
+              <Text style={styles.fieldLabel}>地址</Text>
+              <TextInput
+                value={draft.placeAddress}
+                onChangeText={(value) => onChange({ ...draft, placeAddress: value })}
+                placeholder="例如：大阪市北區中崎西..."
+                placeholderTextColor="#9ca3af"
+                style={styles.input}
+              />
+
+              <Text style={styles.fieldLabel}>出名／推薦</Text>
+              <TextInput
+                value={draft.shopHighlights}
+                onChangeText={(value) => onChange({ ...draft, shopHighlights: value })}
+                placeholder="例如：圓球形提拉米蘇、即席淋咖啡醬"
+                placeholderTextColor="#9ca3af"
+                style={[styles.input, styles.textareaSmall]}
                 multiline
                 textAlignVertical="top"
               />
@@ -466,6 +512,86 @@ function BoardPickerSheet({
   );
 }
 
+function IdeaManageSheet({
+  idea,
+  visible,
+  translating,
+  onClose,
+  onEdit,
+  onTranslate,
+  onDelete
+}: {
+  idea: IdeaRecord;
+  visible: boolean;
+  translating: boolean;
+  onClose: () => void;
+  onEdit: () => void;
+  onTranslate: () => void;
+  onDelete: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const description = idea.notes || idea.summary || idea.description || '';
+  const shouldSuggestTranslation = containsMeaningfulEnglish([
+    idea.title,
+    idea.topic,
+    description,
+    idea.shop_highlights
+  ].filter(Boolean).join('\n'));
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.manageSheet, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <View>
+              <Text style={styles.sheetTitle}>題材設定</Text>
+              <Text numberOfLines={1} style={styles.boardSheetSubtitle}>{idea.title || '未命名題材'}</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Feather name="x" size={22} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity onPress={onEdit} style={styles.manageRow}>
+            <View style={styles.manageIcon}>
+              <Feather name="edit-3" size={19} color={colors.primary} />
+            </View>
+            <View style={styles.manageCopy}>
+              <Text style={styles.manageTitle}>編輯資料</Text>
+              <Text style={styles.manageSubtitle}>修改標題、描述、店名、地址同推薦資料</Text>
+            </View>
+            <Feather name="chevron-right" size={19} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={onTranslate} disabled={translating} style={styles.manageRow}>
+            <View style={styles.manageIcon}>
+              <Feather name="type" size={19} color={colors.primary} />
+            </View>
+            <View style={styles.manageCopy}>
+              <Text style={styles.manageTitle}>整理成繁體中文</Text>
+              <Text style={styles.manageSubtitle}>
+                {shouldSuggestTranslation ? '偵測到英文內容，可以用 AI 轉成繁體書面語' : '用 AI 將現有資料統一成繁體書面語'}
+              </Text>
+            </View>
+            {translating ? <ActivityIndicator color={colors.primary} /> : <Feather name="chevron-right" size={19} color={colors.textMuted} />}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={onDelete} style={[styles.manageRow, styles.manageDangerRow]}>
+            <View style={[styles.manageIcon, styles.manageDangerIcon]}>
+              <Feather name="trash-2" size={19} color={colors.error} />
+            </View>
+            <View style={styles.manageCopy}>
+              <Text style={[styles.manageTitle, styles.manageDangerText]}>刪除題材</Text>
+              <Text style={styles.manageSubtitle}>由題材庫移除呢條資料</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function FilterSheet({
   visible,
   boards,
@@ -550,16 +676,23 @@ function IdeaDetailSheet({
   idea,
   onClose,
   onEdit,
-  onManageBoards
+  onManageBoards,
+  onDelete,
+  onTranslate,
+  translatingIdeaId
 }: {
   idea: IdeaRecord | null;
   onClose: () => void;
   onEdit: (idea: IdeaRecord) => void;
   onManageBoards: (idea: IdeaRecord) => void;
+  onDelete: (idea: IdeaRecord) => void;
+  onTranslate: (idea: IdeaRecord) => void;
+  translatingIdeaId: string | null;
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [showSourceWebView, setShowSourceWebView] = useState(false);
+  const [showManageSheet, setShowManageSheet] = useState(false);
   if (!idea) return null;
 
   const currentIdea = idea;
@@ -741,7 +874,7 @@ function IdeaDetailSheet({
               <TouchableOpacity onPress={openSource} disabled={!sourceUrl} style={styles.detailIconButton}>
                 <Feather name={normalizeType(idea.platform) === 'instagram' ? 'instagram' : 'external-link'} size={24} color={colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => onEdit(idea)} style={styles.detailIconButton}>
+              <TouchableOpacity onPress={() => setShowManageSheet(true)} style={styles.detailIconButton}>
                 <Feather name="more-horizontal" size={25} color={colors.primary} />
               </TouchableOpacity>
               <View style={styles.detailActionSpacer} />
@@ -872,6 +1005,18 @@ function IdeaDetailSheet({
             )}
           </View>
         </ScrollView>
+        <IdeaManageSheet
+          idea={currentIdea}
+          visible={showManageSheet}
+          translating={translatingIdeaId === currentIdea.id}
+          onClose={() => setShowManageSheet(false)}
+          onEdit={() => {
+            setShowManageSheet(false);
+            onEdit(currentIdea);
+          }}
+          onTranslate={() => onTranslate(currentIdea)}
+          onDelete={() => onDelete(currentIdea)}
+        />
         {renderSourceWebView()}
       </View>
     </Modal>
@@ -898,6 +1043,7 @@ export default function ToolsIdeaLibraryScreen() {
   const [boardIdea, setBoardIdea] = useState<IdeaRecord | null>(null);
   const [newBoardName, setNewBoardName] = useState('');
   const [draft, setDraft] = useState<IdeaDraft>(emptyDraft);
+  const [translatingIdeaId, setTranslatingIdeaId] = useState<string | null>(null);
 
   const resolveWorkspace = useCallback(async () => {
     if (!user) return null;
@@ -1043,6 +1189,7 @@ export default function ToolsIdeaLibraryScreen() {
 
   function openEditModal(idea: IdeaRecord) {
     setDraft(draftFromIdea(idea));
+    setSelectedIdea(null);
     setEditingIdea(idea);
   }
 
@@ -1071,6 +1218,11 @@ export default function ToolsIdeaLibraryScreen() {
         country: primaryRegion,
         notes: draft.notes.trim(),
         summary: draft.notes.trim(),
+        description: draft.notes.trim(),
+        place_name: draft.placeName.trim() || null,
+        shop_name: draft.placeName.trim() || null,
+        place_address: draft.placeAddress.trim() || null,
+        shop_highlights: draft.shopHighlights.trim() || null,
         tags: draft.regions,
         categories: draft.regions,
         viral_score: 0,
@@ -1112,6 +1264,11 @@ export default function ToolsIdeaLibraryScreen() {
           country: primaryRegion,
           notes: draft.notes.trim(),
           summary: draft.notes.trim(),
+          description: draft.notes.trim(),
+          place_name: draft.placeName.trim() || null,
+          shop_name: draft.placeName.trim() || null,
+          place_address: draft.placeAddress.trim() || null,
+          shop_highlights: draft.shopHighlights.trim() || null,
           tags: draft.regions,
           categories: nextCategories
         })
@@ -1125,6 +1282,125 @@ export default function ToolsIdeaLibraryScreen() {
       Alert.alert('儲存失敗', message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteIdea(idea: IdeaRecord) {
+    if (!user) return;
+    Alert.alert(
+      '刪除題材',
+      `確定要刪除「${idea.title || '未命名題材'}」？`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '刪除',
+          style: 'destructive',
+          onPress: async () => {
+            setSaving(true);
+            const previousIdeas = ideas;
+            setIdeas((current) => current.filter((item) => item.id !== idea.id));
+            setSelectedIdea(null);
+            try {
+              const { error } = await supabase
+                .from('ideas')
+                .delete()
+                .eq('id', idea.id)
+                .eq('user_id', user.id);
+
+              if (error) throw error;
+            } catch (err: unknown) {
+              setIdeas(previousIdeas);
+              const message = err instanceof Error ? err.message : '請稍後再試';
+              Alert.alert('刪除失敗', message);
+            } finally {
+              setSaving(false);
+            }
+          }
+        }
+      ]
+    );
+  }
+
+  async function translateIdeaToTraditionalChinese(idea: IdeaRecord) {
+    if (!ANTHROPIC_KEY) {
+      Alert.alert('未設定 AI Key', '請先設定 EXPO_PUBLIC_ANTHROPIC_KEY。');
+      return;
+    }
+
+    const source = {
+      title: idea.title || '',
+      topic: idea.topic || '',
+      description: idea.notes || idea.summary || idea.description || '',
+      placeName: idea.place_name || idea.shop_name || '',
+      placeAddress: idea.place_address || '',
+      shopHighlights: idea.shop_highlights || ''
+    };
+
+    setTranslatingIdeaId(idea.id);
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 900,
+          messages: [{
+            role: 'user',
+            content: `你係香港/台灣用戶會睇嘅題材庫編輯。請將以下題材資料整理成繁體中文書面語，避免英文句子，保留店名原文可以，但描述要中文。
+
+只回 JSON，不要 markdown：
+{
+  "title": "8-18字繁體中文題材標題",
+  "topic": "繁體中文主題",
+  "description": "2-4句繁體中文描述，清楚講內容亮點同可拍方向",
+  "placeName": "店名或地點名；如原文店名可保留",
+  "placeAddress": "地址；如未知留空",
+  "shopHighlights": "店舖出名/推薦項目，繁體中文短句"
+}
+
+原始資料：
+${JSON.stringify(source, null, 2)}`
+          }]
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error?.message ?? '整理失敗');
+      const text = data?.content?.map((block: { text?: string }) => block.text).filter(Boolean).join('\n') ?? '';
+      const jsonText = text.replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
+      const parsed = JSON.parse(jsonText) as Partial<Record<'title' | 'topic' | 'description' | 'placeName' | 'placeAddress' | 'shopHighlights', string>>;
+
+      const update = {
+        title: parsed.title?.trim() || idea.title,
+        topic: parsed.topic?.trim() || idea.topic || parsed.title?.trim() || idea.title,
+        notes: parsed.description?.trim() || idea.notes,
+        summary: parsed.description?.trim() || idea.summary,
+        description: parsed.description?.trim() || idea.description,
+        place_name: parsed.placeName?.trim() || idea.place_name,
+        shop_name: parsed.placeName?.trim() || idea.shop_name,
+        place_address: parsed.placeAddress?.trim() || idea.place_address,
+        shop_highlights: parsed.shopHighlights?.trim() || idea.shop_highlights
+      };
+
+      const { error } = await supabase
+        .from('ideas')
+        .update(update)
+        .eq('id', idea.id);
+
+      if (error) throw error;
+      const nextIdea = { ...idea, ...update };
+      setIdeas((current) => current.map((item) => item.id === idea.id ? nextIdea : item));
+      setSelectedIdea((current) => current?.id === idea.id ? nextIdea : current);
+      Alert.alert('已整理', '題材資料已轉成繁體中文。');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '請稍後再試';
+      Alert.alert('整理失敗', message);
+    } finally {
+      setTranslatingIdeaId(null);
     }
   }
 
@@ -1389,6 +1665,9 @@ export default function ToolsIdeaLibraryScreen() {
         onClose={() => setSelectedIdea(null)}
         onEdit={openEditModal}
         onManageBoards={openBoardPicker}
+        onDelete={deleteIdea}
+        onTranslate={translateIdeaToTraditionalChinese}
+        translatingIdeaId={translatingIdeaId}
       />
 
       <BoardPickerSheet
@@ -2228,6 +2507,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10
   },
+  manageSheet: {
+    maxHeight: '72%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingTop: 10
+  },
   sheetHandle: {
     alignSelf: 'center',
     width: 44,
@@ -2263,6 +2550,52 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.bgBodyMuted
   },
+  manageRow: {
+    minHeight: 72,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    backgroundColor: colors.bgBodyMuted,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  manageIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  manageCopy: {
+    flex: 1
+  },
+  manageTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16
+  },
+  manageSubtitle: {
+    marginTop: 3,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 12,
+    lineHeight: 17
+  },
+  manageDangerRow: {
+    borderColor: '#fee2e2',
+    backgroundColor: '#fff7f7'
+  },
+  manageDangerIcon: {
+    backgroundColor: '#fff1f2'
+  },
+  manageDangerText: {
+    color: colors.error
+  },
   fieldLabel: {
     marginBottom: 7,
     marginTop: 12,
@@ -2284,6 +2617,10 @@ const styles = StyleSheet.create({
   },
   textarea: {
     minHeight: 110,
+    lineHeight: 22
+  },
+  textareaSmall: {
+    minHeight: 82,
     lineHeight: 22
   },
   selectorRow: {
