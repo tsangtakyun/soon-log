@@ -25,7 +25,8 @@ import { colors } from '@/theme/colors';
 const ANTHROPIC_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_KEY;
 
 type HookKey = 'H1' | 'H2' | 'H3' | 'H4' | 'H5' | 'H6' | 'H7' | 'H8';
-type TransitionKey = 'T1' | 'T2' | 'T3' | 'T4' | 'T5';
+type TransitionKey = 'T1' | 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'T8';
+type EndingKey = 'E1' | 'E2' | 'E3' | 'E4' | 'E5' | 'E6' | 'E7';
 
 type Option<T extends string> = {
   key: T;
@@ -40,6 +41,7 @@ type Draft = {
   background: string;
   hookStyle: HookKey;
   transitionStyle: TransitionKey;
+  endingStyle: EndingKey;
 };
 
 const INDUSTRIES = [
@@ -81,7 +83,20 @@ const TRANSITION_OPTIONS: Option<TransitionKey>[] = [
   { key: 'T2', title: '轉念 — 入去先信咗', description: '懷疑被現實正面打臉' },
   { key: 'T3', title: '質疑名氣 — 實力存疑', description: '對名氣打預防針' },
   { key: 'T4', title: '實測宣言 — 等我試下', description: '宣佈「我幫你試」' },
-  { key: 'T5', title: '場景切割 — 另有真相', description: '意想不到角度重新定義' }
+  { key: 'T5', title: '場景切割 — 另有真相', description: '意想不到角度重新定義' },
+  { key: 'T6', title: '第一眼唔吸引', description: '由低期待轉入實測' },
+  { key: 'T7', title: '重點係另一樣', description: '表面賣點之外另有核心' },
+  { key: 'T8', title: '動作到領悟', description: '由一個動作帶出觀察' }
+];
+
+const ENDING_OPTIONS: Option<EndingKey>[] = [
+  { key: 'E1', title: '坦白留白', description: '唔過度結論，留一點真實餘地' },
+  { key: 'E2', title: '直接回應開場', description: '結尾扣返開場問題' },
+  { key: 'E3', title: '真實力', description: '用實測感受落判斷' },
+  { key: 'E4', title: '自嘲幽默', description: '用輕鬆自嘲收尾' },
+  { key: 'E5', title: '詩意短句', description: '用一個短句留下畫面' },
+  { key: 'E6', title: '升華人生', description: '由食物/體驗帶到生活感悟' },
+  { key: 'E7', title: '哲學重量', description: '較有份量但不說教' }
 ];
 
 const emptyDraft: Draft = {
@@ -90,7 +105,8 @@ const emptyDraft: Draft = {
   topic: '',
   background: '',
   hookStyle: 'H1',
-  transitionStyle: 'T1'
+  transitionStyle: 'T1',
+  endingStyle: 'E1'
 };
 
 function paramString(value: string | string[] | undefined) {
@@ -201,6 +217,7 @@ export default function ScriptGeneratorScreen() {
 
   const hook = useMemo(() => selectedOption(HOOK_OPTIONS, draft.hookStyle), [draft.hookStyle]);
   const transition = useMemo(() => selectedOption(TRANSITION_OPTIONS, draft.transitionStyle), [draft.transitionStyle]);
+  const ending = useMemo(() => selectedOption(ENDING_OPTIONS, draft.endingStyle), [draft.endingStyle]);
 
   useEffect(() => {
     const brand = paramString(params.brand).trim();
@@ -219,21 +236,77 @@ export default function ScriptGeneratorScreen() {
     }));
   }, [params.background, params.brand, params.industry, params.topic]);
 
-  const prompt = useMemo(() => `你係一個專業香港 IG Reel 劇本創作師。根據以下資料，生成一個完整嘅 IG Reel 劇本：
+  const prompt = useMemo(() => `你係廣東話短片 script 寫手，幫 content creator 寫 IG Reel / YouTube Short。
+廣東話口語，短句，坦白，唔 oversell，每句有目的。
 
-品牌/名稱：${draft.brand || '未提供'}
-行業：${draft.industry}
+結構：
+1.【Opening Hook】一句，5秒
+2.【舖頭資料】如有舖頭名稱 / 地址就原文列出，方便試拍現場導航
+3.【背景 VO】根據題目、地址同題材想法，由 AI 總結成 50-80 字背景資料
+4.【轉場】一句，10秒
+5.【實測內容】4項，每項獨立分段：名稱、拍攝、內容、現場調整
+6.【Ending】一句5秒＋主持1-2句感想
+
+實測內容規則：
+- 唔好每一 part 都寫成「旁白」。
+- 每一 part 用「內容：」取代「旁白：」。
+- 「內容」要 AI 化身成主持，寫成現場試食/試玩/試用時會講同會做嘅內容，大概 45-60 字。
+- 每一 part 都要加「現場調整：主持到場後按真實味道、環境、人流、排隊、價錢或服務再微調。」
+- 拍攝提示同內容要分開，方便現場 crew 睇。
+
+Hook：H1誇張行為問觀眾｜H2挑戰廣泛聲稱｜H3借第三者引懸念｜H4感官記憶+轉折｜H5意外對比｜H6個人披露｜H7荒誕事實｜H8如果句式
+轉場：T1主持緊張同行｜T2懷疑被打臉｜T3對名氣存疑｜T4宣佈親自試｜T5意外角度｜T6第一眼唔吸引｜T7重點係另一樣｜T8動作到領悟
+Ending：E1坦白留白｜E2直接回應開場｜E3真實力｜E4自嘲幽默｜E5詩意短句｜E6升華人生｜E7哲學重量
+
+品牌：${draft.brand || '未提供'}
+類型：${draft.industry}
 主題：${draft.topic || '未提供'}
-背景資料：${draft.background || '未提供'}
-Hook 風格：${hook.key} ${hook.title} - ${hook.description}
-轉場風格：${transition.key} ${transition.title} - ${transition.description}
+Idea Brainstorm 想法 / 補充資料：${draft.background || '未提供'}
+Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title}｜Ending：${ending.key} ${ending.title}
 
-劇本格式：
-- Hook（開場3秒，用選定嘅Hook風格）
-- 中段發展（用選定嘅轉場風格）
-- 結尾 CTA
+請即刻輸出完整 script，唔好加前言。
+【舖頭資料】要獨立列出舖頭名稱同地址；【背景 VO】要由你根據主題、舖頭資料同 Idea Brainstorm 想法重新總結 50-80 字背景資料，唔好照抄原文。
+內容實測每一 part 一定要用「內容：」同「現場調整：」，唔好用「旁白：」。
 
-用廣東話口語寫作，自然流暢，適合 IG Reel 節奏。`, [draft.background, draft.brand, draft.industry, draft.topic, hook, transition]);
+輸出格式：
+
+【Opening Hook】
+（一句）
+
+【舖頭資料】
+名稱：（如有就列出；如無就寫：未提供）
+地址：（如有就列出；如無就寫：未提供）
+
+【背景 VO】
+（50-80字。唔好照抄題材想法，要整理成可直接旁白嘅背景資料）
+
+【轉場】
+（一句）
+
+【實測內容】
+1. 名稱
+   拍攝：
+   內容：
+   現場調整：
+
+2. 名稱
+   拍攝：
+   內容：
+   現場調整：
+
+3. 名稱
+   拍攝：
+   內容：
+   現場調整：
+
+4. 名稱
+   拍攝：
+   內容：
+   現場調整：
+
+【Ending】
+（一句）
+＋ 主持1-2句感想`, [draft.background, draft.brand, draft.industry, draft.topic, ending, hook, transition]);
 
   async function generateScript() {
     if (generating) return;
@@ -256,8 +329,8 @@ Hook 風格：${hook.key} ${hook.title} - ${hook.description}
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1800,
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 2600,
           messages: [{ role: 'user', content: prompt }]
         })
       });
@@ -292,7 +365,9 @@ Hook 風格：${hook.key} ${hook.title} - ${hook.description}
         hook_style: draft.hookStyle,
         hook_description: `${hook.title} - ${hook.description}`,
         transition_style: draft.transitionStyle,
-        transition_description: `${transition.title} - ${transition.description}`
+        transition_description: `${transition.title} - ${transition.description}`,
+        ending_style: draft.endingStyle,
+        ending_description: `${ending.title} - ${ending.description}`
       };
       const basePayload = {
         user_id: user.id,
@@ -410,6 +485,18 @@ Hook 風格：${hook.key} ${hook.title} - ${hook.description}
                   option={option}
                   active={draft.transitionStyle === option.key}
                   onPress={() => setDraft((prev) => ({ ...prev, transitionStyle: option.key }))}
+                />
+              ))}
+            </View>
+
+            <FieldLabel>07 Ending 風格</FieldLabel>
+            <View style={styles.optionGrid}>
+              {ENDING_OPTIONS.map((option) => (
+                <OptionCard
+                  key={option.key}
+                  option={option}
+                  active={draft.endingStyle === option.key}
+                  onPress={() => setDraft((prev) => ({ ...prev, endingStyle: option.key }))}
                 />
               ))}
             </View>
