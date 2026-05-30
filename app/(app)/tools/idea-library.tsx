@@ -1,5 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -54,6 +55,7 @@ type IdeaRecord = {
   video_url?: string | null;
   place_name?: string | null;
   place_address?: string | null;
+  shop_highlights?: string | null;
   shop_name?: string | null;
   lat?: number | null;
   lng?: number | null;
@@ -555,6 +557,7 @@ function IdeaDetailSheet({
   onEdit: (idea: IdeaRecord) => void;
   onManageBoards: (idea: IdeaRecord) => void;
 }) {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [showSourceWebView, setShowSourceWebView] = useState(false);
   if (!idea) return null;
@@ -564,8 +567,11 @@ function IdeaDetailSheet({
   const imageUrl = currentIdea.thumb || '';
   const videoUrl = playableVideoUrl(currentIdea.video_url);
   const placeName = currentIdea.place_name || currentIdea.shop_name || '';
+  const placeAddress = currentIdea.place_address || '';
+  const shopHighlights = currentIdea.shop_highlights || '';
   const description = currentIdea.notes || currentIdea.summary || currentIdea.description || '';
   const hasMap = typeof currentIdea.lat === 'number' && typeof currentIdea.lng === 'number';
+  const hasShopInfo = Boolean(placeName || placeAddress || shopHighlights || hasMap);
   const categories = Array.isArray(currentIdea.categories) ? currentIdea.categories : [];
   const heroHeight = Math.min(Math.round(screenWidth * 16 / 9), Math.round(screenHeight * 0.72));
   const genericTitles = ['IG Reel 靈感', 'Instagram Reel 靈感', 'Instagram'];
@@ -663,6 +669,27 @@ function IdeaDetailSheet({
     if (message) await Share.share({ message });
   }
 
+  function openScriptGenerator() {
+    const background = [
+      description ? `題材描述：${description}` : '',
+      placeName ? `店舖／地點：${placeName}` : '',
+      placeAddress ? `地址：${placeAddress}` : '',
+      shopHighlights ? `出名／推薦：${shopHighlights}` : '',
+      sourceUrl ? `來源：${sourceUrl}` : ''
+    ].filter(Boolean).join('\n').slice(0, 1800);
+
+    onClose();
+    router.push({
+      pathname: '/(app)/tools/script-generator',
+      params: {
+        brand: placeName || currentIdea.title || '',
+        industry: '飲食',
+        topic: currentIdea.title || placeName || currentIdea.topic || 'IG Reel 題材',
+        background
+      }
+    });
+  }
+
   return (
     <Modal visible transparent={false} animationType="slide" onRequestClose={onClose}>
       <View style={styles.detailScreen}>
@@ -712,14 +739,14 @@ function IdeaDetailSheet({
           <View style={styles.detailBody}>
             <View style={styles.detailActions}>
               <TouchableOpacity onPress={openSource} disabled={!sourceUrl} style={styles.detailIconButton}>
-                <Feather name={normalizeType(idea.platform) === 'instagram' ? 'instagram' : 'external-link'} size={24} color="#111827" />
+                <Feather name={normalizeType(idea.platform) === 'instagram' ? 'instagram' : 'external-link'} size={24} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => onEdit(idea)} style={styles.detailIconButton}>
-                <Feather name="more-horizontal" size={25} color="#111827" />
+                <Feather name="more-horizontal" size={25} color={colors.primary} />
               </TouchableOpacity>
               <View style={styles.detailActionSpacer} />
               <TouchableOpacity onPress={() => onManageBoards(idea)} style={styles.addToBoardButton}>
-                <Feather name="plus" size={19} color="#111827" />
+                <Feather name="plus" size={19} color="#ffffff" />
                 <Text style={styles.addToBoardText}>加入分類</Text>
               </TouchableOpacity>
             </View>
@@ -737,6 +764,49 @@ function IdeaDetailSheet({
 
             {description ? <Text style={styles.detailDescription}>{description}</Text> : null}
 
+            <TouchableOpacity onPress={openScriptGenerator} style={styles.scriptGeneratorButton}>
+              <View style={styles.scriptGeneratorIcon}>
+                <Feather name="file-text" size={18} color="#ffffff" />
+              </View>
+              <View style={styles.scriptGeneratorCopy}>
+                <Text style={styles.scriptGeneratorText}>推上劇本生成</Text>
+                <Text style={styles.scriptGeneratorSubtext}>帶入題材、店名同背景資料</Text>
+              </View>
+              <Feather name="chevron-right" size={20} color="#ffffff" />
+            </TouchableOpacity>
+
+            {hasShopInfo ? (
+              <View style={styles.shopInfoCard}>
+                <View style={styles.shopInfoHeader}>
+                  <View style={styles.shopInfoIcon}>
+                    <Feather name="map-pin" size={18} color={colors.primary} />
+                  </View>
+                  <View style={styles.shopInfoTitleWrap}>
+                    <Text style={styles.shopInfoEyebrow}>店舖資料</Text>
+                    <Text style={styles.shopInfoTitle}>{placeName || '已找到地點'}</Text>
+                  </View>
+                </View>
+                {placeAddress ? (
+                  <View style={styles.shopInfoRow}>
+                    <Feather name="navigation" size={16} color={colors.textMuted} />
+                    <Text style={styles.shopInfoText}>{placeAddress}</Text>
+                  </View>
+                ) : null}
+                {shopHighlights ? (
+                  <View style={styles.shopInfoHighlight}>
+                    <Text style={styles.shopInfoHighlightLabel}>出名／推薦</Text>
+                    <Text style={styles.shopInfoHighlightText}>{shopHighlights}</Text>
+                  </View>
+                ) : null}
+                {hasMap ? (
+                  <TouchableOpacity onPress={openMap} style={styles.shopInfoMapButton}>
+                    <Feather name="map" size={16} color="#ffffff" />
+                    <Text style={styles.shopInfoMapButtonText}>在地圖開啟</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null}
+
             {categories.length > 0 ? (
               <View style={styles.detailCategories}>
                 {categories.map((category) => (
@@ -752,7 +822,7 @@ function IdeaDetailSheet({
               <Text style={styles.detailMetaText}>建立：{formatDate(idea.created_at)}</Text>
               {sourceUrl ? (
                 <TouchableOpacity onPress={openSource} style={styles.sourceLinkRow}>
-                  <Feather name="link" size={15} color="#ffffff" />
+                  <Feather name="link" size={15} color={colors.primary} />
                   <Text numberOfLines={1} style={styles.sourceLinkText}>{sourceUrl}</Text>
                 </TouchableOpacity>
               ) : null}
@@ -760,16 +830,16 @@ function IdeaDetailSheet({
 
             <View style={styles.feedbackRow}>
               <TouchableOpacity style={styles.feedbackButton}>
-                <Feather name="heart" size={24} color="#ffffff" />
+                <Feather name="heart" size={24} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.feedbackButton}>
-                <Feather name="thumbs-up" size={24} color="#ffffff" />
+                <Feather name="thumbs-up" size={24} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.feedbackButton}>
-                <Feather name="thumbs-down" size={24} color="#ffffff" />
+                <Feather name="thumbs-down" size={24} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity onPress={shareIdea} style={styles.feedbackButton}>
-                <Feather name="send" size={24} color="#ffffff" />
+                <Feather name="send" size={24} color={colors.primary} />
               </TouchableOpacity>
             </View>
 
@@ -778,7 +848,6 @@ function IdeaDetailSheet({
                 <MapView
                   style={styles.detailMap}
                   pointerEvents="none"
-                  customMapStyle={darkMapStyle}
                   initialRegion={{
                     latitude: idea.lat!,
                     longitude: idea.lng!,
@@ -797,7 +866,7 @@ function IdeaDetailSheet({
               </View>
             ) : (
               <View style={styles.noMapCard}>
-                <Feather name="map-pin" size={20} color="rgba(255,255,255,0.55)" />
+                <Feather name="map-pin" size={20} color={colors.textMuted} />
                 <Text style={styles.noMapText}>未有地點資料。你可以編輯題材補充地點，之後就會顯示地圖。</Text>
               </View>
             )}
@@ -808,16 +877,6 @@ function IdeaDetailSheet({
     </Modal>
   );
 }
-
-const darkMapStyle = [
-  { elementType: 'geometry', stylers: [{ color: '#17212f' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#8ca0b3' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#111827' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#27364a' }] },
-  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9fb2c8' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f2634' }] }
-];
 
 export default function ToolsIdeaLibraryScreen() {
   const { user } = useAuth();
@@ -1364,7 +1423,7 @@ const styles = StyleSheet.create({
   },
   detailScreen: {
     flex: 1,
-    backgroundColor: '#060606'
+    backgroundColor: '#F7F3EE'
   },
   sourceWebViewScreen: {
     flex: 1,
@@ -1399,11 +1458,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000'
   },
   detailContent: {
-    backgroundColor: '#060606'
+    backgroundColor: '#F7F3EE'
   },
   detailHero: {
     width: '100%',
-    backgroundColor: '#101010'
+    backgroundColor: '#E8DED6'
   },
   detailHeroImage: {
     width: '100%',
@@ -1461,11 +1520,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.18)'
+    backgroundColor: 'rgba(0,0,0,0.22)'
   },
   detailBody: {
     paddingHorizontal: 20,
-    paddingTop: 18
+    paddingTop: 18,
+    backgroundColor: '#F7F3EE'
   },
   detailActions: {
     flexDirection: 'row',
@@ -1479,6 +1539,8 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E8DED6',
     backgroundColor: '#ffffff'
   },
   detailActionSpacer: {
@@ -1487,14 +1549,14 @@ const styles = StyleSheet.create({
   addToBoardButton: {
     minHeight: 52,
     borderRadius: 999,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 18
   },
   addToBoardText: {
-    color: '#111827',
+    color: '#ffffff',
     fontFamily: fonts.bodyBold,
     fontSize: 16,
     fontWeight: '800'
@@ -1510,13 +1572,13 @@ const styles = StyleSheet.create({
   },
   placeName: {
     flex: 1,
-    color: '#ffffff',
+    color: colors.primaryDeep,
     fontFamily: fonts.bodyBold,
     fontSize: 19,
     fontWeight: '800'
   },
   detailTitle: {
-    color: '#ffffff',
+    color: colors.text,
     fontFamily: fonts.bodyBold,
     fontSize: 23,
     fontWeight: '800',
@@ -1524,10 +1586,44 @@ const styles = StyleSheet.create({
     marginBottom: 12
   },
   detailDescription: {
-    color: 'rgba(255,255,255,0.88)',
+    color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 16,
     lineHeight: 25
+  },
+  scriptGeneratorButton: {
+    minHeight: 68,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 20
+  },
+  scriptGeneratorIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.16)'
+  },
+  scriptGeneratorCopy: {
+    flex: 1
+  },
+  scriptGeneratorText: {
+    color: '#ffffff',
+    fontFamily: fonts.bodyBold,
+    fontSize: 16,
+    fontWeight: '800'
+  },
+  scriptGeneratorSubtext: {
+    marginTop: 2,
+    color: 'rgba(255,255,255,0.72)',
+    fontFamily: fonts.body,
+    fontSize: 12
   },
   detailCategories: {
     flexDirection: 'row',
@@ -1538,31 +1634,118 @@ const styles = StyleSheet.create({
   detailCategoryPill: {
     overflow: 'hidden',
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    color: '#ffffff',
+    backgroundColor: '#FFF8F3',
+    color: colors.primary,
     fontFamily: fonts.bodyBold,
     fontSize: 12,
     fontWeight: '700',
     paddingHorizontal: 10,
     paddingVertical: 5
   },
+  shopInfoCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+    backgroundColor: '#ffffff',
+    padding: 16,
+    marginTop: 22,
+    gap: 12
+  },
+  shopInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  shopInfoIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FBF4EE'
+  },
+  shopInfoTitleWrap: {
+    flex: 1
+  },
+  shopInfoEyebrow: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    fontWeight: '800'
+  },
+  shopInfoTitle: {
+    marginTop: 2,
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 17,
+    fontWeight: '800',
+    lineHeight: 23
+  },
+  shopInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9
+  },
+  shopInfoText: {
+    flex: 1,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 21
+  },
+  shopInfoHighlight: {
+    borderRadius: 14,
+    backgroundColor: '#FBF4EE',
+    paddingHorizontal: 12,
+    paddingVertical: 11
+  },
+  shopInfoHighlightLabel: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    fontWeight: '800'
+  },
+  shopInfoHighlightText: {
+    marginTop: 4,
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 21
+  },
+  shopInfoMapButton: {
+    alignSelf: 'flex-start',
+    minHeight: 38,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 8
+  },
+  shopInfoMapButtonText: {
+    color: '#ffffff',
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    fontWeight: '800'
+  },
   detailMetaCard: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: '#2E0F1F',
+    borderColor: '#E8DED6',
+    backgroundColor: '#ffffff',
     padding: 16,
     marginTop: 24
   },
   detailMetaLabel: {
-    color: '#ffffff',
+    color: colors.text,
     fontFamily: fonts.bodyBold,
     fontSize: 18,
     fontWeight: '800',
     marginBottom: 10
   },
   detailMetaText: {
-    color: 'rgba(255,255,255,0.78)',
+    color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 14,
     lineHeight: 21
@@ -1572,13 +1755,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 7,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.18)',
+    borderTopColor: '#E8DED6',
     marginTop: 14,
     paddingTop: 12
   },
   sourceLinkText: {
     flex: 1,
-    color: '#ffffff',
+    color: colors.primary,
     fontFamily: fonts.bodyMedium,
     fontSize: 13
   },
@@ -1605,13 +1788,13 @@ const styles = StyleSheet.create({
   },
   viewMapButton: {
     borderRadius: 999,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.primary,
     alignItems: 'center',
     paddingVertical: 16,
     marginTop: 14
   },
   viewMapButtonText: {
-    color: '#111827',
+    color: '#ffffff',
     fontFamily: fonts.bodyBold,
     fontSize: 16,
     fontWeight: '800'
@@ -1619,8 +1802,8 @@ const styles = StyleSheet.create({
   noMapCard: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderColor: '#E8DED6',
+    backgroundColor: '#ffffff',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -1629,7 +1812,7 @@ const styles = StyleSheet.create({
   },
   noMapText: {
     flex: 1,
-    color: 'rgba(255,255,255,0.68)',
+    color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 13,
     lineHeight: 19

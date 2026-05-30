@@ -109,6 +109,15 @@ function isMissingColumnError(error: unknown, column: string) {
   return text.includes(column.toLowerCase()) && (text.includes('schema cache') || text.includes('column'));
 }
 
+function missingColumnName(error: unknown) {
+  const message = typeof error === 'object' && error && 'message' in error
+    ? String((error as { message?: unknown }).message ?? '')
+    : JSON.stringify(error);
+
+  if (!message.includes('schema cache') && !message.includes('Could not find')) return '';
+  return message.match(/'([^']+)' column/)?.[1] ?? '';
+}
+
 async function findExistingIdea(userId: string, url: string): Promise<ExistingIdea | null> {
   const { data: bySource } = await supabase
     .from('ideas')
@@ -211,6 +220,7 @@ export async function saveSharedIdea(params: {
     categories: boardCategories,
     place_name: '',
     place_address: '',
+    shop_highlights: '',
     viral_score: 0,
     ai_viral_base: 0,
     date: new Date().toISOString(),
@@ -224,26 +234,29 @@ export async function saveSharedIdea(params: {
     source_url: url
   };
 
-  const { data, error } = await supabase
-    .from('ideas')
-    .insert(insertPayload)
-    .select('id')
-    .single();
+  let savedId: string | undefined;
+  let lastError: unknown = null;
 
-  let savedId = data?.id as string | undefined;
-
-  if (error && isMissingColumnError(error, 'video_url')) {
-    delete insertPayload.video_url;
-    const { data: retryData, error: retryError } = await supabase
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { data, error } = await supabase
       .from('ideas')
       .insert(insertPayload)
       .select('id')
       .single();
 
-    if (retryError) throw retryError;
-    savedId = retryData?.id as string | undefined;
-  } else if (error) {
-    throw error;
+    if (!error) {
+      savedId = data?.id as string | undefined;
+      break;
+    }
+
+    lastError = error;
+    const column = missingColumnName(error);
+    if (!column || !(column in insertPayload)) break;
+    delete insertPayload[column];
+  }
+
+  if (!savedId && lastError) {
+    throw lastError;
   }
 
   if (savedId) {

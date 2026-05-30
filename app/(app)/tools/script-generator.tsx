@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -93,6 +93,10 @@ const emptyDraft: Draft = {
   transitionStyle: 'T1'
 };
 
+function paramString(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] || '' : value || '';
+}
+
 function selectedOption<T extends string>(options: Option<T>[], key: T) {
   return options.find((option) => option.key === key) ?? options[0];
 }
@@ -182,6 +186,12 @@ function OptionCard<T extends string>({
 
 export default function ScriptGeneratorScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    brand?: string;
+    industry?: string;
+    topic?: string;
+    background?: string;
+  }>();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<Draft>(emptyDraft);
@@ -191,6 +201,23 @@ export default function ScriptGeneratorScreen() {
 
   const hook = useMemo(() => selectedOption(HOOK_OPTIONS, draft.hookStyle), [draft.hookStyle]);
   const transition = useMemo(() => selectedOption(TRANSITION_OPTIONS, draft.transitionStyle), [draft.transitionStyle]);
+
+  useEffect(() => {
+    const brand = paramString(params.brand).trim();
+    const industry = paramString(params.industry).trim();
+    const topic = paramString(params.topic).trim();
+    const background = paramString(params.background).trim();
+
+    if (!brand && !industry && !topic && !background) return;
+
+    setDraft((prev) => ({
+      ...prev,
+      brand: brand || prev.brand,
+      industry: industry || prev.industry,
+      topic: topic || prev.topic,
+      background: background || prev.background
+    }));
+  }, [params.background, params.brand, params.industry, params.topic]);
 
   const prompt = useMemo(() => `你係一個專業香港 IG Reel 劇本創作師。根據以下資料，生成一個完整嘅 IG Reel 劇本：
 

@@ -23,6 +23,7 @@ type AnalysisResult = {
   video_url?: string;
   placeName?: string;
   placeAddress?: string;
+  shopHighlights?: string;
   categories?: string[];
 };
 
@@ -35,6 +36,7 @@ type VideoResolveResult = {
   videoUrl?: string;
   placeName?: string;
   placeAddress?: string;
+  shopHighlights?: string;
   country?: string;
 };
 
@@ -80,6 +82,7 @@ async function analyzeUrl(targetUrl: string, sharedText = ''): Promise<AnalysisR
     video_url: data.video_url || data.videoUrl || data.video || data.media_url || data.playback_url || data.hls_url || data.media?.video_url || data.media?.playback_url || '',
     placeName: data.placeName || data.place_name || '',
     placeAddress: data.placeAddress || data.place_address || '',
+    shopHighlights: firstString(data.shopHighlights, data.shop_highlights, data.famousItems, data.famous_items, data.signatureDishes, data.signature_dishes, data.mustTry, data.must_try),
     categories: asStringArray(data.categories)
   };
 }
@@ -102,6 +105,7 @@ async function resolveVideoFromUrl(targetUrl: string): Promise<VideoResolveResul
       videoUrl: firstString(data.video_url, data.videoUrl, data.video, data.media_url, data.playback_url, data.hls_url, data.media?.video_url, data.media?.playback_url),
       placeName: firstString(data.placeName, data.place_name, data.location_name, data.location?.name, data.place?.name),
       placeAddress: firstString(data.placeAddress, data.place_address, data.location_address, data.location?.address, data.place?.address),
+      shopHighlights: firstString(data.shopHighlights, data.shop_highlights, data.famousItems, data.famous_items, data.signatureDishes, data.signature_dishes, data.mustTry, data.must_try),
       country: firstString(data.country, data.region, data.location?.country, data.place?.country)
     };
   } catch (error) {
@@ -199,6 +203,7 @@ export async function enrichIdeaFromUrl(ideaId: string, targetUrl: string, board
   const country = firstString(result.country, result.region, resolved?.country) || 'HK';
   const placeName = firstString(result.placeName, resolved?.placeName);
   const placeAddress = firstString(result.placeAddress, resolved?.placeAddress);
+  const shopHighlights = firstString(result.shopHighlights, resolved?.shopHighlights);
   const placeQuery = placeName || placeAddress || '';
   const coords = placeQuery ? await geocodePlace(placeQuery, country) : null;
   const mergedCategories = Array.from(new Set([...(result.categories ?? []), ...boardCategories].filter(Boolean)));
@@ -214,6 +219,7 @@ export async function enrichIdeaFromUrl(ideaId: string, targetUrl: string, board
     categories: mergedCategories,
     place_name: placeName,
     place_address: placeAddress,
+    shop_highlights: shopHighlights,
     lat: coords?.lat ?? null,
     lng: coords?.lng ?? null,
     description,

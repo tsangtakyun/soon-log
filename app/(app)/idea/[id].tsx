@@ -49,6 +49,29 @@ export default function IdeaDetailScreen() {
 
   const sourceUrl = idea?.url || idea?.source_url;
 
+  function openScriptGenerator() {
+    if (!idea) return;
+
+    const placeName = idea.place_name || idea.shop_name || '';
+    const background = [
+      idea.summary || idea.description ? `題材描述：${idea.summary || idea.description}` : '',
+      placeName ? `店舖／地點：${placeName}` : '',
+      idea.place_address ? `地址：${idea.place_address}` : '',
+      idea.shop_highlights ? `出名／推薦：${idea.shop_highlights}` : '',
+      sourceUrl ? `來源：${sourceUrl}` : ''
+    ].filter(Boolean).join('\n').slice(0, 1800);
+
+    router.push({
+      pathname: '/(app)/tools/script-generator',
+      params: {
+        brand: placeName || idea.title || '',
+        industry: '飲食',
+        topic: idea.title || placeName || idea.topic || 'IG Reel 題材',
+        background
+      }
+    });
+  }
+
   async function generateScript() {
     if (!idea || generating) return;
     if (!ANTHROPIC_KEY) {
@@ -146,6 +169,12 @@ ${idea.tags?.length ? '標籤：' + idea.tags.join(', ') : ''}`
                 <Text style={styles.placeTitle}>📍 到埗發現</Text>
                 {idea.place_name || idea.shop_name ? <Text style={styles.placeText}>{idea.place_name || idea.shop_name}</Text> : null}
                 {idea.place_address ? <Text style={styles.placeMuted}>{idea.place_address}</Text> : null}
+                {idea.shop_highlights ? (
+                  <View style={styles.highlightBox}>
+                    <Text style={styles.highlightLabel}>出名／推薦</Text>
+                    <Text style={styles.highlightText}>{idea.shop_highlights}</Text>
+                  </View>
+                ) : null}
               </View>
             ) : null}
 
@@ -162,9 +191,15 @@ ${idea.tags?.length ? '標籤：' + idea.tags.join(', ') : ''}`
                 <Text style={styles.generatingText}>Mayan 生成緊劇本...</Text>
               </View>
             ) : (
-              <TouchableOpacity style={styles.generateButton} onPress={generateScript}>
-                <Text style={styles.generateButtonText}>🎬 生成劇本</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity style={styles.pushScriptButton} onPress={openScriptGenerator}>
+                  <Text style={styles.pushScriptButtonText}>推上劇本生成</Text>
+                  <Text style={styles.pushScriptButtonSubtext}>帶入題材、店名同背景資料</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.generateButton} onPress={generateScript}>
+                  <Text style={styles.generateButtonText}>🎬 生成劇本</Text>
+                </TouchableOpacity>
+              </>
             )}
 
             {sourceUrl ? (
@@ -265,6 +300,24 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 13
   },
+  highlightBox: {
+    marginTop: 8,
+    borderRadius: 12,
+    backgroundColor: '#FBF4EE',
+    padding: 12,
+    gap: 4
+  },
+  highlightLabel: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
+  },
+  highlightText: {
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 21
+  },
   notesBox: {
     borderRadius: 14,
     backgroundColor: colors.bgMuted,
@@ -304,6 +357,23 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontFamily: fonts.bodyBold,
     fontSize: 16
+  },
+  pushScriptButton: {
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 16
+  },
+  pushScriptButtonText: {
+    color: '#ffffff',
+    fontFamily: fonts.bodyBold,
+    fontSize: 16
+  },
+  pushScriptButtonSubtext: {
+    marginTop: 3,
+    color: 'rgba(255,255,255,0.72)',
+    fontFamily: fonts.body,
+    fontSize: 12
   },
   generatingBox: {
     flexDirection: 'row',

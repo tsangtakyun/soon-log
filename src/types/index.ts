@@ -113,6 +113,7 @@ export type Idea = {
   lng: number | null;
   place_name: string | null;
   place_address: string | null;
+  shop_highlights: string | null;
   shop_name: string | null;
   description: string | null;
   hook: string | null;
