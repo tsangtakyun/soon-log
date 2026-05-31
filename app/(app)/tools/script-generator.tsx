@@ -522,7 +522,7 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
             <TextInput
               value={draft.brand}
               onChangeText={(brand) => setDraft((prev) => ({ ...prev, brand }))}
-              placeholder="例：One Bite、丁丁、Hilary Travels"
+              placeholder="例：Renee"
               placeholderTextColor="#9ca3af"
               style={styles.input}
             />
@@ -596,6 +596,7 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
             </View>
           </View>
 
+          <Text style={styles.creditHint}>每次生成扣 10 Credits</Text>
           <TouchableOpacity onPress={generateScript} disabled={generating} style={[styles.generateButton, generating && styles.disabledButton]}>
             {generating ? (
               <View style={styles.generateLoading}>
@@ -606,7 +607,6 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
               <Text style={styles.generateButtonText}>✨ 生成劇本</Text>
             )}
           </TouchableOpacity>
-          <Text style={styles.creditHint}>每次生成扣 10 Credits</Text>
 
           {generatedScript ? (
             <View style={styles.resultCard}>
@@ -802,7 +802,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     textAlign: 'center',
-    marginTop: -8
+    marginBottom: -8
   },
   resultCard: {
     backgroundColor: '#ffffff',

@@ -21,6 +21,7 @@ import { SocialLinksSheet } from '@/components/SocialLinksSheet';
 import { TrendStrip } from '@/components/TrendStrip';
 import ClipPlayer from '@/components/ClipPlayer';
 import { useAuth } from '@/hooks/useAuth';
+import { getCredits } from '@/lib/credits';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { isTrendVisibleInResultWindow, trendHoldCutoffIso } from '@/lib/trends';
@@ -319,7 +320,7 @@ export default function HomeScreen() {
   const [loadingTrends, setLoadingTrends] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [trendStripRefreshKey, setTrendStripRefreshKey] = useState(0);
-  const [credits, setCredits] = useState(30);
+  const [credits, setCredits] = useState<number | null>(null);
   const [deletingDiaryId, setDeletingDiaryId] = useState<string | null>(null);
   const screenWidth = Dimensions.get('window').width;
   const heroHeight = Math.round(Dimensions.get('window').height * 0.36);
@@ -334,19 +335,15 @@ export default function HomeScreen() {
 
   const loadProfileSummary = useCallback(async () => {
     if (!user) return;
-    const [{ data: creditData }, { data: profileData }] = await Promise.all([
-      supabase
-        .from('user_credits')
-        .select('balance')
-        .eq('user_id', user.id)
-        .maybeSingle(),
+    const [creditBalance, { data: profileData }] = await Promise.all([
+      user.email ? getCredits(user.email) : Promise.resolve(null),
       supabase
         .from('profiles')
         .select('avatar_url, username, display_name')
         .eq('id', user.id)
         .maybeSingle()
     ]);
-    if (creditData?.balance !== undefined) setCredits(creditData.balance as number);
+    if (creditBalance !== null) setCredits(creditBalance);
     if (profileData) setHomeProfile(profileData as HomeProfile);
   }, [user]);
 
@@ -439,8 +436,9 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      loadProfileSummary();
       loadDiaries();
-    }, [loadDiaries])
+    }, [loadDiaries, loadProfileSummary])
   );
 
   const onRefresh = useCallback(async () => {
@@ -498,9 +496,12 @@ export default function HomeScreen() {
             <Pressable onPress={() => setDrawerOpen(true)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
               <Feather name="menu" size={20} color="#ffffff" />
             </Pressable>
-            <Pressable onPress={() => Alert.alert('AI Credits', `你今日仲有 ${credits} credits`)} style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}>
+            <Pressable
+              onPress={() => Alert.alert('Credits', `你現有 ${credits ?? 0} Credits\nAI 生成每次扣 10 Credits`)}
+              style={({ pressed }) => [styles.squareButton, pressed && styles.pressed]}
+            >
               <Image source={require('../../../assets/coin.png')} style={styles.topIcon} />
-              <Text style={styles.creditTiny}>{credits}</Text>
+              <Text style={styles.creditTiny}>{credits ?? '...'}</Text>
             </Pressable>
           </View>
           <View style={styles.topActions}>

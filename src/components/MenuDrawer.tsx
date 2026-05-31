@@ -12,14 +12,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/lib/supabase';
+import { getCredits } from '@/lib/credits';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
-
-type CreditRow = {
-  balance: number;
-  daily_limit: number;
-};
 
 type DrawerRoute =
   | '/(app)/profile'
@@ -31,22 +26,25 @@ type DrawerRoute =
 export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const { user, profile, signOut } = useAuth();
-  const [credits, setCredits] = useState<CreditRow>({ balance: 30, daily_limit: 30 });
+  const [credits, setCredits] = useState<number | null>(null);
   const width = Dimensions.get('window').width * 0.8;
   const displayName = profile?.display_name || profile?.username || user?.email || 'SOON';
   const username = profile?.username ? `@${profile.username}` : user?.email || '@soon';
   const initial = displayName.slice(0, 1).toUpperCase();
-  const progress = Math.max(0, Math.min(100, (credits.balance / Math.max(credits.daily_limit || 30, 1)) * 100));
+  const progress = credits === null ? 0 : credits > 0 ? 100 : 0;
 
   const loadCredits = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('user_credits')
-      .select('balance, daily_limit')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    if (!user.email) {
+      setCredits(null);
+      return;
+    }
 
-    if (data) setCredits(data as CreditRow);
+    try {
+      setCredits(await getCredits(user.email));
+    } catch {
+      setCredits(null);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -85,14 +83,14 @@ export function MenuDrawer({ visible, onClose }: { visible: boolean; onClose: ()
             <View style={styles.coinsRow}>
               <View style={styles.coinsLabelRow}>
                 <Image source={require('../../assets/coin.png')} style={styles.coinIcon} />
-                <Text style={styles.coinsLabel}>Coins</Text>
+                <Text style={styles.coinsLabel}>Credits</Text>
               </View>
-              <Text style={styles.coinBalance}>{credits.balance}</Text>
+              <Text style={styles.coinBalance}>{credits ?? '...'}</Text>
             </View>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${progress}%` }]} />
             </View>
-            <Text style={styles.coinCaption}>{credits.balance} / 30 今日剩餘</Text>
+            <Text style={styles.coinCaption}>總 Credits｜AI 生成每次扣 10</Text>
           </View>
 
           <View style={styles.menu}>

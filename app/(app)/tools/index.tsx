@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { getCredits } from '@/lib/credits';
@@ -44,9 +44,11 @@ export default function ToolsScreen() {
     }
   }, [email]);
 
-  useEffect(() => {
-    loadBalance();
-  }, [loadBalance]);
+  useFocusEffect(
+    useCallback(() => {
+      loadBalance();
+    }, [loadBalance])
+  );
 
   return (
     <View style={styles.screen}>
