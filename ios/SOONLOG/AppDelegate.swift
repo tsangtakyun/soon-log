@@ -84,7 +84,7 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
 #if targetEnvironment(simulator)
     let host = "localhost"
 #else
-    let host = "Tommys-MacBook-Pro.local"
+    let host = "192.168.1.152"
 #endif
     return URL(string: "http://\(host):8081/.expo/.virtual-metro-entry.bundle?platform=ios&dev=true&minify=false")
   }
