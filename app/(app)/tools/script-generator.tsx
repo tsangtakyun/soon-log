@@ -250,6 +250,16 @@ export default function ScriptGeneratorScreen() {
       .catch(() => setCreditBalance(null));
   }, [user?.email]);
 
+  const refreshCreditBalance = useCallback(async () => {
+    const email = user?.email?.trim().toLowerCase();
+    if (!email) return;
+    try {
+      setCreditBalance(await getCredits(email));
+    } catch {
+      // Credit display should not block generation flow.
+    }
+  }, [user?.email]);
+
   const prompt = useMemo(() => `你係廣東話短片 script 寫手，幫 content creator 寫 IG Reel / YouTube Short。
 廣東話口語，短句，坦白，唔 oversell，每句有目的。
 
@@ -341,7 +351,7 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
         setCreditBalance(creditResult.balance);
 
         if (!creditResult.success && creditResult.error === 'insufficient_credits') {
-          Alert.alert('Credits 不足', '請到 SOON-EGG 購買', [{ text: '了解' }]);
+          Alert.alert('Credits 不足', `需要 10 Credits 生成劇本\n現有：${creditResult.balance} Credits`, [{ text: '了解' }]);
           return;
         }
       }
@@ -364,6 +374,7 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
       if (!response.ok) throw new Error(data?.error?.message ?? '生成失敗');
       const text = data?.content?.map((block: { text?: string }) => block.text).filter(Boolean).join('\n\n') ?? '';
       setGeneratedScript(text.trim());
+      await refreshCreditBalance();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '請稍後再試';
       Alert.alert('生成失敗', message);
@@ -502,7 +513,7 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
         >
           <Text style={styles.subtitle}>IG Reel 劇本工作台</Text>
-          <Text style={[styles.creditText, (creditBalance ?? 10) < 3 && styles.creditWarning]}>
+          <Text style={[styles.creditText, (creditBalance ?? 10) < 10 && styles.creditWarning]}>
             🪙 {creditBalance ?? '...'} Credits
           </Text>
 
@@ -595,6 +606,7 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
               <Text style={styles.generateButtonText}>✨ 生成劇本</Text>
             )}
           </TouchableOpacity>
+          <Text style={styles.creditHint}>每次生成扣 10 Credits</Text>
 
           {generatedScript ? (
             <View style={styles.resultCard}>
@@ -784,6 +796,13 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontFamily: fonts.bodyBold,
     fontSize: 16
+  },
+  creditHint: {
+    color: '#888888',
+    fontFamily: fonts.body,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: -8
   },
   resultCard: {
     backgroundColor: '#ffffff',

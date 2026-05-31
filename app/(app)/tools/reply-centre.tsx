@@ -407,6 +407,7 @@ function MessageSheet({
                       </>
                     )}
                   </TouchableOpacity>
+                  <Text style={styles.creditHint}>每次 AI 生成扣 10 Credits</Text>
 
                   <FieldLabel>我的回覆</FieldLabel>
                   <TextInput
@@ -583,6 +584,16 @@ export default function ReplyCentreToolScreen() {
       .catch(() => setCreditBalance(null));
   }, [user?.email]);
 
+  const refreshCreditBalance = useCallback(async () => {
+    const email = user?.email?.trim().toLowerCase();
+    if (!email) return;
+    try {
+      setCreditBalance(await getCredits(email));
+    } catch {
+      // Credit display should not block reply generation.
+    }
+  }, [user?.email]);
+
   async function onRefresh() {
     setRefreshing(true);
     try {
@@ -684,7 +695,7 @@ export default function ReplyCentreToolScreen() {
         setCreditBalance(creditResult.balance);
 
         if (!creditResult.success && creditResult.error === 'insufficient_credits') {
-          Alert.alert('Credits 不足', '請到 SOON-EGG 購買', [{ text: '了解' }]);
+          Alert.alert('Credits 不足', `需要 10 Credits 生成回覆\n現有：${creditResult.balance} Credits`, [{ text: '了解' }]);
           return;
         }
       }
@@ -718,6 +729,7 @@ export default function ReplyCentreToolScreen() {
         userEditedReply: current.userEditedReply || reply,
         status: current.status === 'pending' ? 'in_progress' : current.status
       }));
+      await refreshCreditBalance();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '請稍後再試';
       Alert.alert('AI 生成失敗', message);
@@ -768,7 +780,7 @@ export default function ReplyCentreToolScreen() {
           <Text style={styles.title}>回覆中心</Text>
           <Text style={styles.subtitle}>AI 幫你覆 fans 同客</Text>
         </View>
-        <Text style={[styles.creditText, (creditBalance ?? 10) < 3 && styles.creditWarning]}>
+        <Text style={[styles.creditText, (creditBalance ?? 10) < 10 && styles.creditWarning]}>
           🪙 {creditBalance ?? '...'} Credits
         </Text>
       </View>
@@ -1268,6 +1280,14 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontFamily: fonts.bodyBold,
     fontSize: 14
+  },
+  creditHint: {
+    color: '#888888',
+    fontFamily: fonts.body,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 6
   },
   copyButton: {
     marginTop: 10,

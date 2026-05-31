@@ -113,6 +113,28 @@ export default function SoonAiScreen() {
       .catch(() => setCreditBalance(null));
   }, [user?.email]);
 
+  const refreshCreditBalance = useCallback(async () => {
+    const email = user?.email?.trim().toLowerCase();
+    if (!email) return;
+    try {
+      setCreditBalance(await getCredits(email));
+    } catch {
+      // Credit display should not block the chat flow.
+    }
+  }, [user?.email]);
+
+  const appendNoCreditsMessage = useCallback(() => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-credits`,
+        role: 'assistant',
+        content: 'Credits 已用完 🪙\n請到 egg.sooncreator.network 購買更多 Credits',
+        timestamp: new Date()
+      }
+    ]);
+  }, []);
+
   const clearMessages = useCallback(() => {
     if (messages.length === 0 || isLoading) return;
     Alert.alert('清除對話？', '呢個動作會清空今次對話內容。', [
@@ -125,7 +147,7 @@ export default function SoonAiScreen() {
     const content = (text ?? inputText).trim();
     if (!content || isLoading) return;
     if (creditBalance === 0) {
-      Alert.alert('Credits 用完了', '請到 egg.sooncreator.network 購買');
+      appendNoCreditsMessage();
       return;
     }
     if (!ANTHROPIC_KEY) {
@@ -153,8 +175,7 @@ export default function SoonAiScreen() {
         setCreditBalance(creditResult.balance);
 
         if (!creditResult.success && creditResult.error === 'insufficient_credits') {
-          Alert.alert('Credits 用完了', '請到 egg.sooncreator.network 購買');
-          setMessages((prev) => prev.filter((message) => message.id !== userMessage.id));
+          appendNoCreditsMessage();
           return;
         }
       }
@@ -179,22 +200,23 @@ export default function SoonAiScreen() {
       const aiText = data?.content?.map((block: { text?: string }) => block.text).filter(Boolean).join('\n\n').trim();
       if (!aiText) throw new Error('SOON AI 暫時未有回覆。');
 
-      setMessages((prev) => [
-        ...prev,
-        {
+	      setMessages((prev) => [
+	        ...prev,
+	        {
           id: `${Date.now()}-assistant`,
           role: 'assistant',
           content: aiText,
           timestamp: new Date()
-        }
-      ]);
+	        }
+	      ]);
+      await refreshCreditBalance();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '請稍後再試。';
       Alert.alert('發送失敗', message);
     } finally {
       setIsLoading(false);
     }
-  }, [conversationHistory, creditBalance, inputText, isLoading, user?.email]);
+  }, [appendNoCreditsMessage, conversationHistory, creditBalance, inputText, isLoading, refreshCreditBalance, user?.email]);
 
   return (
     <KeyboardAvoidingView
@@ -210,8 +232,8 @@ export default function SoonAiScreen() {
         <View style={styles.headerText}>
           <Text style={styles.title}>SOON AI</Text>
           <Text style={styles.subtitle}>你的 AI 創作夥伴</Text>
-          <Text style={[styles.creditText, (creditBalance ?? 10) < 3 && styles.creditWarning]}>
-            🪙 {creditBalance ?? '...'} Credits
+          <Text style={[styles.creditText, (creditBalance ?? 10) < 10 && styles.creditWarning]}>
+            🪙 {creditBalance ?? '...'}
           </Text>
         </View>
         <TouchableOpacity

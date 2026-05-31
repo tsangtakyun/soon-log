@@ -1,8 +1,8 @@
 import { supabase } from './supabase';
 
 const COSTS = {
-  tool_enter: 10,
-  ai_generate: 3
+  tool_enter: 0,
+  ai_generate: 10
 } as const;
 
 type CreditAction = keyof typeof COSTS;
@@ -32,6 +32,7 @@ export async function deductCredits(
   const cost = COSTS[action];
 
   if (!normalizedEmail) return { success: false, balance: 0, error: 'missing_email' };
+  if (cost === 0) return { success: true, balance: await getCredits(normalizedEmail) };
 
   const { data: row } = await supabase
     .from('user_credits')
