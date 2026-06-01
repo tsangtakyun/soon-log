@@ -213,7 +213,7 @@ export default function IdeaShareScreen() {
 
   function dismiss() {
     resetShareIntent();
-    router.replace('/feed');
+    router.replace('/(app)/tools/idea-library');
   }
 
   return (
@@ -240,7 +240,7 @@ export default function IdeaShareScreen() {
             <Text style={styles.errorTitle}>讀取失敗</Text>
             <Text style={styles.errorText}>{errorMsg}</Text>
             <Pressable onPress={dismiss} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>返回動態</Text>
+              <Text style={styles.primaryButtonText}>返回題材庫</Text>
             </Pressable>
           </View>
         ) : null}
