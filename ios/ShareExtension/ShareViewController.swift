@@ -454,6 +454,7 @@ class ShareViewController: UIViewController {
           meta: metaWithSelectedBoard(existingMeta: $0.meta, previewImage: bestPreviewImage())
         )
       }
+      sharedWebUrl = mergeWithPendingWebUrls(sharedWebUrl, userDefaults: userDefaults)
       userDefaults?.set(toData(data: sharedWebUrl), forKey: sharedKey)
       userDefaults?.synchronize()
       if linkPreviewLabel.text?.isEmpty ?? true {
@@ -761,13 +762,51 @@ class ShareViewController: UIViewController {
     guard !sharedWebUrl.isEmpty else { return }
     sharedWebUrl = sharedWebUrl.map { WebUrl(url: $0.url, meta: metaWithSelectedBoard(existingMeta: $0.meta)) }
     let userDefaults = UserDefaults(suiteName: hostAppGroupIdentifier)
+    sharedWebUrl = mergeWithPendingWebUrls(sharedWebUrl, userDefaults: userDefaults)
     userDefaults?.set(toData(data: sharedWebUrl), forKey: sharedKey)
     userDefaults?.synchronize()
   }
 
+  private func pendingWebUrls(from userDefaults: UserDefaults?) -> [WebUrl] {
+    guard let data = userDefaults?.object(forKey: sharedKey) as? Data,
+      let pending = try? JSONDecoder().decode([WebUrl].self, from: data)
+    else {
+      return []
+    }
+
+    return pending
+  }
+
+  private func mergeWithPendingWebUrls(_ current: [WebUrl], userDefaults: UserDefaults?) -> [WebUrl] {
+    var merged: [WebUrl] = []
+    var indexesByUrl: [String: Int] = [:]
+
+    for item in pendingWebUrls(from: userDefaults) + current {
+      let normalized = item.url.trimmingCharacters(in: .whitespacesAndNewlines)
+      if normalized.isEmpty {
+        continue
+      }
+
+      if let existingIndex = indexesByUrl[normalized] {
+        merged[existingIndex] = WebUrl(url: normalized, meta: item.meta)
+      } else {
+        indexesByUrl[normalized] = merged.count
+        merged.append(WebUrl(url: normalized, meta: item.meta))
+      }
+    }
+
+    return Array(merged.suffix(50))
+  }
+
   private func finishLoading(type: RedirectType) {
     pendingRedirectType = type
-    statusLabel.text = "已準備好儲存"
+    if type == .weburl && sharedWebUrl.count > 1 {
+      statusLabel.text = "已準備好儲存 \(sharedWebUrl.count) 條題材"
+      saveButton.setTitle("儲存 \(sharedWebUrl.count) 條", for: .normal)
+    } else {
+      statusLabel.text = "已準備好儲存"
+      saveButton.setTitle("儲存", for: .normal)
+    }
     saveButton.isEnabled = true
     saveButton.backgroundColor = UIColor(red: 0.82, green: 0.31, blue: 0.49, alpha: 1)
   }

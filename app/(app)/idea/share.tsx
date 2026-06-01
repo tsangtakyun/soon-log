@@ -12,6 +12,15 @@ import { colors } from '@/theme/colors';
 
 type Status = 'idle' | 'ready' | 'saving' | 'saved' | 'error';
 
+type SharedIdeaItem = {
+  url: string;
+  selectedBoard: string;
+  sharedBoards: string[];
+  previewImage: string;
+  videoUrl: string;
+  sharedText: string;
+};
+
 function formatSaveError(err: unknown) {
   if (err instanceof Error) return err.message;
 
@@ -33,78 +42,156 @@ function normalizeSharedPayloadText(value: string, sharedUrl: string) {
   return text;
 }
 
+function parseJson(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function stringFromMeta(meta: unknown, key: string) {
+  if (!meta || typeof meta !== 'object') return '';
+  const value = (meta as Record<string, unknown>)[key];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function sharedWebUrlEntries(shareIntent: Record<string, any>) {
+  const rawWebUrls = parseJson(shareIntent.meta?.soonWebUrls);
+  if (Array.isArray(rawWebUrls)) {
+    return rawWebUrls
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const url = typeof entry.url === 'string' ? entry.url.trim() : '';
+        const meta = parseJson((entry as Record<string, unknown>).meta) ?? (entry as Record<string, unknown>).meta ?? {};
+        return url ? { url, meta } : null;
+      })
+      .filter(Boolean) as { url: string; meta: Record<string, unknown> }[];
+  }
+
+  if (Array.isArray(shareIntent.weburls)) {
+    return shareIntent.weburls
+      .map((entry: Record<string, unknown>) => {
+        const url = typeof entry?.url === 'string' ? entry.url.trim() : '';
+        const meta = parseJson(entry?.meta) ?? {};
+        return url ? { url, meta: meta as Record<string, unknown> } : null;
+      })
+      .filter(Boolean) as { url: string; meta: Record<string, unknown> }[];
+  }
+
+  return [];
+}
+
+function buildSharedItems(shareIntent: Record<string, any>): SharedIdeaItem[] {
+  const files = Array.isArray(shareIntent.files) ? shareIntent.files : [];
+  const firstFile = files[0] as Record<string, unknown> | undefined;
+  const filePath = typeof firstFile?.path === 'string' ? firstFile.path.trim() : '';
+  const fileMime = typeof firstFile?.mimeType === 'string' ? firstFile.mimeType : '';
+  const fileType = fileMime.startsWith('video/') ? 'video' : fileMime.startsWith('image/') ? 'image' : '';
+
+  const fallbackMeta = shareIntent.meta ?? {};
+  const localMediaPath = stringFromMeta(fallbackMeta, 'soonLocalMediaPath') || filePath;
+  const localMediaType = stringFromMeta(fallbackMeta, 'soonLocalMediaType') || fileType;
+  const localThumbnail = stringFromMeta(fallbackMeta, 'soonLocalThumbnail');
+  const fallbackThumbnail = stringFromMeta(fallbackMeta, 'soonThumbnail') || localThumbnail || (localMediaType === 'image' ? localMediaPath : '');
+  const fallbackVideoUrl = localMediaType === 'video' ? localMediaPath : '';
+  const fallbackText = stringFromMeta(fallbackMeta, 'soonSharedText') || (typeof shareIntent.text === 'string' ? shareIntent.text.trim() : '');
+  const fallbackBoard = stringFromMeta(fallbackMeta, 'soonBoard');
+  const fallbackBoards = boardsFromShareMeta((fallbackMeta as Record<string, unknown>)?.soonBoards);
+
+  const entries = sharedWebUrlEntries(shareIntent);
+  const rawItems = entries.length > 0
+    ? entries.map((entry) => {
+      const meta = entry.meta ?? {};
+      const previewImage = stringFromMeta(meta, 'soonThumbnail') || fallbackThumbnail;
+      const mediaType = stringFromMeta(meta, 'soonLocalMediaType') || localMediaType;
+      const mediaPath = stringFromMeta(meta, 'soonLocalMediaPath') || localMediaPath;
+      const payloadText = stringFromMeta(meta, 'soonSharedText') || fallbackText;
+      const selectedBoard = stringFromMeta(meta, 'soonBoard') || fallbackBoard;
+
+      return {
+        url: entry.url,
+        selectedBoard,
+        sharedBoards: boardsFromShareMeta((meta as Record<string, unknown>)?.soonBoards).concat(fallbackBoards),
+        previewImage,
+        videoUrl: mediaType === 'video' ? mediaPath : fallbackVideoUrl,
+        sharedText: normalizeSharedPayloadText(payloadText, entry.url)
+      };
+    })
+    : [{
+      url: shareIntent.webUrl || extractSharedUrl(shareIntent.text) || localMediaPath,
+      selectedBoard: fallbackBoard,
+      sharedBoards: fallbackBoards,
+      previewImage: fallbackThumbnail,
+      videoUrl: fallbackVideoUrl,
+      sharedText: ''
+    }];
+
+  const seen = new Set<string>();
+  return rawItems
+    .map((item) => ({
+      ...item,
+      url: item.url.trim(),
+      sharedText: item.sharedText || normalizeSharedPayloadText(fallbackText, item.url)
+    }))
+    .filter((item) => {
+      if (!item.url || seen.has(item.url)) return false;
+      seen.add(item.url);
+      return true;
+    });
+}
+
 export default function IdeaShareScreen() {
   const { shareIntent, hasShareIntent, resetShareIntent } = useShareIntentContext();
   const { user } = useAuth();
   const router = useRouter();
   const autoSaveStarted = useRef(false);
   const [status, setStatus] = useState<Status>('idle');
+  const [sharedItems, setSharedItems] = useState<SharedIdeaItem[]>([]);
   const [url, setUrl] = useState('');
-  const [selectedBoard, setSelectedBoard] = useState('');
-  const [previewImage, setPreviewImage] = useState('');
-  const [videoUrl, setVideoUrl] = useState('');
-  const [sharedText, setSharedText] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     if (!hasShareIntent || !shareIntent || status !== 'idle') return;
 
-    const meta = shareIntent.meta;
-    const metaString = (key: string) => {
-      const value = meta?.[key];
-      return typeof value === 'string' ? value.trim() : '';
-    };
-    const files = Array.isArray((shareIntent as any).files) ? (shareIntent as any).files : [];
-    const firstFile = files[0] as Record<string, unknown> | undefined;
-    const filePath = typeof firstFile?.path === 'string' ? firstFile.path.trim() : '';
-    const fileMime = typeof firstFile?.mimeType === 'string' ? firstFile.mimeType : '';
-    const fileType = fileMime.startsWith('video/') ? 'video' : fileMime.startsWith('image/') ? 'image' : '';
-    const localMediaPath = metaString('soonLocalMediaPath') || filePath;
-    const localMediaType = metaString('soonLocalMediaType') || fileType;
-    const localThumbnail = metaString('soonLocalThumbnail');
-    const thumbnail = metaString('soonThumbnail') || localThumbnail || (localMediaType === 'image' ? localMediaPath : '');
-    const sharedVideoUrl = localMediaType === 'video' ? localMediaPath : '';
-    const sharedUrl = shareIntent.webUrl || extractSharedUrl(shareIntent.text) || localMediaPath;
-    if (!sharedUrl) {
+    const items = buildSharedItems(shareIntent as Record<string, any>);
+    const firstItem = items[0];
+    if (!firstItem) {
       setStatus('error');
       setErrorMsg('無法讀取分享連結');
       return;
     }
-    const payloadText = metaString('soonSharedText') || (typeof shareIntent.text === 'string' ? shareIntent.text.trim() : '');
-    const sharedCaption = normalizeSharedPayloadText(payloadText, sharedUrl);
 
-    const board = metaString('soonBoard');
-    const boards = boardsFromShareMeta(shareIntent.meta?.soonBoards);
-    if (board) boards.push(board);
+    const boards = items.flatMap((item) => item.selectedBoard ? [...item.sharedBoards, item.selectedBoard] : item.sharedBoards);
     if (boards.length > 0) {
       mergeLocalIdeaBoards(boards).catch((error) => {
         console.warn('[share-idea] board sync failed', error);
       });
     }
 
-    setSelectedBoard(board);
-    setPreviewImage(thumbnail);
-    setVideoUrl(sharedVideoUrl);
-    setSharedText(sharedCaption);
-    setUrl(sharedUrl);
+    setSharedItems(items);
+    setUrl(firstItem.url);
     setStatus('ready');
   }, [hasShareIntent, shareIntent, status]);
 
   async function saveIdea() {
-    if (!url || !user) return;
+    if (sharedItems.length === 0 || !user) return;
 
     setStatus('saving');
     try {
-      const sharedBoards = boardsFromShareMeta(shareIntent?.meta?.soonBoards);
-      await saveSharedIdea({
-        user,
-        url,
-        selectedBoard,
-        sharedBoards,
-        previewImage,
-        videoUrl,
-        sharedText
-      });
+      for (const item of sharedItems) {
+        await saveSharedIdea({
+          user,
+          url: item.url,
+          selectedBoard: item.selectedBoard,
+          sharedBoards: item.sharedBoards,
+          previewImage: item.previewImage,
+          videoUrl: item.videoUrl,
+          sharedText: item.sharedText
+        });
+      }
 
       setStatus('saved');
       resetShareIntent();
@@ -118,11 +205,11 @@ export default function IdeaShareScreen() {
   }
 
   useEffect(() => {
-    if (status !== 'ready' || !url || !user || autoSaveStarted.current) return;
+    if (status !== 'ready' || sharedItems.length === 0 || !user || autoSaveStarted.current) return;
 
     autoSaveStarted.current = true;
     saveIdea();
-  }, [status, url, user, previewImage, videoUrl, sharedText]);
+  }, [status, sharedItems, user]);
 
   function dismiss() {
     resetShareIntent();
@@ -142,7 +229,11 @@ export default function IdeaShareScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {url ? <Text numberOfLines={2} style={styles.urlPill}>{url}</Text> : null}
+        {url ? (
+          <Text numberOfLines={2} style={styles.urlPill}>
+            {sharedItems.length > 1 ? `${sharedItems.length} 條題材待儲存` : url}
+          </Text>
+        ) : null}
 
         {status === 'error' ? (
           <View style={styles.centerState}>
@@ -157,7 +248,7 @@ export default function IdeaShareScreen() {
         {status === 'saved' ? (
           <View style={styles.centerState}>
             <Text style={styles.savedIcon}>◈</Text>
-            <Text style={styles.savedText}>已儲存入題材庫</Text>
+            <Text style={styles.savedText}>{sharedItems.length > 1 ? `已儲存 ${sharedItems.length} 條入題材庫` : '已儲存入題材庫'}</Text>
             <Text style={styles.savedSubtext}>AI 會喺背景補充標題、Hook 同標籤。</Text>
           </View>
         ) : null}
@@ -169,11 +260,13 @@ export default function IdeaShareScreen() {
             </View>
             <View style={styles.quickCopy}>
               <Text style={styles.quickTitle}>Save to 題材庫</Text>
-              <Text style={styles.quickDescription}>先儲存連結，AI 之後自動補充標題、Hook 同標籤。</Text>
-              {selectedBoard ? (
+              <Text style={styles.quickDescription}>
+                {sharedItems.length > 1 ? `準備儲存 ${sharedItems.length} 條題材，AI 之後自動補充資料。` : '先儲存連結，AI 之後自動補充標題、Hook 同標籤。'}
+              </Text>
+              {sharedItems[0]?.selectedBoard ? (
                 <View style={styles.boardPill}>
                   <Feather name="folder" size={13} color={colors.primary} />
-                  <Text style={styles.boardPillText}>{selectedBoard}</Text>
+                  <Text style={styles.boardPillText}>{sharedItems[0].selectedBoard}</Text>
                 </View>
               ) : null}
             </View>

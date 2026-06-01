@@ -482,6 +482,67 @@ function patchExpoLinkingManifestFallback() {
   console.log('Patched expo-linking manifest fallback scheme');
 }
 
+function patchExpoShareIntentWebUrls() {
+  const utilsFile = path.join(
+    __dirname,
+    '..',
+    'node_modules',
+    'expo-share-intent',
+    'build',
+    'utils.js'
+  );
+
+  if (!fs.existsSync(utilsFile)) {
+    return;
+  }
+
+  const source = fs.readFileSync(utilsFile, 'utf8');
+
+  if (source.includes('SOON-LOG preserve all iOS weburls')) {
+    return;
+  }
+
+  const original = `    else if (shareIntent?.weburls?.length) {
+        const weburl = shareIntent.weburls[0];
+        result = {
+            ...SHAREINTENT_DEFAULTVALUE,
+            type: "weburl",
+            text: weburl.url, // retrocompatibility
+            webUrl: weburl.url,
+            meta: parseJson(weburl.meta, {}),
+        };
+    }`;
+
+  const patched = `    else if (shareIntent?.weburls?.length) {
+        const weburls = shareIntent.weburls.map((weburl) => ({
+            url: weburl.url,
+            meta: parseJson(weburl.meta, {}),
+        }));
+        const weburl = weburls[0];
+        result = {
+            ...SHAREINTENT_DEFAULTVALUE,
+            type: "weburl",
+            text: weburl.url, // retrocompatibility
+            webUrl: weburl.url,
+            meta: {
+                ...weburl.meta,
+                // SOON-LOG preserve all iOS weburls:
+                // The stock parser keeps only the first URL. We need the full
+                // batch so Instagram shares can save multiple ideas at once.
+                soonWebUrls: JSON.stringify(weburls),
+            },
+        };
+    }`;
+
+  if (!source.includes(original)) {
+    console.warn('expo-share-intent weburls patch skipped: expected source not found');
+    return;
+  }
+
+  fs.writeFileSync(utilsFile, source.replace(original, patched));
+  console.log('Patched expo-share-intent iOS weburls batch parsing');
+}
+
 removeMacDuplicateFiles();
 patchExpoAutolinking();
 patchExpoDevMenuSwiftImport();
@@ -492,3 +553,4 @@ patchReactNativeMapsGoogleManager();
 patchExpoImageLoaderReactImport();
 patchExpoRouterRootUrlScheme();
 patchExpoLinkingManifestFallback();
+patchExpoShareIntentWebUrls();
