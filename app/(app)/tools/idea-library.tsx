@@ -1034,7 +1034,7 @@ function IdeaDetailSheet({
           onClose={() => setShowManageSheet(false)}
           onEdit={() => {
             setShowManageSheet(false);
-            onEdit(currentIdea);
+            setTimeout(() => onEdit(currentIdea), 180);
           }}
           onTranslate={() => onTranslate(currentIdea)}
           onDelete={() => onDelete(currentIdea)}
