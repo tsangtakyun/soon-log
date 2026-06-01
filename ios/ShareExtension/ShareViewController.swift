@@ -837,13 +837,13 @@ class ShareViewController: UIViewController {
   }
 
   @objc private func saveToHostApp() {
-    guard pendingRedirectType != nil else { return }
+    guard let pendingRedirectType else { return }
     persistSelectedBoardToSharedPayload()
     saveButton.isEnabled = false
-    saveButton.setTitle("已儲存", for: .normal)
+    saveButton.setTitle("正在開啟 EGG…", for: .normal)
 
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-      self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+      self.redirectToHostApp(type: pendingRedirectType)
     }
   }
 
