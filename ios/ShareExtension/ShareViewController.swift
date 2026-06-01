@@ -39,6 +39,7 @@ class ShareViewController: UIViewController {
   private var selectedBoard = "Recents"
   private let boardsKey = "soonlogIdeaBoards"
   private var extensionContentText: String?
+  private var currentShareWebUrlSet = Set<String>()
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -454,6 +455,7 @@ class ShareViewController: UIViewController {
           meta: metaWithSelectedBoard(existingMeta: $0.meta, previewImage: bestPreviewImage())
         )
       }
+      currentShareWebUrlSet = Set(sharedWebUrl.map { normalizedUrl($0.url) }.filter { !$0.isEmpty })
       sharedWebUrl = mergeWithPendingWebUrls(sharedWebUrl, userDefaults: userDefaults)
       userDefaults?.set(toData(data: sharedWebUrl), forKey: sharedKey)
       userDefaults?.synchronize()
@@ -760,11 +762,21 @@ class ShareViewController: UIViewController {
 
   private func persistSelectedBoardToSharedPayload() {
     guard !sharedWebUrl.isEmpty else { return }
-    sharedWebUrl = sharedWebUrl.map { WebUrl(url: $0.url, meta: metaWithSelectedBoard(existingMeta: $0.meta)) }
+    sharedWebUrl = sharedWebUrl.map {
+      if currentShareWebUrlSet.contains(normalizedUrl($0.url)) {
+        return WebUrl(url: $0.url, meta: metaWithSelectedBoard(existingMeta: $0.meta))
+      }
+
+      return $0
+    }
     let userDefaults = UserDefaults(suiteName: hostAppGroupIdentifier)
     sharedWebUrl = mergeWithPendingWebUrls(sharedWebUrl, userDefaults: userDefaults)
     userDefaults?.set(toData(data: sharedWebUrl), forKey: sharedKey)
     userDefaults?.synchronize()
+  }
+
+  private func normalizedUrl(_ url: String) -> String {
+    return url.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
   private func pendingWebUrls(from userDefaults: UserDefaults?) -> [WebUrl] {
