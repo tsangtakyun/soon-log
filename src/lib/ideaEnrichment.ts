@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { cleanAiText, stripCitationMarkup } from '@/lib/textSanitizer';
 import type { ViralPotential } from '@/types';
 
 const AUTOFILL_API = 'https://idea-brainstorm.vercel.app/api/autofill-link';
@@ -42,12 +43,13 @@ type VideoResolveResult = {
 
 function asStringArray(value: unknown) {
   if (!Array.isArray(value)) return [];
-  return value.map((item) => String(item).trim()).filter(Boolean);
+  return value.map((item) => stripCitationMarkup(String(item))).filter(Boolean);
 }
 
 function firstString(...values: unknown[]) {
   for (const value of values) {
-    if (typeof value === 'string' && value.trim()) return value.trim();
+    const clean = cleanAiText(value);
+    if (clean) return clean;
   }
   return '';
 }
@@ -64,24 +66,24 @@ async function analyzeUrl(targetUrl: string, sharedText = ''): Promise<AnalysisR
 
   const data = await response.json();
   return {
-    title: data.title || 'IG Reel 靈感',
-    topic: data.title || '',
-    description: data.desc || data.caption || data.metadataDescription || data.description || '',
-    desc: data.desc || data.caption || '',
-    caption: data.caption || '',
-    metadataDescription: data.metadataDescription || '',
-    hook: data.hook || '',
-    script_hook: data.script_hook || '',
-    country: data.country || 'HK',
-    region: data.country || 'HK',
+    title: firstString(data.title) || 'IG Reel 靈感',
+    topic: firstString(data.title),
+    description: firstString(data.desc, data.caption, data.metadataDescription, data.description),
+    desc: firstString(data.desc, data.caption),
+    caption: firstString(data.caption),
+    metadataDescription: firstString(data.metadataDescription),
+    hook: firstString(data.hook),
+    script_hook: firstString(data.script_hook),
+    country: firstString(data.country) || 'HK',
+    region: firstString(data.country) || 'HK',
     viral_potential: data.viral_potential || 'medium',
     tags: asStringArray(data.tags),
-    platform: data.platform || 'instagram',
+    platform: firstString(data.platform) || 'instagram',
     image: data.image || data.image_url || data.thumbnail || data.thumbnail_url || data.ogImage || data.og_image || data.media?.thumbnail_url || '',
     videoUrl: data.videoUrl || data.video_url || data.video || data.media_url || data.playback_url || data.hls_url || data.media?.video_url || data.media?.playback_url || '',
     video_url: data.video_url || data.videoUrl || data.video || data.media_url || data.playback_url || data.hls_url || data.media?.video_url || data.media?.playback_url || '',
-    placeName: data.placeName || data.place_name || '',
-    placeAddress: data.placeAddress || data.place_address || '',
+    placeName: firstString(data.placeName, data.place_name),
+    placeAddress: firstString(data.placeAddress, data.place_address),
     shopHighlights: firstString(data.shopHighlights, data.shop_highlights, data.famousItems, data.famous_items, data.signatureDishes, data.signature_dishes, data.mustTry, data.must_try),
     categories: asStringArray(data.categories)
   };

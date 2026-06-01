@@ -31,6 +31,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { loadLocalIdeaBoards, mergeLocalIdeaBoards } from '@/lib/ideaBoards';
 import { enrichIdeaFromUrl } from '@/lib/ideaEnrichment';
 import { supabase } from '@/lib/supabase';
+import { stripCitationMarkup } from '@/lib/textSanitizer';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 
@@ -150,14 +151,14 @@ function formatDate(value: string) {
 
 function draftFromIdea(idea: IdeaRecord): IdeaDraft {
   return {
-    title: idea.title ?? '',
-    topic: idea.topic ?? '',
+    title: stripCitationMarkup(idea.title),
+    topic: stripCitationMarkup(idea.topic),
     type: normalizeType(idea.platform),
     regions: ideaRegions(idea),
-    notes: idea.notes ?? idea.summary ?? idea.description ?? '',
-    placeName: idea.place_name ?? idea.shop_name ?? '',
-    placeAddress: idea.place_address ?? '',
-    shopHighlights: idea.shop_highlights ?? ''
+    notes: stripCitationMarkup(idea.notes ?? idea.summary ?? idea.description),
+    placeName: stripCitationMarkup(idea.place_name ?? idea.shop_name),
+    placeAddress: stripCitationMarkup(idea.place_address),
+    shopHighlights: stripCitationMarkup(idea.shop_highlights)
   };
 }
 
@@ -699,16 +700,18 @@ function IdeaDetailSheet({
   const sourceUrl = currentIdea.source_url || currentIdea.url || '';
   const imageUrl = currentIdea.thumb || '';
   const videoUrl = playableVideoUrl(currentIdea.video_url);
-  const placeName = currentIdea.place_name || currentIdea.shop_name || '';
-  const placeAddress = currentIdea.place_address || '';
-  const shopHighlights = currentIdea.shop_highlights || '';
-  const description = currentIdea.notes || currentIdea.summary || currentIdea.description || '';
+  const placeName = stripCitationMarkup(currentIdea.place_name || currentIdea.shop_name);
+  const placeAddress = stripCitationMarkup(currentIdea.place_address);
+  const shopHighlights = stripCitationMarkup(currentIdea.shop_highlights);
+  const description = stripCitationMarkup(currentIdea.notes || currentIdea.summary || currentIdea.description);
   const hasMap = typeof currentIdea.lat === 'number' && typeof currentIdea.lng === 'number';
   const hasShopInfo = Boolean(placeName || placeAddress || shopHighlights || hasMap);
   const categories = Array.isArray(currentIdea.categories) ? currentIdea.categories : [];
   const heroHeight = Math.min(Math.round(screenWidth * 16 / 9), Math.round(screenHeight * 0.72));
   const genericTitles = ['IG Reel 靈感', 'Instagram Reel 靈感', 'Instagram'];
-  const shouldShowTitle = Boolean(currentIdea.title && !genericTitles.includes(currentIdea.title));
+  const detailTitle = stripCitationMarkup(currentIdea.title);
+  const detailTopic = stripCitationMarkup(currentIdea.topic);
+  const shouldShowTitle = Boolean(detailTitle && !genericTitles.includes(detailTitle));
 
   function openSource() {
     if (!sourceUrl) return;
@@ -790,7 +793,7 @@ function IdeaDetailSheet({
 
   async function openMap() {
     if (!hasMap) return;
-    const label = encodeURIComponent(placeName || currentIdea.title || 'Saved idea');
+    const label = encodeURIComponent(placeName || detailTitle || 'Saved idea');
     const appleUrl = `http://maps.apple.com/?ll=${currentIdea.lat},${currentIdea.lng}&q=${label}`;
     const googleUrl = `https://www.google.com/maps/search/?api=1&query=${currentIdea.lat},${currentIdea.lng}`;
     const canOpenApple = await Linking.canOpenURL(appleUrl);
@@ -798,7 +801,7 @@ function IdeaDetailSheet({
   }
 
   async function shareIdea() {
-    const message = [currentIdea.title, placeName, sourceUrl].filter(Boolean).join('\n');
+    const message = [detailTitle, placeName, sourceUrl].filter(Boolean).join('\n');
     if (message) await Share.share({ message });
   }
 
@@ -815,9 +818,9 @@ function IdeaDetailSheet({
     router.push({
       pathname: '/(app)/tools/script-generator',
       params: {
-        brand: placeName || currentIdea.title || '',
+        brand: placeName || detailTitle || '',
         industry: '飲食',
-        topic: currentIdea.title || placeName || currentIdea.topic || 'IG Reel 題材',
+        topic: detailTitle || placeName || detailTopic || 'IG Reel 題材',
         background
       }
     });
@@ -858,7 +861,7 @@ function IdeaDetailSheet({
             ) : (
               <View style={styles.detailHeroEmpty}>
                 <Feather name="bookmark" size={42} color="rgba(255,255,255,0.45)" />
-                <Text style={styles.detailHeroEmptyText}>{idea.title || 'IG Reel 靈感'}</Text>
+                <Text style={styles.detailHeroEmptyText}>{detailTitle || 'IG Reel 靈感'}</Text>
               </View>
             )}
 
@@ -892,7 +895,7 @@ function IdeaDetailSheet({
             ) : null}
 
             {shouldShowTitle ? (
-              <Text style={styles.detailTitle}>{idea.title || '未命名題材'}</Text>
+              <Text style={styles.detailTitle}>{detailTitle || '未命名題材'}</Text>
             ) : null}
 
             {description ? <Text style={styles.detailDescription}>{description}</Text> : null}
@@ -1211,18 +1214,18 @@ export default function ToolsIdeaLibraryScreen() {
       const { error } = await supabase.from('ideas').insert({
         user_id: user.id,
         workspace_id: workspaceId,
-        title: draft.title.trim(),
-        topic: draft.topic.trim() || draft.title.trim(),
+        title: stripCitationMarkup(draft.title),
+        topic: stripCitationMarkup(draft.topic) || stripCitationMarkup(draft.title),
         platform: draft.type,
         region: primaryRegion,
         country: primaryRegion,
-        notes: draft.notes.trim(),
-        summary: draft.notes.trim(),
-        description: draft.notes.trim(),
-        place_name: draft.placeName.trim() || null,
-        shop_name: draft.placeName.trim() || null,
-        place_address: draft.placeAddress.trim() || null,
-        shop_highlights: draft.shopHighlights.trim() || null,
+        notes: stripCitationMarkup(draft.notes),
+        summary: stripCitationMarkup(draft.notes),
+        description: stripCitationMarkup(draft.notes),
+        place_name: stripCitationMarkup(draft.placeName) || null,
+        shop_name: stripCitationMarkup(draft.placeName) || null,
+        place_address: stripCitationMarkup(draft.placeAddress) || null,
+        shop_highlights: stripCitationMarkup(draft.shopHighlights) || null,
         tags: draft.regions,
         categories: draft.regions,
         viral_score: 0,
@@ -1257,18 +1260,18 @@ export default function ToolsIdeaLibraryScreen() {
       const { error } = await supabase
         .from('ideas')
         .update({
-          title: draft.title.trim(),
-          topic: draft.topic.trim() || draft.title.trim(),
+          title: stripCitationMarkup(draft.title),
+          topic: stripCitationMarkup(draft.topic) || stripCitationMarkup(draft.title),
           platform: draft.type,
           region: primaryRegion,
           country: primaryRegion,
-          notes: draft.notes.trim(),
-          summary: draft.notes.trim(),
-          description: draft.notes.trim(),
-          place_name: draft.placeName.trim() || null,
-          shop_name: draft.placeName.trim() || null,
-          place_address: draft.placeAddress.trim() || null,
-          shop_highlights: draft.shopHighlights.trim() || null,
+          notes: stripCitationMarkup(draft.notes),
+          summary: stripCitationMarkup(draft.notes),
+          description: stripCitationMarkup(draft.notes),
+          place_name: stripCitationMarkup(draft.placeName) || null,
+          shop_name: stripCitationMarkup(draft.placeName) || null,
+          place_address: stripCitationMarkup(draft.placeAddress) || null,
+          shop_highlights: stripCitationMarkup(draft.shopHighlights) || null,
           tags: draft.regions,
           categories: nextCategories
         })
@@ -1375,15 +1378,15 @@ ${JSON.stringify(source, null, 2)}`
       const parsed = JSON.parse(jsonText) as Partial<Record<'title' | 'topic' | 'description' | 'placeName' | 'placeAddress' | 'shopHighlights', string>>;
 
       const update = {
-        title: parsed.title?.trim() || idea.title,
-        topic: parsed.topic?.trim() || idea.topic || parsed.title?.trim() || idea.title,
-        notes: parsed.description?.trim() || idea.notes,
-        summary: parsed.description?.trim() || idea.summary,
-        description: parsed.description?.trim() || idea.description,
-        place_name: parsed.placeName?.trim() || idea.place_name,
-        shop_name: parsed.placeName?.trim() || idea.shop_name,
-        place_address: parsed.placeAddress?.trim() || idea.place_address,
-        shop_highlights: parsed.shopHighlights?.trim() || idea.shop_highlights
+        title: stripCitationMarkup(parsed.title) || stripCitationMarkup(idea.title),
+        topic: stripCitationMarkup(parsed.topic) || stripCitationMarkup(idea.topic) || stripCitationMarkup(parsed.title) || stripCitationMarkup(idea.title),
+        notes: stripCitationMarkup(parsed.description) || stripCitationMarkup(idea.notes),
+        summary: stripCitationMarkup(parsed.description) || stripCitationMarkup(idea.summary),
+        description: stripCitationMarkup(parsed.description) || stripCitationMarkup(idea.description),
+        place_name: stripCitationMarkup(parsed.placeName) || stripCitationMarkup(idea.place_name),
+        shop_name: stripCitationMarkup(parsed.placeName) || stripCitationMarkup(idea.shop_name),
+        place_address: stripCitationMarkup(parsed.placeAddress) || stripCitationMarkup(idea.place_address),
+        shop_highlights: stripCitationMarkup(parsed.shopHighlights) || stripCitationMarkup(idea.shop_highlights)
       };
 
       const { error } = await supabase

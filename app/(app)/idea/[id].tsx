@@ -5,6 +5,7 @@ import { BackHeader } from '@/components/BackHeader';
 import { Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import { stripCitationMarkup } from '@/lib/textSanitizer';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 import { Idea } from '@/types';
@@ -48,25 +49,31 @@ export default function IdeaDetailScreen() {
   }, [loadIdea]);
 
   const sourceUrl = idea?.url || idea?.source_url;
+  const cleanTitle = stripCitationMarkup(idea?.title);
+  const cleanSummary = stripCitationMarkup(idea?.summary || idea?.description);
+  const cleanHook = stripCitationMarkup(idea?.script_hook || idea?.hook);
+  const cleanPlaceName = stripCitationMarkup(idea?.place_name || idea?.shop_name);
+  const cleanPlaceAddress = stripCitationMarkup(idea?.place_address);
+  const cleanShopHighlights = stripCitationMarkup(idea?.shop_highlights);
+  const cleanNotes = stripCitationMarkup(idea?.notes);
 
   function openScriptGenerator() {
     if (!idea) return;
 
-    const placeName = idea.place_name || idea.shop_name || '';
     const background = [
-      idea.summary || idea.description ? `題材描述：${idea.summary || idea.description}` : '',
-      placeName ? `店舖／地點：${placeName}` : '',
-      idea.place_address ? `地址：${idea.place_address}` : '',
-      idea.shop_highlights ? `出名／推薦：${idea.shop_highlights}` : '',
+      cleanSummary ? `題材描述：${cleanSummary}` : '',
+      cleanPlaceName ? `店舖／地點：${cleanPlaceName}` : '',
+      cleanPlaceAddress ? `地址：${cleanPlaceAddress}` : '',
+      cleanShopHighlights ? `出名／推薦：${cleanShopHighlights}` : '',
       sourceUrl ? `來源：${sourceUrl}` : ''
     ].filter(Boolean).join('\n').slice(0, 1800);
 
     router.push({
       pathname: '/(app)/tools/script-generator',
       params: {
-        brand: placeName || idea.title || '',
+        brand: cleanPlaceName || cleanTitle || '',
         industry: '飲食',
-        topic: idea.title || placeName || idea.topic || 'IG Reel 題材',
+        topic: cleanTitle || cleanPlaceName || stripCitationMarkup(idea.topic) || 'IG Reel 題材',
         background
       }
     });
@@ -106,12 +113,12 @@ export default function IdeaDetailScreen() {
 }`,
           messages: [{
             role: 'user',
-            content: `題材：${idea.title}
-${idea.summary ? '描述：' + idea.summary : ''}
-${idea.script_hook ? 'Hook 參考：' + idea.script_hook : ''}
-${idea.place_name ? '地點：' + idea.place_name : ''}
-${idea.country ? '地區：' + idea.country : ''}
-${idea.tags?.length ? '標籤：' + idea.tags.join(', ') : ''}`
+            content: `題材：${cleanTitle}
+	${cleanSummary ? '描述：' + cleanSummary : ''}
+	${cleanHook ? 'Hook 參考：' + cleanHook : ''}
+	${cleanPlaceName ? '地點：' + cleanPlaceName : ''}
+	${idea.country ? '地區：' + idea.country : ''}
+	${idea.tags?.length ? '標籤：' + idea.tags.join(', ') : ''}`
           }]
         })
       });
@@ -128,7 +135,7 @@ ${idea.tags?.length ? '標籤：' + idea.tags.join(', ') : ''}`
           background: parsed.background,
           test: parsed.test,
           ending: parsed.ending,
-          title: idea.title || '題材劇本',
+          title: cleanTitle || '題材劇本',
         }
       });
     } catch (err: unknown) {
@@ -151,37 +158,37 @@ ${idea.tags?.length ? '標籤：' + idea.tags.join(', ') : ''}`
               <Text style={styles.country}>{idea.country || idea.region || 'HK'}</Text>
             </View>
 
-            <Text style={styles.title}>{idea.title || '未命名題材'}</Text>
+            <Text style={styles.title}>{cleanTitle || '未命名題材'}</Text>
 
-            {idea.summary || idea.description ? (
-              <Text style={styles.summary}>{idea.summary || idea.description}</Text>
+            {cleanSummary ? (
+              <Text style={styles.summary}>{cleanSummary}</Text>
             ) : null}
 
-            {idea.script_hook || idea.hook ? (
+            {cleanHook ? (
               <View style={styles.hookBox}>
                 <Text style={styles.hookLabel}>Hook</Text>
-                <Text style={styles.hookText}>{idea.script_hook || idea.hook}</Text>
+                <Text style={styles.hookText}>{cleanHook}</Text>
               </View>
             ) : null}
 
-            {idea.place_name || idea.shop_name || idea.place_address ? (
+            {cleanPlaceName || cleanPlaceAddress ? (
               <View style={styles.placeBox}>
                 <Text style={styles.placeTitle}>📍 到埗發現</Text>
-                {idea.place_name || idea.shop_name ? <Text style={styles.placeText}>{idea.place_name || idea.shop_name}</Text> : null}
-                {idea.place_address ? <Text style={styles.placeMuted}>{idea.place_address}</Text> : null}
-                {idea.shop_highlights ? (
+                {cleanPlaceName ? <Text style={styles.placeText}>{cleanPlaceName}</Text> : null}
+                {cleanPlaceAddress ? <Text style={styles.placeMuted}>{cleanPlaceAddress}</Text> : null}
+                {cleanShopHighlights ? (
                   <View style={styles.highlightBox}>
                     <Text style={styles.highlightLabel}>出名／推薦</Text>
-                    <Text style={styles.highlightText}>{idea.shop_highlights}</Text>
+                    <Text style={styles.highlightText}>{cleanShopHighlights}</Text>
                   </View>
                 ) : null}
               </View>
             ) : null}
 
-            {idea.notes ? (
+            {cleanNotes ? (
               <View style={styles.notesBox}>
                 <Text style={styles.notesLabel}>筆記</Text>
-                <Text style={styles.notesText}>{idea.notes}</Text>
+                <Text style={styles.notesText}>{cleanNotes}</Text>
               </View>
             ) : null}
 
