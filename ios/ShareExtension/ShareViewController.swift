@@ -513,6 +513,11 @@ class ShareViewController: UIViewController {
     header.addArrangedSubview(titleLabel)
     header.addArrangedSubview(newBoardButton)
 
+    let scrollView = UIScrollView()
+    scrollView.translatesAutoresizingMaskIntoConstraints = false
+    scrollView.alwaysBounceVertical = true
+    scrollView.showsVerticalScrollIndicator = true
+
     let contentStack = UIStackView()
     contentStack.axis = .vertical
     contentStack.spacing = 14
@@ -554,7 +559,8 @@ class ShareViewController: UIViewController {
     contentStack.addArrangedSubview(linkPreviewLabel)
 
     view.addSubview(header)
-    view.addSubview(contentStack)
+    view.addSubview(scrollView)
+    scrollView.addSubview(contentStack)
     view.addSubview(saveButton)
 
     NSLayoutConstraint.activate([
@@ -565,9 +571,16 @@ class ShareViewController: UIViewController {
 
       recentsRow.heightAnchor.constraint(equalToConstant: 78),
 
-      contentStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 28),
-      contentStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -28),
-      contentStack.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 64),
+      scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+      scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 44),
+      scrollView.bottomAnchor.constraint(equalTo: saveButton.topAnchor, constant: -18),
+
+      contentStack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 28),
+      contentStack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -28),
+      contentStack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+      contentStack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -18),
+      contentStack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -56),
 
       saveButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 28),
       saveButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -28),

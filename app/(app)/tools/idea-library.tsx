@@ -28,7 +28,7 @@ import { WebView } from 'react-native-webview';
 import { BackHeader } from '@/components/BackHeader';
 import ClipPlayer from '@/components/ClipPlayer';
 import { useAuth } from '@/hooks/useAuth';
-import { loadLocalIdeaBoards, mergeLocalIdeaBoards } from '@/lib/ideaBoards';
+import { loadLocalIdeaBoards, mergeLocalIdeaBoards, saveLocalIdeaBoards } from '@/lib/ideaBoards';
 import { enrichIdeaFromUrl } from '@/lib/ideaEnrichment';
 import { supabase } from '@/lib/supabase';
 import { stripCitationMarkup } from '@/lib/textSanitizer';
@@ -602,6 +602,7 @@ function FilterSheet({
   onBoardChange,
   onRegionChange,
   onViewModeChange,
+  onDeleteBoard,
   onClose
 }: {
   visible: boolean;
@@ -612,6 +613,7 @@ function FilterSheet({
   onBoardChange: (board: string | null) => void;
   onRegionChange: (region: RegionKey | null) => void;
   onViewModeChange: (mode: 'list' | 'map') => void;
+  onDeleteBoard: (board: string) => void;
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -628,41 +630,58 @@ function FilterSheet({
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.fieldLabel}>顯示方式</Text>
-          <View style={styles.selectorRow}>
-            <Chip label="清單" active={viewMode === 'list'} onPress={() => onViewModeChange('list')} />
-            <Chip label="地圖" active={viewMode === 'map'} onPress={() => onViewModeChange('map')} />
-          </View>
+          <ScrollView style={styles.filterSheetScroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.filterSheetContent}>
+            <Text style={styles.fieldLabel}>顯示方式</Text>
+            <View style={styles.selectorRow}>
+              <Chip label="清單" active={viewMode === 'list'} onPress={() => onViewModeChange('list')} />
+              <Chip label="地圖" active={viewMode === 'map'} onPress={() => onViewModeChange('map')} />
+            </View>
 
-          <Text style={styles.fieldLabel}>地區</Text>
-          <View style={styles.selectorRow}>
-            <Chip label="全部地區" active={!regionFilter} onPress={() => onRegionChange(null)} />
-            {REGIONS.map((region) => (
-              <Chip
-                key={region.key}
-                label={region.label}
-                active={regionFilter === region.key}
-                onPress={() => onRegionChange(region.key)}
-              />
-            ))}
-          </View>
+            <Text style={styles.fieldLabel}>地區</Text>
+            <View style={styles.selectorRow}>
+              <Chip label="全部地區" active={!regionFilter} onPress={() => onRegionChange(null)} />
+              {REGIONS.map((region) => (
+                <Chip
+                  key={region.key}
+                  label={region.label}
+                  active={regionFilter === region.key}
+                  onPress={() => onRegionChange(region.key)}
+                />
+              ))}
+            </View>
 
-          {boards.length > 0 ? (
-            <>
-              <Text style={styles.fieldLabel}>分類</Text>
-              <View style={styles.selectorRow}>
-                <Chip label="全部" active={!boardFilter} onPress={() => onBoardChange(null)} />
-                {boards.map((board) => (
-                  <Chip
-                    key={board}
-                    label={board}
-                    active={boardFilter === board}
-                    onPress={() => onBoardChange(board)}
-                  />
-                ))}
-              </View>
-            </>
-          ) : null}
+            {boards.length > 0 ? (
+              <>
+                <Text style={styles.fieldLabel}>分類</Text>
+                <View style={styles.selectorRow}>
+                  <Chip label="全部" active={!boardFilter} onPress={() => onBoardChange(null)} />
+                  {boards.map((board) => (
+                    <Chip
+                      key={board}
+                      label={board}
+                      active={boardFilter === board}
+                      onPress={() => onBoardChange(board)}
+                    />
+                  ))}
+                </View>
+
+                <Text style={styles.fieldLabel}>管理分類</Text>
+                <View style={styles.boardManageRows}>
+                  {boards.map((board) => (
+                    <View key={`manage-${board}`} style={styles.boardManageRow}>
+                      <View style={styles.boardManageCopy}>
+                        <Feather name="folder" size={17} color={colors.primary} />
+                        <Text style={styles.boardManageText} numberOfLines={1}>{board}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => onDeleteBoard(board)} style={styles.boardDeleteButton} hitSlop={8}>
+                        <Feather name="trash-2" size={17} color={colors.error} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              </>
+            ) : null}
+          </ScrollView>
 
           <TouchableOpacity onPress={onClose} style={styles.saveButton}>
             <Text style={styles.saveButtonText}>完成</Text>
@@ -1433,6 +1452,73 @@ ${JSON.stringify(source, null, 2)}`
     }
   }
 
+  async function deleteBoard(board: string) {
+    if (!user) return;
+
+    const affectedIdeas = ideas.filter((idea) => Array.isArray(idea.categories) && idea.categories.includes(board));
+    Alert.alert(
+      '刪除分類',
+      affectedIdeas.length > 0
+        ? `會從 ${affectedIdeas.length} 條題材移除「${board}」分類，題材本身不會刪除。`
+        : `確定要刪除「${board}」分類？`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '刪除',
+          style: 'destructive',
+          onPress: async () => {
+            setSaving(true);
+            const previousIdeas = ideas;
+            const previousBoards = localBoards;
+            const nextBoards = boardOptions.filter((item) => item !== board);
+            const nextIdeas = ideas.map((idea) => ({
+              ...idea,
+              categories: Array.isArray(idea.categories)
+                ? idea.categories.filter((category) => category !== board)
+                : idea.categories
+            }));
+
+            setIdeas(nextIdeas);
+            setLocalBoards(nextBoards);
+            if (boardFilter === board) setBoardFilter(null);
+            setSelectedIdea((current) => {
+              if (!current) return current;
+              return {
+                ...current,
+                categories: Array.isArray(current.categories)
+                  ? current.categories.filter((category) => category !== board)
+                  : current.categories
+              };
+            });
+
+            try {
+              await Promise.all(affectedIdeas.map(async (idea) => {
+                const categories = Array.isArray(idea.categories)
+                  ? idea.categories.filter((category) => category !== board)
+                  : [];
+                const { error } = await supabase
+                  .from('ideas')
+                  .update({ categories })
+                  .eq('id', idea.id)
+                  .eq('user_id', user.id);
+                if (error) throw error;
+              }));
+
+              await saveLocalIdeaBoards(nextBoards);
+            } catch (err: unknown) {
+              setIdeas(previousIdeas);
+              setLocalBoards(previousBoards);
+              const message = err instanceof Error ? err.message : '請稍後再試';
+              Alert.alert('刪除分類失敗', message);
+            } finally {
+              setSaving(false);
+            }
+          }
+        }
+      ]
+    );
+  }
+
   function renderIdea({ item }: { item: IdeaRecord }) {
     const regions = ideaRegions(item);
     const previewImage = ideaPreviewImage(item);
@@ -1692,6 +1778,7 @@ ${JSON.stringify(source, null, 2)}`
         onBoardChange={setBoardFilter}
         onRegionChange={setRegionFilter}
         onViewModeChange={setViewMode}
+        onDeleteBoard={deleteBoard}
         onClose={() => setShowFilterSheet(false)}
       />
     </View>
@@ -2502,6 +2589,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10
   },
+  filterSheetContent: {
+    paddingBottom: 8
+  },
+  filterSheetScroll: {
+    maxHeight: screenHeight * 0.5
+  },
   boardSheet: {
     maxHeight: '78%',
     borderTopLeftRadius: 24,
@@ -2633,6 +2726,42 @@ const styles = StyleSheet.create({
   },
   boardRows: {
     gap: 8
+  },
+  boardManageRows: {
+    gap: 8
+  },
+  boardManageRow: {
+    minHeight: 50,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: 12,
+    paddingRight: 8
+  },
+  boardManageCopy: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  boardManageText: {
+    flex: 1,
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15
+  },
+  boardDeleteButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff1f2'
   },
   boardRow: {
     minHeight: 54,

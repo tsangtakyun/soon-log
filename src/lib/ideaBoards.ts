@@ -5,6 +5,7 @@ const IDEA_BOARDS_KEY = 'soonlogIdeaBoards';
 
 type IdeaBoardsNativeModule = {
   getBoards?: () => Promise<string[]>;
+  setBoards?: (boards: string[]) => Promise<string[]>;
 };
 
 const nativeIdeaBoards = NativeModules.IdeaBoardsModule as IdeaBoardsNativeModule | undefined;
@@ -77,5 +78,17 @@ export async function mergeLocalIdeaBoards(boards: unknown) {
   const existing = await loadLocalIdeaBoards();
   const merged = uniqueBoards([...existing, ...normalizeBoards(boards)]).sort((a, b) => a.localeCompare(b));
   await AsyncStorage.setItem(IDEA_BOARDS_KEY, JSON.stringify(merged));
+  await nativeIdeaBoards?.setBoards?.(merged).catch((error) => {
+    console.warn('[idea-boards] native board save failed', error);
+  });
   return merged;
+}
+
+export async function saveLocalIdeaBoards(boards: unknown) {
+  const nextBoards = uniqueBoards(normalizeBoards(boards)).sort((a, b) => a.localeCompare(b));
+  await AsyncStorage.setItem(IDEA_BOARDS_KEY, JSON.stringify(nextBoards));
+  await nativeIdeaBoards?.setBoards?.(nextBoards).catch((error) => {
+    console.warn('[idea-boards] native board save failed', error);
+  });
+  return nextBoards;
 }

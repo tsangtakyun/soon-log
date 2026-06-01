@@ -16,4 +16,16 @@ class IdeaBoardsModule: NSObject {
     let boards = userDefaults?.stringArray(forKey: boardsKey) ?? []
     resolve(boards)
   }
+
+  @objc(setBoards:resolver:rejecter:)
+  func setBoards(_ boards: [String], resolver resolve: RCTPromiseResolveBlock, rejecter reject: RCTPromiseRejectBlock) {
+    let cleaned = boards
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty && $0 != "Recents" }
+    let unique = Array(NSOrderedSet(array: cleaned)) as? [String] ?? cleaned
+    let userDefaults = UserDefaults(suiteName: appGroupIdentifier)
+    userDefaults?.set(unique, forKey: boardsKey)
+    userDefaults?.synchronize()
+    resolve(unique)
+  }
 }
