@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, T
 import { BackHeader } from '@/components/BackHeader';
 import { EmptyState } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
+import { resolveLinkedScriptOwnerIds } from '@/lib/scriptIdentity';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
@@ -43,11 +44,15 @@ export default function ScriptHistoryScreen() {
     if (showLoader) setLoading(true);
 
     try {
-      const { data, error } = await supabase
+      const ownerIds = await resolveLinkedScriptOwnerIds(user.id, user.email);
+      let query = supabase
         .from('scripts')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
+
+      query = ownerIds.length > 1 ? query.in('user_id', ownerIds) : query.eq('user_id', user.id);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setScripts((data ?? []) as ScriptRecord[]);
@@ -92,11 +97,15 @@ export default function ScriptHistoryScreen() {
     if (!user) return;
     setDeletingId(script.id);
     try {
-      const { error } = await supabase
+      const ownerIds = await resolveLinkedScriptOwnerIds(user.id, user.email);
+      let query = supabase
         .from('scripts')
         .delete()
-        .eq('id', script.id)
-        .eq('user_id', user.id);
+        .eq('id', script.id);
+
+      query = ownerIds.length > 1 ? query.in('user_id', ownerIds) : query.eq('user_id', user.id);
+
+      const { error } = await query;
 
       if (error) throw error;
       setScripts((current) => current.filter((item) => item.id !== script.id));
@@ -119,7 +128,7 @@ export default function ScriptHistoryScreen() {
 
   return (
     <View style={styles.screen}>
-      <BackHeader title="劇本歷史" />
+      <BackHeader title="劇本歷史" backTo="/(app)/tools/script-generator" />
       {loading ? (
         <View style={styles.loading}>
           <ActivityIndicator color={colors.primary} />

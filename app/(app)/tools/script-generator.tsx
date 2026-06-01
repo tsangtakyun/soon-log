@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackHeader } from '@/components/BackHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { deductCredits, getCredits } from '@/lib/credits';
+import { resolveScriptOwnerId } from '@/lib/scriptIdentity';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
@@ -483,9 +484,10 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
 
     setSaving(true);
     try {
-      const workspaceId = await resolveWorkspaceId(user.id, user.email);
+      const scriptOwnerId = await resolveScriptOwnerId(user.id, user.email);
+      const workspaceId = await resolveWorkspaceId(scriptOwnerId, user.email);
       const payload = {
-        user_id: user.id,
+        user_id: scriptOwnerId,
         workspace_id: workspaceId,
         title: draft.topic.trim() || draft.brand.trim() || 'IG Reel 劇本',
         brand: draft.brand.trim() || null,
@@ -504,7 +506,7 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
       let { error } = await supabase.from('scripts').insert(payload);
       if (error) {
         ({ error } = await supabase.from('scripts').insert({
-          user_id: user.id,
+          user_id: scriptOwnerId,
           workspace_id: workspaceId,
           title: payload.title,
           brand: payload.brand,
