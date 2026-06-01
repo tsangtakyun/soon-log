@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -33,6 +34,9 @@ type Option<T extends string> = {
   title: string;
   description: string;
 };
+
+type ScriptOption = Option<HookKey> | Option<TransitionKey> | Option<EndingKey>;
+type OptionPickerKind = 'hook' | 'transition' | 'ending';
 
 type Draft = {
   brand: string;
@@ -182,21 +186,80 @@ function Chip({
   );
 }
 
-function OptionCard<T extends string>({
+function OptionSelectButton({
   option,
-  active,
   onPress
 }: {
-  option: Option<T>;
-  active: boolean;
+  option: ScriptOption;
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity onPress={onPress} style={[styles.optionCard, active && styles.optionCardActive]}>
-      <Text style={[styles.optionKey, active && styles.optionTextActive]}>{option.key}</Text>
-      <Text style={[styles.optionTitle, active && styles.optionTextActive]}>{option.title}</Text>
-      <Text style={[styles.optionDescription, active && styles.optionDescriptionActive]}>{option.description}</Text>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.82} style={styles.optionSelectButton}>
+      <View style={styles.optionSelectCopy}>
+        <Text style={styles.optionKey}>{option.key}</Text>
+        <Text style={styles.optionTitle}>{option.title}</Text>
+        <Text style={styles.optionDescription}>{option.description}</Text>
+      </View>
+      <Feather name="chevron-down" size={22} color={colors.primary} />
     </TouchableOpacity>
+  );
+}
+
+function OptionPickerSheet({
+  visible,
+  title,
+  options,
+  selectedKey,
+  onSelect,
+  onClose
+}: {
+  visible: boolean;
+  title: string;
+  options: ScriptOption[];
+  selectedKey: string;
+  onSelect: (key: string) => void;
+  onClose: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.sheetOverlay}>
+        <Pressable style={styles.sheetBackdrop} onPress={onClose} />
+        <View style={[styles.optionSheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>{title}</Text>
+            <TouchableOpacity onPress={onClose} style={styles.sheetCloseButton}>
+              <Feather name="x" size={20} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetList}>
+            {options.map((option) => {
+              const active = option.key === selectedKey;
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  onPress={() => {
+                    onSelect(option.key);
+                    onClose();
+                  }}
+                  activeOpacity={0.86}
+                  style={[styles.sheetOption, active && styles.sheetOptionActive]}
+                >
+                  <View style={styles.optionSelectCopy}>
+                    <Text style={[styles.sheetOptionKey, active && styles.optionTextActive]}>{option.key}</Text>
+                    <Text style={[styles.sheetOptionTitle, active && styles.optionTextActive]}>{option.title}</Text>
+                    <Text style={[styles.sheetOptionDescription, active && styles.optionDescriptionActive]}>{option.description}</Text>
+                  </View>
+                  {active ? <Feather name="check" size={20} color="#ffffff" /> : null}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -216,10 +279,38 @@ export default function ScriptGeneratorScreen() {
   const [saving, setSaving] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [creditBalance, setCreditBalance] = useState<number | null>(null);
+  const [optionPicker, setOptionPicker] = useState<OptionPickerKind | null>(null);
 
   const hook = useMemo(() => selectedOption(HOOK_OPTIONS, draft.hookStyle), [draft.hookStyle]);
   const transition = useMemo(() => selectedOption(TRANSITION_OPTIONS, draft.transitionStyle), [draft.transitionStyle]);
   const ending = useMemo(() => selectedOption(ENDING_OPTIONS, draft.endingStyle), [draft.endingStyle]);
+  const optionPickerConfig = useMemo(() => {
+    if (optionPicker === 'hook') {
+      return {
+        title: '05 Hook 風格',
+        options: HOOK_OPTIONS,
+        selectedKey: draft.hookStyle,
+        onSelect: (key: string) => setDraft((prev) => ({ ...prev, hookStyle: key as HookKey }))
+      };
+    }
+    if (optionPicker === 'transition') {
+      return {
+        title: '06 轉場風格',
+        options: TRANSITION_OPTIONS,
+        selectedKey: draft.transitionStyle,
+        onSelect: (key: string) => setDraft((prev) => ({ ...prev, transitionStyle: key as TransitionKey }))
+      };
+    }
+    if (optionPicker === 'ending') {
+      return {
+        title: '07 Ending 風格',
+        options: ENDING_OPTIONS,
+        selectedKey: draft.endingStyle,
+        onSelect: (key: string) => setDraft((prev) => ({ ...prev, endingStyle: key as EndingKey }))
+      };
+    }
+    return null;
+  }, [draft.endingStyle, draft.hookStyle, draft.transitionStyle, optionPicker]);
 
   useEffect(() => {
     const brand = paramString(params.brand).trim();
@@ -560,40 +651,13 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
             />
 
             <FieldLabel>05 Hook 風格</FieldLabel>
-            <View style={styles.optionGrid}>
-              {HOOK_OPTIONS.map((option) => (
-                <OptionCard
-                  key={option.key}
-                  option={option}
-                  active={draft.hookStyle === option.key}
-                  onPress={() => setDraft((prev) => ({ ...prev, hookStyle: option.key }))}
-                />
-              ))}
-            </View>
+            <OptionSelectButton option={hook} onPress={() => setOptionPicker('hook')} />
 
             <FieldLabel>06 轉場風格</FieldLabel>
-            <View style={styles.optionGrid}>
-              {TRANSITION_OPTIONS.map((option) => (
-                <OptionCard
-                  key={option.key}
-                  option={option}
-                  active={draft.transitionStyle === option.key}
-                  onPress={() => setDraft((prev) => ({ ...prev, transitionStyle: option.key }))}
-                />
-              ))}
-            </View>
+            <OptionSelectButton option={transition} onPress={() => setOptionPicker('transition')} />
 
             <FieldLabel>07 Ending 風格</FieldLabel>
-            <View style={styles.optionGrid}>
-              {ENDING_OPTIONS.map((option) => (
-                <OptionCard
-                  key={option.key}
-                  option={option}
-                  active={draft.endingStyle === option.key}
-                  onPress={() => setDraft((prev) => ({ ...prev, endingStyle: option.key }))}
-                />
-              ))}
-            </View>
+            <OptionSelectButton option={ending} onPress={() => setOptionPicker('ending')} />
           </View>
 
           <Text style={styles.creditHint}>每次生成扣 10 Credits</Text>
@@ -634,6 +698,16 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
+      {optionPickerConfig ? (
+        <OptionPickerSheet
+          visible={Boolean(optionPicker)}
+          title={optionPickerConfig.title}
+          options={optionPickerConfig.options}
+          selectedKey={optionPickerConfig.selectedKey}
+          onSelect={optionPickerConfig.onSelect}
+          onClose={() => setOptionPicker(null)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -734,23 +808,19 @@ const styles = StyleSheet.create({
   industryChipTextActive: {
     color: '#ffffff'
   },
-  optionGrid: {
+  optionSelectButton: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10
-  },
-  optionCard: {
-    width: '48%',
-    minHeight: 118,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.bodyBorder,
     backgroundColor: colors.bgBodyMuted,
-    padding: 12
+    padding: 14
   },
-  optionCardActive: {
-    backgroundColor: '#8B1A1A',
-    borderColor: '#8B1A1A'
+  optionSelectCopy: {
+    flex: 1
   },
   optionKey: {
     color: colors.primary,
@@ -776,6 +846,91 @@ const styles = StyleSheet.create({
   },
   optionDescriptionActive: {
     color: 'rgba(255,255,255,0.72)'
+  },
+  sheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end'
+  },
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.36)'
+  },
+  optionSheet: {
+    maxHeight: '72%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: '#F8F4EF',
+    paddingTop: 10,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: -8 }
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 42,
+    height: 5,
+    borderRadius: 99,
+    backgroundColor: '#d8cec5',
+    marginBottom: 12
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12
+  },
+  sheetTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 18
+  },
+  sheetCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  sheetList: {
+    gap: 10,
+    paddingBottom: 10
+  },
+  sheetOption: {
+    minHeight: 86,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    backgroundColor: '#ffffff',
+    padding: 14
+  },
+  sheetOptionActive: {
+    backgroundColor: '#8B1A1A',
+    borderColor: '#8B1A1A'
+  },
+  sheetOptionKey: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
+  },
+  sheetOptionTitle: {
+    marginTop: 6,
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15,
+    lineHeight: 20
+  },
+  sheetOptionDescription: {
+    marginTop: 5,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 12,
+    lineHeight: 18
   },
   generateButton: {
     borderRadius: 16,
