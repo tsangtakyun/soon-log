@@ -36,6 +36,7 @@ export default function ScriptHistoryScreen() {
   const [scripts, setScripts] = useState<ScriptRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadScripts = useCallback(async (showLoader = true) => {
     if (!user) return;
@@ -68,6 +69,43 @@ export default function ScriptHistoryScreen() {
     if (!content) return;
     await Clipboard.setStringAsync(content);
     Alert.alert('已複製', '劇本已複製到剪貼板。');
+  }
+
+  function confirmDeleteScript(script: ScriptRecord) {
+    Alert.alert(
+      '刪除劇本？',
+      `「${script.title || script.topic || '未命名劇本'}」會由歷史記錄移除。`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '刪除',
+          style: 'destructive',
+          onPress: () => {
+            void deleteScript(script);
+          }
+        }
+      ]
+    );
+  }
+
+  async function deleteScript(script: ScriptRecord) {
+    if (!user) return;
+    setDeletingId(script.id);
+    try {
+      const { error } = await supabase
+        .from('scripts')
+        .delete()
+        .eq('id', script.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      setScripts((current) => current.filter((item) => item.id !== script.id));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '請稍後再試';
+      Alert.alert('刪除失敗', message);
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   async function onRefresh() {
@@ -107,9 +145,22 @@ export default function ScriptHistoryScreen() {
                     {[item.brand, item.industry, formatDate(item.created_at)].filter(Boolean).join(' · ')}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => copyScript(item)} style={styles.copyButton}>
-                  <Feather name="copy" size={16} color={colors.primary} />
-                </TouchableOpacity>
+                <View style={styles.cardActions}>
+                  <TouchableOpacity onPress={() => copyScript(item)} style={styles.iconButton}>
+                    <Feather name="copy" size={16} color={colors.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => confirmDeleteScript(item)}
+                    disabled={deletingId === item.id}
+                    style={[styles.iconButton, styles.deleteButton, deletingId === item.id && styles.disabledButton]}
+                  >
+                    {deletingId === item.id ? (
+                      <ActivityIndicator size="small" color="#991b1b" />
+                    ) : (
+                      <Feather name="trash-2" size={16} color="#991b1b" />
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
               {item.content || item.qc_final || item.ai_draft ? (
                 <Text numberOfLines={5} style={styles.content}>{item.content || item.qc_final || item.ai_draft}</Text>
@@ -168,13 +219,23 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12
   },
-  copyButton: {
+  cardActions: {
+    flexDirection: 'row',
+    gap: 8
+  },
+  iconButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
     backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  deleteButton: {
+    backgroundColor: '#fee2e2'
+  },
+  disabledButton: {
+    opacity: 0.62
   },
   content: {
     marginTop: 12,
