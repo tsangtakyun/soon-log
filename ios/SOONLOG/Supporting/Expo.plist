@@ -15,7 +15,7 @@
       <key>ios</key>
       <dict>
         <key>bundleIdentifier</key>
-        <string>network.sooncreator.log</string>
+        <string>com.theirstudio.sooncreatorlog</string>
       </dict>
     </dict>
     <key>EXUpdatesCheckOnLaunch</key>

@@ -15,7 +15,7 @@ module.exports = {
     },
     ios: {
       supportsTablet: true,
-      bundleIdentifier: 'network.sooncreator.log',
+      bundleIdentifier: 'com.theirstudio.sooncreatorlog',
       icon: './assets/icon.png',
       config: {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
@@ -38,6 +38,11 @@ module.exports = {
         backgroundColor: '#F5F2ED'
       }
     },
+    extra: {
+      eas: {
+        projectId: 'd84b00bf-0152-4bd5-b572-0ea1021ff58e'
+      }
+    },
     plugins: [
       'expo-router',
       [
@@ -53,7 +58,7 @@ module.exports = {
             NSExtensionActivationSupportsWebURLWithMaxCount: 1,
             NSExtensionActivationSupportsWebPageWithMaxCount: 1
           },
-          iosShareExtensionBundleIdentifier: 'network.sooncreator.log.ShareExtension'
+          iosShareExtensionBundleIdentifier: 'com.theirstudio.sooncreatorlog.share'
         }
       ],
       [

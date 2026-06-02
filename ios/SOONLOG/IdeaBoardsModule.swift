@@ -2,7 +2,7 @@ import Foundation
 
 @objc(IdeaBoardsModule)
 class IdeaBoardsModule: NSObject {
-  private let appGroupIdentifier = "group.network.sooncreator.log"
+  private let appGroupIdentifier = "group.com.theirstudio.sooncreatorlog.shared"
   private let boardsKey = "soonlogIdeaBoards"
 
   @objc

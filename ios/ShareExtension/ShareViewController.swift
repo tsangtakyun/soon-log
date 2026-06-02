@@ -11,7 +11,7 @@ import Social
 import UIKit
 
 class ShareViewController: UIViewController {
-  let hostAppGroupIdentifier = "group.network.sooncreator.log"
+  let hostAppGroupIdentifier = "group.com.theirstudio.sooncreatorlog.shared"
   let shareProtocol = "soonlog"
   let sharedKey = "soonlogShareKey"
   var sharedMedia: [SharedMediaFile] = []
