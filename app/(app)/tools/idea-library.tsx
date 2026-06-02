@@ -1,4 +1,3 @@
-import { Feather } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -27,6 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { BackHeader } from '@/components/BackHeader';
 import ClipPlayer from '@/components/ClipPlayer';
+import { LineIcon as Feather } from '@/components/LineIcon';
 import { useAuth } from '@/hooks/useAuth';
 import { loadLocalIdeaBoards, mergeLocalIdeaBoards, saveLocalIdeaBoards } from '@/lib/ideaBoards';
 import { enrichIdeaFromUrl } from '@/lib/ideaEnrichment';
