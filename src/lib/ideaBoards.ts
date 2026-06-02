@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeModules } from 'react-native';
+import { supabase } from '@/lib/supabase';
 
 const IDEA_BOARDS_KEY = 'soonlogIdeaBoards';
 
@@ -91,4 +92,20 @@ export async function saveLocalIdeaBoards(boards: unknown) {
     console.warn('[idea-boards] native board save failed', error);
   });
   return nextBoards;
+}
+
+export async function syncIdeaBoardsFromAccount(userId: string) {
+  const { data, error } = await supabase
+    .from('ideas')
+    .select('categories')
+    .eq('user_id', userId);
+
+  if (error) throw error;
+
+  const regionKeys = new Set(['HK', 'TW', 'JP', 'KR', 'US']);
+  const accountBoards = (data ?? [])
+    .flatMap((idea: { categories?: unknown }) => normalizeBoards(idea.categories))
+    .filter((board) => !regionKeys.has(board));
+
+  return mergeLocalIdeaBoards(accountBoards);
 }

@@ -72,6 +72,7 @@ type IdeaDraft = {
   topic: string;
   type: Exclude<IdeaType, 'all'>;
   regions: RegionKey[];
+  boards: string[];
   notes: string;
   placeName: string;
   placeAddress: string;
@@ -98,6 +99,7 @@ const emptyDraft: IdeaDraft = {
   topic: '',
   type: 'instagram',
   regions: ['HK'],
+  boards: [],
   notes: '',
   placeName: '',
   placeAddress: '',
@@ -109,6 +111,14 @@ const screenHeight = Dimensions.get('window').height;
 const ideaGridCardWidth = Math.floor((screenWidth - 44) / 2);
 const ideaCardPreviewHeight = Math.round((ideaGridCardWidth * 16) / 9);
 const enrichingIdeaIds = new Set<string>();
+const darkMapStyle = [
+  { elementType: 'geometry', stylers: [{ color: '#263141' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#d9e2f1' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#1a2330' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#3a4658' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#1f3a4d' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#2f3d33' }] }
+];
 
 function normalizeType(value?: string | null): Exclude<IdeaType, 'all'> {
   const lower = (value ?? '').toLowerCase();
@@ -155,6 +165,7 @@ function draftFromIdea(idea: IdeaRecord): IdeaDraft {
     topic: stripCitationMarkup(idea.topic),
     type: normalizeType(idea.platform),
     regions: ideaRegions(idea),
+    boards: ideaBoards(idea),
     notes: stripCitationMarkup(idea.notes ?? idea.summary ?? idea.description),
     placeName: stripCitationMarkup(idea.place_name ?? idea.shop_name),
     placeAddress: stripCitationMarkup(idea.place_address),
@@ -278,6 +289,7 @@ function FormSheet({
   title,
   draft,
   saving,
+  boardOptions = [],
   onChange,
   onClose,
   onSave
@@ -286,11 +298,13 @@ function FormSheet({
   title: string;
   draft: IdeaDraft;
   saving: boolean;
+  boardOptions?: string[];
   onChange: (draft: IdeaDraft) => void;
   onClose: () => void;
   onSave: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const [newBoardName, setNewBoardName] = useState('');
 
   function toggleRegion(region: RegionKey) {
     const hasRegion = draft.regions.includes(region);
@@ -299,6 +313,22 @@ function FormSheet({
       : [...draft.regions, region];
     onChange({ ...draft, regions: next.length > 0 ? next : [region] });
   }
+
+  function toggleBoard(board: string) {
+    const nextBoards = draft.boards.includes(board)
+      ? draft.boards.filter((item) => item !== board)
+      : [...draft.boards, board];
+    onChange({ ...draft, boards: nextBoards });
+  }
+
+  function addBoard() {
+    const board = newBoardName.trim();
+    if (!board) return;
+    onChange({ ...draft, boards: draft.boards.includes(board) ? draft.boards : [...draft.boards, board] });
+    setNewBoardName('');
+  }
+
+  const allBoards = Array.from(new Set([...boardOptions, ...draft.boards].filter(Boolean))).sort((a, b) => a.localeCompare(b));
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -354,6 +384,32 @@ function FormSheet({
                     onPress={() => toggleRegion(region.key)}
                   />
                 ))}
+              </View>
+
+              <Text style={styles.fieldLabel}>分類</Text>
+              {allBoards.length > 0 ? (
+                <View style={styles.selectorRow}>
+                  {allBoards.map((board) => (
+                    <Chip
+                      key={board}
+                      label={board}
+                      active={draft.boards.includes(board)}
+                      onPress={() => toggleBoard(board)}
+                    />
+                  ))}
+                </View>
+              ) : null}
+              <View style={styles.newBoardRow}>
+                <TextInput
+                  value={newBoardName}
+                  onChangeText={setNewBoardName}
+                  placeholder="新增分類，例如：台灣"
+                  placeholderTextColor="#9ca3af"
+                  style={styles.newBoardInput}
+                />
+                <TouchableOpacity onPress={addBoard} style={styles.newBoardButton}>
+                  <Feather name="plus" size={18} color="#ffffff" />
+                </TouchableOpacity>
               </View>
 
               <Text style={styles.fieldLabel}>備註</Text>
@@ -1126,8 +1182,10 @@ export default function ToolsIdeaLibraryScreen() {
       const { data, error } = await query;
       if (error) throw error;
       const nextIdeas = (data ?? []) as IdeaRecord[];
+      const accountBoards = Array.from(new Set(nextIdeas.flatMap((idea) => ideaBoards(idea)))).sort((a, b) => a.localeCompare(b));
       setIdeas(nextIdeas);
-      setLocalBoards(await loadLocalIdeaBoards());
+      const storedBoards = await loadLocalIdeaBoards();
+      setLocalBoards(accountBoards.length > 0 ? await mergeLocalIdeaBoards(accountBoards) : storedBoards);
 
       if (autoEnrich) {
         const pending = nextIdeas.filter(ideaNeedsEnrichment).slice(0, 4);
@@ -1230,6 +1288,7 @@ export default function ToolsIdeaLibraryScreen() {
     setSaving(true);
     try {
       const primaryRegion = draft.regions[0] ?? 'HK';
+      const nextCategories = mergeRegionsAndBoards(draft.regions, draft.boards);
       const { error } = await supabase.from('ideas').insert({
         user_id: user.id,
         workspace_id: workspaceId,
@@ -1246,7 +1305,7 @@ export default function ToolsIdeaLibraryScreen() {
         place_address: stripCitationMarkup(draft.placeAddress) || null,
         shop_highlights: stripCitationMarkup(draft.shopHighlights) || null,
         tags: draft.regions,
-        categories: draft.regions,
+        categories: nextCategories,
         viral_score: 0,
         ai_viral_base: 0,
         viral_potential: 'medium',
@@ -1254,6 +1313,9 @@ export default function ToolsIdeaLibraryScreen() {
       });
 
       if (error) throw error;
+      if (draft.boards.length > 0) {
+        setLocalBoards(await mergeLocalIdeaBoards(draft.boards));
+      }
       setShowAddModal(false);
       await loadIdeas(false);
     } catch (err: unknown) {
@@ -1274,8 +1336,7 @@ export default function ToolsIdeaLibraryScreen() {
     setSaving(true);
     try {
       const primaryRegion = draft.regions[0] ?? 'HK';
-      const boardCategories = ideaBoards(editingIdea);
-      const nextCategories = mergeRegionsAndBoards(draft.regions, boardCategories);
+      const nextCategories = mergeRegionsAndBoards(draft.regions, draft.boards);
       const { error } = await supabase
         .from('ideas')
         .update({
@@ -1297,6 +1358,9 @@ export default function ToolsIdeaLibraryScreen() {
         .eq('id', editingIdea.id);
 
       if (error) throw error;
+      if (draft.boards.length > 0) {
+        setLocalBoards(await mergeLocalIdeaBoards(draft.boards));
+      }
       setEditingIdea(null);
       await loadIdeas(false);
     } catch (err: unknown) {
@@ -1734,6 +1798,7 @@ ${JSON.stringify(source, null, 2)}`
         title="新增題材"
         draft={draft}
         saving={saving}
+        boardOptions={boardOptions}
         onChange={setDraft}
         onClose={() => setShowAddModal(false)}
         onSave={saveNewIdea}
@@ -1744,6 +1809,7 @@ ${JSON.stringify(source, null, 2)}`
         title="題材詳情"
         draft={draft}
         saving={saving}
+        boardOptions={boardOptions}
         onChange={setDraft}
         onClose={() => setEditingIdea(null)}
         onSave={saveSelectedIdea}

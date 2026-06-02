@@ -4,6 +4,7 @@ import { Tabs, usePathname } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
+import { syncIdeaBoardsFromAccount } from '@/lib/ideaBoards';
 import { fonts } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
 import { trendHoldCutoffIso } from '@/lib/trends';
@@ -104,6 +105,13 @@ export default function AppTabs() {
       setUnreadTrendCount(count || 0);
     }
   }, [markPrediktSeen, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    syncIdeaBoardsFromAccount(user.id).catch((error) => {
+      console.warn('[idea-boards] account sync failed', error);
+    });
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
