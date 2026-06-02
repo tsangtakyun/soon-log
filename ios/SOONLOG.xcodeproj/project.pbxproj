@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		13B07FC01A68108700A75B9A /* main.jsbundle in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FC21A68108700A75B9A /* main.jsbundle */; };
+		13B07FC11A68108700A75B9A /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FC31A68108700A75B9A /* assets */; };
 		16E8CDA4E1A14C7FABBDE038 /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = EC55A420234F4D3791336DC1 /* MainInterface.storyboard */; };
 		34B76A09326044BBB7A58CB5 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08EA97E48C5243729DB8EE3B /* ShareViewController.swift */; };
 		3C1C03A00C6946478E12DD89 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */; };
@@ -52,6 +54,8 @@
 		13B07F961A680F5B00A75B9A /* SOONLOG.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SOONLOG.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = SOONLOG/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = SOONLOG/Info.plist; sourceTree = "<group>"; };
+		13B07FC21A68108700A75B9A /* main.jsbundle */ = {isa = PBXFileReference; lastKnownFileType = text.javascript; name = main.jsbundle; path = SOONLOG/main.jsbundle; sourceTree = "<group>"; };
+		13B07FC31A68108700A75B9A /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = SOONLOG/assets; sourceTree = "<group>"; };
 		15E39999CA92478FB300CA58 /* ShareExtension.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ShareExtension.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 		3E542E8D3E53F8ED8E4CC5DF /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SOONLOG/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = PrivacyInfo.xcprivacy; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -107,6 +111,8 @@
 				F11748442D0722820044C1D9 /* SOONLOG-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
+				13B07FC21A68108700A75B9A /* main.jsbundle */,
+				13B07FC31A68108700A75B9A /* assets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
 			);
@@ -282,6 +288,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
+				13B07FC01A68108700A75B9A /* main.jsbundle in Resources */,
+				13B07FC11A68108700A75B9A /* assets in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				DDE089907FF6E03CAF8DF800 /* PrivacyInfo.xcprivacy in Resources */,
