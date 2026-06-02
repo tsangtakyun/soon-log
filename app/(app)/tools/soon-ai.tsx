@@ -17,11 +17,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
+import { generateAiText } from '@/lib/aiGenerate';
 import { deductCredits, getCredits } from '@/lib/credits';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
-
-const ANTHROPIC_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_KEY;
 
 const SYSTEM_PROMPT = `你係 SOON AI，SOON-EGG Creator Network 嘅亞洲市場創作夥伴。
 
@@ -150,11 +149,6 @@ export default function SoonAiScreen() {
       appendNoCreditsMessage();
       return;
     }
-    if (!ANTHROPIC_KEY) {
-      Alert.alert('未設定 AI Key', '請先設定 EXPO_PUBLIC_ANTHROPIC_KEY。');
-      return;
-    }
-
     const userMessage: ChatMessage = {
       id: `${Date.now()}-user`,
       role: 'user',
@@ -180,25 +174,12 @@ export default function SoonAiScreen() {
         }
       }
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_KEY,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1400,
-          system: SYSTEM_PROMPT,
-          messages: history
-        })
+      const aiText = await generateAiText({
+        model: 'claude-haiku-4-5-20251001',
+        maxTokens: 1400,
+        system: SYSTEM_PROMPT,
+        messages: history
       });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error?.message ?? 'SOON AI 暫時回覆唔到。');
-      const aiText = data?.content?.map((block: { text?: string }) => block.text).filter(Boolean).join('\n\n').trim();
-      if (!aiText) throw new Error('SOON AI 暫時未有回覆。');
 
 	      setMessages((prev) => [
 	        ...prev,

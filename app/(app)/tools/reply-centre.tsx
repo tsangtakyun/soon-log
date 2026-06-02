@@ -20,12 +20,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackHeader } from '@/components/BackHeader';
 import { useAuth } from '@/hooks/useAuth';
+import { generateAiText } from '@/lib/aiGenerate';
 import { deductCredits, getCredits } from '@/lib/credits';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
-
-const ANTHROPIC_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_KEY;
 
 type InboxFilter = '全部' | '電郵' | '訊息' | '粉絲';
 type StatusFilter = '全部' | '未回覆' | '進行中' | '已解決';
@@ -61,11 +60,6 @@ type MessageDraft = {
   tagsText: string;
   notes: string;
   followUpDate: Date | null;
-};
-
-type AnthropicTextBlock = {
-  type?: string;
-  text?: string;
 };
 
 const INBOX_TABS: InboxFilter[] = ['全部', '電郵', '訊息', '粉絲'];
@@ -682,10 +676,6 @@ export default function ReplyCentreToolScreen() {
 
   async function generateReply() {
     if (!selectedThread) return;
-    if (!ANTHROPIC_KEY) {
-      Alert.alert('未設定 AI Key', '請先設定 EXPO_PUBLIC_ANTHROPIC_KEY。');
-      return;
-    }
 
     setGenerating(true);
     try {
@@ -701,27 +691,11 @@ export default function ReplyCentreToolScreen() {
       }
 
       const prompt = `你係一個專業香港創作者助手。以下係一條來自${inboxLabel(draft.inboxType)}嘅訊息，請用廣東話口語幫我生成一個友善、專業嘅回覆。訊息：${draft.originalMessage}`;
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_KEY,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1024,
-          messages: [{ role: 'user', content: prompt }]
-        })
+      const reply = await generateAiText({
+        prompt,
+        model: 'claude-haiku-4-5-20251001',
+        maxTokens: 1024
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error?.message || 'AI 生成失敗');
-      const reply = (data.content as AnthropicTextBlock[] | undefined)
-        ?.map((block) => block.text)
-        .filter(Boolean)
-        .join('\n')
-        .trim();
-      if (!reply) throw new Error('AI 沒有返回內容');
 
       setDraft((current) => ({
         ...current,

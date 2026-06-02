@@ -18,13 +18,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackHeader } from '@/components/BackHeader';
 import { useAuth } from '@/hooks/useAuth';
+import { generateAiText } from '@/lib/aiGenerate';
 import { deductCredits, getCredits } from '@/lib/credits';
 import { resolveScriptOwnerId } from '@/lib/scriptIdentity';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
-
-const ANTHROPIC_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_KEY;
 
 type HookKey = 'H1' | 'H2' | 'H3' | 'H4' | 'H5' | 'H6' | 'H7' | 'H8';
 type TransitionKey = 'T1' | 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'T8';
@@ -430,11 +429,6 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
       Alert.alert('請輸入主題', '要有主題先可以生成劇本。');
       return;
     }
-    if (!ANTHROPIC_KEY) {
-      Alert.alert('未設定 AI Key', '請先設定 EXPO_PUBLIC_ANTHROPIC_KEY。');
-      return;
-    }
-
     setGenerating(true);
     try {
       const email = user?.email?.trim().toLowerCase();
@@ -448,23 +442,12 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
         }
       }
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_KEY,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 2600,
-          messages: [{ role: 'user', content: prompt }]
-        })
+      const text = await generateAiText({
+        prompt,
+        model: 'claude-sonnet-4-20250514',
+        maxTokens: 2600
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.error?.message ?? '生成失敗');
-      const text = data?.content?.map((block: { text?: string }) => block.text).filter(Boolean).join('\n\n') ?? '';
       setGeneratedScript(text.trim());
       await refreshCreditBalance();
     } catch (err: unknown) {
