@@ -306,14 +306,6 @@ function FormSheet({
   const insets = useSafeAreaInsets();
   const [newBoardName, setNewBoardName] = useState('');
 
-  function toggleRegion(region: RegionKey) {
-    const hasRegion = draft.regions.includes(region);
-    const next = hasRegion
-      ? draft.regions.filter((item) => item !== region)
-      : [...draft.regions, region];
-    onChange({ ...draft, regions: next.length > 0 ? next : [region] });
-  }
-
   function toggleBoard(board: string) {
     const nextBoards = draft.boards.includes(board)
       ? draft.boards.filter((item) => item !== board)
@@ -352,39 +344,6 @@ function FormSheet({
                 placeholderTextColor="#9ca3af"
                 style={styles.input}
               />
-
-              <Text style={styles.fieldLabel}>主題</Text>
-              <TextInput
-                value={draft.topic}
-                onChangeText={(value) => onChange({ ...draft, topic: value })}
-                placeholder="例如：2026 世界盃"
-                placeholderTextColor="#9ca3af"
-                style={styles.input}
-              />
-
-              <Text style={styles.fieldLabel}>類型</Text>
-              <View style={styles.selectorRow}>
-                {TYPE_FILTERS.filter((type) => type.key !== 'all').map((type) => (
-                  <Chip
-                    key={type.key}
-                    label={type.label.replace(' BLOG', '')}
-                    active={draft.type === type.key}
-                    onPress={() => onChange({ ...draft, type: type.key as Exclude<IdeaType, 'all'> })}
-                  />
-                ))}
-              </View>
-
-              <Text style={styles.fieldLabel}>地區</Text>
-              <View style={styles.selectorRow}>
-                {REGIONS.map((region) => (
-                  <Chip
-                    key={region.key}
-                    label={region.label}
-                    active={draft.regions.includes(region.key)}
-                    onPress={() => toggleRegion(region.key)}
-                  />
-                ))}
-              </View>
 
               <Text style={styles.fieldLabel}>分類</Text>
               {allBoards.length > 0 ? (

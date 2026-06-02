@@ -2,6 +2,8 @@ import { Stack, router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts as useExpoFonts } from 'expo-font';
+import { Feather, FontAwesome, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -111,7 +113,14 @@ export default function RootLayout() {
   const [introDone, setIntroDone] = useState(false);
   const [serifLoaded, serifError] = useSerifFonts({ DMSerifDisplay_400Regular });
   const [sansLoaded, sansError] = useSansFonts({ DMSans_400Regular, DMSans_500Medium, DMSans_700Bold });
-  const fontsReady = (serifLoaded && sansLoaded) || Boolean(serifError || sansError);
+  const [iconLoaded, iconError] = useExpoFonts({
+    ...Feather.font,
+    ...FontAwesome.font,
+    ...Ionicons.font,
+    ...MaterialCommunityIcons.font,
+    ...MaterialIcons.font
+  });
+  const fontsReady = (serifLoaded && sansLoaded && iconLoaded) || Boolean(serifError || sansError || iconError);
 
   useEffect(() => {
     if (!fontsReady) return;
