@@ -82,25 +82,25 @@
 	<string>UIStatusBarStyleDefault</string>
 	<key>UIAppFonts</key>
 	<array>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/AntDesign.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Entypo.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/EvilIcons.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Brands.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Regular.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Solid.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Brands.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Regular.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Solid.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Fontisto.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Foundation.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Octicons.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/SimpleLineIcons.ttf</string>
-		<string>assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Zocial.ttf</string>
+		<string>assets/vector-icons/Fonts/AntDesign.ttf</string>
+		<string>assets/vector-icons/Fonts/Entypo.ttf</string>
+		<string>assets/vector-icons/Fonts/EvilIcons.ttf</string>
+		<string>assets/vector-icons/Fonts/Feather.ttf</string>
+		<string>assets/vector-icons/Fonts/FontAwesome.ttf</string>
+		<string>assets/vector-icons/Fonts/FontAwesome5_Brands.ttf</string>
+		<string>assets/vector-icons/Fonts/FontAwesome5_Regular.ttf</string>
+		<string>assets/vector-icons/Fonts/FontAwesome5_Solid.ttf</string>
+		<string>assets/vector-icons/Fonts/FontAwesome6_Brands.ttf</string>
+		<string>assets/vector-icons/Fonts/FontAwesome6_Regular.ttf</string>
+		<string>assets/vector-icons/Fonts/FontAwesome6_Solid.ttf</string>
+		<string>assets/vector-icons/Fonts/Fontisto.ttf</string>
+		<string>assets/vector-icons/Fonts/Foundation.ttf</string>
+		<string>assets/vector-icons/Fonts/Ionicons.ttf</string>
+		<string>assets/vector-icons/Fonts/MaterialCommunityIcons.ttf</string>
+		<string>assets/vector-icons/Fonts/MaterialIcons.ttf</string>
+		<string>assets/vector-icons/Fonts/Octicons.ttf</string>
+		<string>assets/vector-icons/Fonts/SimpleLineIcons.ttf</string>
+		<string>assets/vector-icons/Fonts/Zocial.ttf</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
