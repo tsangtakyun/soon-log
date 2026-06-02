@@ -1,8 +1,8 @@
-import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Tabs, usePathname } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
+import { LineIcon } from '@/components/LineIcon';
 import { useAuth } from '@/hooks/useAuth';
 import { syncIdeaBoardsFromAccount } from '@/lib/ideaBoards';
 import { fonts } from '@/lib/theme';
@@ -194,7 +194,7 @@ export default function AppTabs() {
         name="home/index"
         options={{
           title: '首頁',
-          tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />
+          tabBarIcon: ({ color }) => <LineIcon name="home" size={24} color={color} />
         }}
       />
       <Tabs.Screen
@@ -243,7 +243,7 @@ export default function AppTabs() {
           title: '討論區',
           tabBarIcon: ({ color }) => (
             <View>
-              <Feather name="trending-up" size={22} color={color} />
+              <LineIcon name="trending-up" size={24} color={color} />
               {unreadTrendCount > 0 ? (
                 <View
                   style={{
@@ -270,7 +270,7 @@ export default function AppTabs() {
         name="tools/index"
         options={{
           title: '工具',
-          tabBarIcon: ({ color }) => <Feather name="tool" size={22} color={color} />
+          tabBarIcon: ({ color }) => <LineIcon name="tool" size={24} color={color} />
         }}
       />
       <Tabs.Screen name="tools/idea-library" options={{ href: null }} />

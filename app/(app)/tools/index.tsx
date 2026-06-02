@@ -1,7 +1,7 @@
-import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LineIcon } from '@/components/LineIcon';
 import { useAuth } from '@/hooks/useAuth';
 import { getCredits } from '@/lib/credits';
 import { fonts } from '@/lib/theme';
@@ -9,7 +9,7 @@ import { colors } from '@/theme/colors';
 
 type ToolItem = {
   name: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: 'bookmark' | 'calendar' | 'check-square' | 'cpu' | 'file-text' | 'message-circle';
   route: string;
   desc: string;
 };
@@ -89,7 +89,7 @@ function ToolSection({
             onPress={() => router.push(tool.route as never)}
             style={({ pressed }) => [styles.card, pressed && styles.pressed]}
           >
-            <Feather name={tool.icon} size={28} color={colors.primary} />
+            <LineIcon name={tool.icon} size={30} color={colors.primary} />
             <Text style={styles.name}>{tool.name}</Text>
             <Text style={styles.desc}>{tool.desc}</Text>
           </Pressable>
