@@ -10,6 +10,11 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		13B07FC01A68108700A75B9A /* main.jsbundle in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FC21A68108700A75B9A /* main.jsbundle */; };
 		13B07FC11A68108700A75B9A /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FC31A68108700A75B9A /* assets */; };
+		7C0F00000000000000000001 /* Feather.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000011 /* Feather.ttf */; };
+		7C0F00000000000000000002 /* FontAwesome.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000012 /* FontAwesome.ttf */; };
+		7C0F00000000000000000003 /* Ionicons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000013 /* Ionicons.ttf */; };
+		7C0F00000000000000000004 /* MaterialCommunityIcons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000014 /* MaterialCommunityIcons.ttf */; };
+		7C0F00000000000000000005 /* MaterialIcons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000015 /* MaterialIcons.ttf */; };
 		16E8CDA4E1A14C7FABBDE038 /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = EC55A420234F4D3791336DC1 /* MainInterface.storyboard */; };
 		34B76A09326044BBB7A58CB5 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08EA97E48C5243729DB8EE3B /* ShareViewController.swift */; };
 		3C1C03A00C6946478E12DD89 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */; };
@@ -56,6 +61,11 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = SOONLOG/Info.plist; sourceTree = "<group>"; };
 		13B07FC21A68108700A75B9A /* main.jsbundle */ = {isa = PBXFileReference; lastKnownFileType = text.javascript; name = main.jsbundle; path = SOONLOG/main.jsbundle; sourceTree = "<group>"; };
 		13B07FC31A68108700A75B9A /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = SOONLOG/assets; sourceTree = "<group>"; };
+		7C0F00000000000000000011 /* Feather.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = Feather.ttf; path = SOONLOG/Feather.ttf; sourceTree = "<group>"; };
+		7C0F00000000000000000012 /* FontAwesome.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = FontAwesome.ttf; path = SOONLOG/FontAwesome.ttf; sourceTree = "<group>"; };
+		7C0F00000000000000000013 /* Ionicons.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = Ionicons.ttf; path = SOONLOG/Ionicons.ttf; sourceTree = "<group>"; };
+		7C0F00000000000000000014 /* MaterialCommunityIcons.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = MaterialCommunityIcons.ttf; path = SOONLOG/MaterialCommunityIcons.ttf; sourceTree = "<group>"; };
+		7C0F00000000000000000015 /* MaterialIcons.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = MaterialIcons.ttf; path = SOONLOG/MaterialIcons.ttf; sourceTree = "<group>"; };
 		15E39999CA92478FB300CA58 /* ShareExtension.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ShareExtension.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 		3E542E8D3E53F8ED8E4CC5DF /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SOONLOG/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = PrivacyInfo.xcprivacy; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -113,6 +123,11 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FC21A68108700A75B9A /* main.jsbundle */,
 				13B07FC31A68108700A75B9A /* assets */,
+				7C0F00000000000000000011 /* Feather.ttf */,
+				7C0F00000000000000000012 /* FontAwesome.ttf */,
+				7C0F00000000000000000013 /* Ionicons.ttf */,
+				7C0F00000000000000000014 /* MaterialCommunityIcons.ttf */,
+				7C0F00000000000000000015 /* MaterialIcons.ttf */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
 			);
@@ -290,6 +305,11 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FC01A68108700A75B9A /* main.jsbundle in Resources */,
 				13B07FC11A68108700A75B9A /* assets in Resources */,
+				7C0F00000000000000000001 /* Feather.ttf in Resources */,
+				7C0F00000000000000000002 /* FontAwesome.ttf in Resources */,
+				7C0F00000000000000000003 /* Ionicons.ttf in Resources */,
+				7C0F00000000000000000004 /* MaterialCommunityIcons.ttf in Resources */,
+				7C0F00000000000000000005 /* MaterialIcons.ttf in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				DDE089907FF6E03CAF8DF800 /* PrivacyInfo.xcprivacy in Resources */,
