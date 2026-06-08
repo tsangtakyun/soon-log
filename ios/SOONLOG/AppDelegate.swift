@@ -72,21 +72,9 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
 
   override func bundleURL() -> URL? {
 #if DEBUG
-    return debugMetroURL()
-      ?? RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
+    return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
 #else
     return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
   }
-
-#if DEBUG
-  private func debugMetroURL() -> URL? {
-#if targetEnvironment(simulator)
-    let host = "localhost"
-#else
-    let host = "192.168.1.152"
-#endif
-    return URL(string: "http://\(host):8081/.expo/.virtual-metro-entry.bundle?platform=ios&dev=true&minify=false")
-  }
-#endif
 }

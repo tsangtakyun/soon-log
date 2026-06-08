@@ -111,6 +111,7 @@ function RootNavigator() {
 
 export default function RootLayout() {
   const [introDone, setIntroDone] = useState(false);
+  const [fontWaitExpired, setFontWaitExpired] = useState(false);
   const [serifLoaded, serifError] = useSerifFonts({ DMSerifDisplay_400Regular });
   const [sansLoaded, sansError] = useSansFonts({ DMSans_400Regular, DMSans_500Medium, DMSans_700Bold });
   const [iconLoaded, iconError] = useExpoFonts({
@@ -120,7 +121,14 @@ export default function RootLayout() {
     ...MaterialCommunityIcons.font,
     ...MaterialIcons.font
   });
-  const fontsReady = (serifLoaded && sansLoaded && iconLoaded) || Boolean(serifError || sansError || iconError);
+  const fontsReady = (serifLoaded && sansLoaded && iconLoaded) || Boolean(serifError || sansError || iconError || fontWaitExpired);
+
+  useEffect(() => {
+    if (fontsReady) return;
+
+    const timer = setTimeout(() => setFontWaitExpired(true), 4000);
+    return () => clearTimeout(timer);
+  }, [fontsReady]);
 
   useEffect(() => {
     if (!fontsReady) return;

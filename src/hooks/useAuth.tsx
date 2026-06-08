@@ -51,15 +51,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    const fallbackTimer = setTimeout(() => {
+      if (!mounted) return;
+      setLoading(false);
+    }, 5000);
 
     supabase.auth.getSession()
       .then(({ data }) => {
         if (!mounted) return;
+        clearTimeout(fallbackTimer);
         setSession(data.session);
         setLoading(false);
       })
       .catch(() => {
         if (!mounted) return;
+        clearTimeout(fallbackTimer);
         setSession(null);
         setLoading(false);
       });
@@ -71,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
+      clearTimeout(fallbackTimer);
       listener.subscription.unsubscribe();
     };
   }, []);
