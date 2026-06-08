@@ -16,6 +16,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.theirstudio.sooncreatorlog',
+      appleTeamId: 'K47W3XX3CK',
       icon: './assets/icon.png',
       config: {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY

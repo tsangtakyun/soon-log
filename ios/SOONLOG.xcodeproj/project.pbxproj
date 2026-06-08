@@ -268,12 +268,12 @@
 				LastUpgradeCheck = 1130;
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
-						DevelopmentTeam = WGK73GTPCX;
+						DevelopmentTeam = K47W3XX3CK;
 						LastSwiftMigration = 1250;
 						ProvisioningStyle = Automatic;
 					};
 					ED6B13FB88B441BDA9C8E670 = {
-						DevelopmentTeam = WGK73GTPCX;
+						DevelopmentTeam = K47W3XX3CK;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -473,7 +473,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = WGK73GTPCX;
+				DEVELOPMENT_TEAM = K47W3XX3CK;
 				ENABLE_BITCODE = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -514,7 +514,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = WGK73GTPCX;
+				DEVELOPMENT_TEAM = K47W3XX3CK;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = SOONLOG/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -547,7 +547,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = WGK73GTPCX;
+				DEVELOPMENT_TEAM = K47W3XX3CK;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
@@ -580,7 +580,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = WGK73GTPCX;
+				DEVELOPMENT_TEAM = K47W3XX3CK;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "ShareExtension/ShareExtension-Info.plist";
