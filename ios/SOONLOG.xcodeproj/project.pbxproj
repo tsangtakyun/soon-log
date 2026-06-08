@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		13B07FC01A68108700A75B9A /* main.jsbundle in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FC21A68108700A75B9A /* main.jsbundle */; };
 		13B07FC11A68108700A75B9A /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FC31A68108700A75B9A /* assets */; };
 		7C0F00000000000000000001 /* Feather.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000011 /* Feather.ttf */; };
 		7C0F00000000000000000002 /* FontAwesome.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000012 /* FontAwesome.ttf */; };
@@ -248,7 +247,6 @@
 				F3CD950CABBA4070877D6A4F /* Sources */,
 				34B71832405549C8890E70D3 /* Resources */,
 				7936FF6D401846C9905773DA /* Frameworks */,
-				F3C5D413653154C92ACE603A /* Copy GoogleMaps.bundle */,
 			);
 			buildRules = (
 			);
@@ -303,7 +301,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
-				13B07FC01A68108700A75B9A /* main.jsbundle in Resources */,
 				13B07FC11A68108700A75B9A /* assets in Resources */,
 				7C0F00000000000000000001 /* Feather.ttf in Resources */,
 				7C0F00000000000000000002 /* FontAwesome.ttf in Resources */,
@@ -342,6 +339,7 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleMaps.bundle",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
@@ -396,24 +394,6 @@
 			shellPath = /bin/bash;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SOONLOG/Pods-SOONLOG-resources.sh\"\n";
 			showEnvVarsInLog = 0;
-		};
-		F3C5D413653154C92ACE603A /* Copy GoogleMaps.bundle */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Copy GoogleMaps.bundle";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/bash;
-			shellScript = "set -e\nGOOGLE_MAPS_BUNDLE=\"${PODS_ROOT}/GoogleMaps/Maps/Resources/GoogleMapsResources/GoogleMaps.bundle\"\nDESTINATION=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleMaps.bundle\"\nif [ -d \"$GOOGLE_MAPS_BUNDLE\" ]; then\n  rm -rf \"$DESTINATION\"\n  cp -RX \"$GOOGLE_MAPS_BUNDLE\" \"$DESTINATION\"\nfi\nxattr -cr \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\" 2>/dev/null || true\n";
 		};
 		B00F00D1234567890ABCDEFA /* Bundle React Native code and images */ = {
 			isa = PBXShellScriptBuildPhase;

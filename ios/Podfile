@@ -246,13 +246,21 @@ post_integrate do |installer|
         phase.remove_from_project
       end
 
+      phase_name = 'Copy GoogleMaps.bundle'
+      if target.name != 'SOONLOG'
+        target.shell_script_build_phases
+          .select { |phase| phase.name == phase_name }
+          .each(&:remove_from_project)
+        next
+      end
+
       # Google Maps iOS SDK expects GoogleMaps.bundle at the app bundle root.
       # CocoaPods currently stages GoogleMapsResources.bundle, so copy the nested
       # GoogleMaps.bundle explicitly to avoid a launch-time GMSServicesException.
-      phase_name = 'Copy GoogleMaps.bundle'
       phase = target.shell_script_build_phases.find { |p| p.name == phase_name } ||
         target.new_shell_script_build_phase(phase_name)
       phase.shell_path = '/bin/bash'
+      phase.output_paths = ['${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleMaps.bundle']
       phase.shell_script = <<~'SH'
         set -e
         GOOGLE_MAPS_BUNDLE="${PODS_ROOT}/GoogleMaps/Maps/Resources/GoogleMapsResources/GoogleMaps.bundle"
