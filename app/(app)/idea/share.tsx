@@ -249,7 +249,7 @@ export default function IdeaShareScreen() {
           <View style={styles.centerState}>
             <Text style={styles.savedIcon}>◈</Text>
             <Text style={styles.savedText}>{sharedItems.length > 1 ? `已儲存 ${sharedItems.length} 條入題材庫` : '已儲存入題材庫'}</Text>
-            <Text style={styles.savedSubtext}>AI 會喺背景補充標題、Hook 同標籤。</Text>
+            <Text style={styles.savedSubtext}>AI 正在背景補充標題、封面、店舖同推薦資料，通常約 10–30 秒完成。</Text>
           </View>
         ) : null}
 
@@ -261,7 +261,7 @@ export default function IdeaShareScreen() {
             <View style={styles.quickCopy}>
               <Text style={styles.quickTitle}>Save to 題材庫</Text>
               <Text style={styles.quickDescription}>
-                {sharedItems.length > 1 ? `準備儲存 ${sharedItems.length} 條題材，AI 之後自動補充資料。` : '先儲存連結，AI 之後自動補充標題、Hook 同標籤。'}
+                {sharedItems.length > 1 ? `準備儲存 ${sharedItems.length} 條題材；先入庫，AI 之後約 10–30 秒補資料。` : '先儲存連結；AI 之後約 10–30 秒補標題、封面、店舖同推薦資料。'}
               </Text>
               {sharedItems[0]?.selectedBoard ? (
                 <View style={styles.boardPill}>

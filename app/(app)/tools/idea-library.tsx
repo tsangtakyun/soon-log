@@ -1,6 +1,6 @@
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -247,10 +247,9 @@ function ideaSearchText(idea: IdeaRecord) {
     .toLowerCase();
 }
 
-function ideaNeedsEnrichment(idea: IdeaRecord) {
+function ideaHasPendingEnrichment(idea: IdeaRecord) {
   const sourceUrl = ideaSourceUrl(idea);
   if (!sourceUrl) return false;
-  if (enrichingIdeaIds.has(idea.id)) return false;
 
   const tags = Array.isArray(idea.tags) ? idea.tags : [];
   const hasPendingTag = tags.includes('待分析');
@@ -266,6 +265,11 @@ function ideaNeedsEnrichment(idea: IdeaRecord) {
     (!idea.video_url || !idea.place_name || (!idea.summary && !idea.description));
 
   return hasPendingTag || hasGenericTitle || missingUsefulPreview || missingMediaPreview || missingInstagramDetails;
+}
+
+function ideaNeedsEnrichment(idea: IdeaRecord) {
+  if (enrichingIdeaIds.has(idea.id)) return false;
+  return ideaHasPendingEnrichment(idea);
 }
 
 function Chip({
@@ -1081,6 +1085,8 @@ export default function ToolsIdeaLibraryScreen() {
   const [newBoardName, setNewBoardName] = useState('');
   const [draft, setDraft] = useState<IdeaDraft>(emptyDraft);
   const [translatingIdeaId, setTranslatingIdeaId] = useState<string | null>(null);
+  const [pendingEnrichmentCount, setPendingEnrichmentCount] = useState(0);
+  const enrichmentPollingStartedAt = useRef<number | null>(null);
 
   const resolveWorkspace = useCallback(async () => {
     if (!user) return null;
@@ -1143,6 +1149,7 @@ export default function ToolsIdeaLibraryScreen() {
       const nextIdeas = (data ?? []) as IdeaRecord[];
       const accountBoards = Array.from(new Set(nextIdeas.flatMap((idea) => ideaBoards(idea)))).sort((a, b) => a.localeCompare(b));
       setIdeas(nextIdeas);
+      setPendingEnrichmentCount(nextIdeas.filter(ideaHasPendingEnrichment).length);
       const storedBoards = await loadLocalIdeaBoards();
       setLocalBoards(accountBoards.length > 0 ? await mergeLocalIdeaBoards(accountBoards) : storedBoards);
 
@@ -1170,6 +1177,27 @@ export default function ToolsIdeaLibraryScreen() {
   useEffect(() => {
     loadIdeas();
   }, [loadIdeas]);
+
+  useEffect(() => {
+    if (pendingEnrichmentCount <= 0) {
+      enrichmentPollingStartedAt.current = null;
+      return undefined;
+    }
+
+    if (!enrichmentPollingStartedAt.current) {
+      enrichmentPollingStartedAt.current = Date.now();
+    }
+
+    if (Date.now() - enrichmentPollingStartedAt.current > 90000) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      loadIdeas(false);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [loadIdeas, pendingEnrichmentCount]);
 
   const boardOptions = useMemo(() => {
     const categories = new Set<string>();
@@ -1548,6 +1576,13 @@ ${JSON.stringify(source, null, 2)}`
     const playableVideo = playableVideoUrl(item.video_url);
     const sourceUrl = ideaSourceUrl(item);
     const placeName = item.place_name || item.shop_name;
+    const pendingEnrichment = ideaHasPendingEnrichment(item);
+    const cardTitle = pendingEnrichment && (!item.title || item.title === 'IG Reel 靈感' || item.title === 'Instagram Reel 靈感')
+      ? 'AI 正在整理題材'
+      : item.title || '未命名題材';
+    const cardTopic = pendingEnrichment
+      ? '補資料中，約需 10–30 秒'
+      : item.topic || item.summary || '未設定主題';
     return (
       <Pressable onPress={() => openDetailModal(item)} style={({ pressed }) => [styles.ideaCard, pressed && styles.pressed]}>
         <View style={styles.cardMedia}>
@@ -1564,10 +1599,16 @@ ${JSON.stringify(source, null, 2)}`
             <View style={styles.cardImageEmpty}>
               <Feather name={sourceUrl ? 'instagram' : 'bookmark'} size={22} color="#c7b8ad" />
               <Text style={styles.cardImageEmptyText}>
-                {sourceUrl ? '未能預覽原片' : '未有預覽'}
+                {pendingEnrichment ? 'AI 正在補預覽' : sourceUrl ? '未能預覽原片' : '未有預覽'}
               </Text>
             </View>
           )}
+          {pendingEnrichment ? (
+            <View style={styles.enrichmentBadge}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.enrichmentBadgeText}>AI 補資料中</Text>
+            </View>
+          ) : null}
         </View>
         <View style={styles.cardBody}>
           {placeName ? (
@@ -1577,10 +1618,10 @@ ${JSON.stringify(source, null, 2)}`
             </View>
           ) : null}
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle} numberOfLines={2}>{item.title || '未命名題材'}</Text>
+            <Text style={styles.cardTitle} numberOfLines={2}>{cardTitle}</Text>
             <Feather name="chevron-right" size={18} color={colors.textMuted} />
           </View>
-          <Text style={styles.cardTopic} numberOfLines={1}>{item.topic || item.summary || '未設定主題'}</Text>
+          <Text style={[styles.cardTopic, pendingEnrichment && styles.cardTopicPending]} numberOfLines={1}>{cardTopic}</Text>
           <View style={styles.cardTags}>
             <Text style={styles.typeTag}>{typeLabel(item.platform)}</Text>
             {regions.map((region) => <Text key={region} style={styles.regionTag}>{region}</Text>)}
@@ -1595,6 +1636,7 @@ ${JSON.stringify(source, null, 2)}`
     const previewImage = ideaPreviewImage(item);
     const playableVideo = playableVideoUrl(item.video_url);
     const sourceUrl = ideaSourceUrl(item);
+    const pendingEnrichment = ideaHasPendingEnrichment(item);
     return (
       <Pressable key={item.id} onPress={() => openDetailModal(item)} style={({ pressed }) => [styles.mapIdeaCard, pressed && styles.pressed]}>
         {playableVideo ? (
@@ -1610,12 +1652,12 @@ ${JSON.stringify(source, null, 2)}`
           <View style={styles.mapIdeaImageEmpty}>
             <Feather name={sourceUrl ? 'instagram' : 'bookmark'} size={20} color="#c7b8ad" />
             <Text style={styles.mapIdeaImageEmptyText}>
-              {sourceUrl ? '未能預覽' : '未有預覽'}
+              {pendingEnrichment ? 'AI 補資料中' : sourceUrl ? '未能預覽' : '未有預覽'}
             </Text>
           </View>
         )}
-        <Text style={styles.mapIdeaTitle} numberOfLines={2}>{item.title || '未命名題材'}</Text>
-        <Text style={styles.mapIdeaPlace} numberOfLines={1}>{item.place_name || item.shop_name || typeLabel(item.platform)}</Text>
+        <Text style={styles.mapIdeaTitle} numberOfLines={2}>{pendingEnrichment ? 'AI 正在整理題材' : item.title || '未命名題材'}</Text>
+        <Text style={styles.mapIdeaPlace} numberOfLines={1}>{pendingEnrichment ? '約需 10–30 秒' : item.place_name || item.shop_name || typeLabel(item.platform)}</Text>
       </Pressable>
     );
   }
@@ -2407,6 +2449,28 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600'
   },
+  enrichmentBadge: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    bottom: 10,
+    minHeight: 30,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 10
+  },
+  enrichmentBadgeText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    fontWeight: '800'
+  },
   cardBody: {
     minHeight: 130,
     paddingHorizontal: 12,
@@ -2446,6 +2510,10 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 13
+  },
+  cardTopicPending: {
+    color: colors.primary,
+    fontFamily: fonts.bodyMedium
   },
   cardTags: {
     marginTop: 8,
