@@ -17,6 +17,7 @@
 
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Feather } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -626,6 +627,12 @@ export default function ScheduleToolScreen() {
   useEffect(() => {
     loadSchedules();
   }, [loadSchedules]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadSchedules(false);
+    }, [loadSchedules])
+  );
 
   async function onRefresh() {
     setRefreshing(true);
