@@ -589,8 +589,8 @@ export default function ScheduleToolScreen() {
       const id = workspaceId ?? await resolveWorkspaceId(user.id, user.email);
       setWorkspaceId(id);
 
-      let data: ScheduleRecord[] | null = null;
-      let error: unknown = null;
+      const records = new Map<string, ScheduleRecord>();
+      let firstError: unknown = null;
 
       if (id) {
         const result = await supabase
@@ -599,22 +599,28 @@ export default function ScheduleToolScreen() {
           .eq('workspace_id', id)
           .order('date', { ascending: true })
           .order('start_time', { ascending: true });
-        data = result.data as ScheduleRecord[] | null;
-        error = result.error;
+        if (result.error) {
+          firstError = result.error;
+        } else {
+          (result.data as ScheduleRecord[] | null)?.forEach((item) => records.set(item.id, item));
+        }
       }
 
-      if (error || !id) {
-        const result = await supabase
-          .from('schedules')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('start_at', { ascending: true });
-        data = result.data as ScheduleRecord[] | null;
-        error = result.error;
+      const ownResult = await supabase
+        .from('schedules')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: true })
+        .order('start_time', { ascending: true });
+
+      if (ownResult.error) {
+        if (records.size === 0) throw ownResult.error;
+      } else {
+        (ownResult.data as ScheduleRecord[] | null)?.forEach((item) => records.set(item.id, item));
       }
 
-      if (error) throw error;
-      setSchedules(data ?? []);
+      if (records.size === 0 && firstError) throw firstError;
+      setSchedules(Array.from(records.values()));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '載入失敗';
       Alert.alert('日程載入失敗', message);
