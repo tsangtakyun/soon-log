@@ -24,6 +24,7 @@ import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -202,6 +203,24 @@ function formatCardDateTime(item: ScheduleRecord) {
   return `${dateText} ${timeText}`;
 }
 
+function visibleNotes(item: ScheduleRecord) {
+  const value = item.notes ?? item.description ?? '';
+  return value
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('來源：') && !line.trim().startsWith('來源:'))
+    .join('\n')
+    .trim();
+}
+
+async function openLocationInMaps(location: string) {
+  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+  try {
+    await Linking.openURL(url);
+  } catch {
+    Alert.alert('未能開啟地圖', '請稍後再試。');
+  }
+}
+
 function formatButtonDate(date: Date) {
   return new Intl.DateTimeFormat('zh-HK', { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
 }
@@ -302,6 +321,7 @@ function Chip({
 function ScheduleCard({ item, onPress }: { item: ScheduleRecord; onPress: () => void }) {
   const type = normalizeType(item.type);
   const status = normalizeStatus(item);
+  const notePreview = visibleNotes(item);
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.86} style={styles.card}>
@@ -314,12 +334,17 @@ function ScheduleCard({ item, onPress }: { item: ScheduleRecord; onPress: () => 
         <Text style={styles.dateText}>{formatCardDateTime(item)}</Text>
       </View>
       {item.location ? (
-        <View style={styles.inlineMeta}>
-          <Feather name="map-pin" size={13} color={colors.textMuted} />
-          <Text numberOfLines={1} style={styles.metaText}>{item.location}</Text>
-        </View>
+        <TouchableOpacity
+          onPress={() => openLocationInMaps(item.location!)}
+          activeOpacity={0.75}
+          accessibilityRole="link"
+          style={styles.inlineMeta}
+        >
+          <Feather name="map-pin" size={13} color={colors.primary} />
+          <Text numberOfLines={1} style={styles.locationText}>{item.location}</Text>
+        </TouchableOpacity>
       ) : null}
-      {(item.notes || item.description) ? <Text numberOfLines={2} style={styles.notesText}>{item.notes ?? item.description}</Text> : null}
+      {notePreview ? <Text numberOfLines={2} style={styles.notesText}>{notePreview}</Text> : null}
     </TouchableOpacity>
   );
 }
@@ -1071,6 +1096,13 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 13
+  },
+  locationText: {
+    flex: 1,
+    color: colors.textMuted,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 13,
+    textDecorationLine: 'underline'
   },
   notesText: {
     marginTop: 8,
