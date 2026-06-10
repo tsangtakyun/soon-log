@@ -9,11 +9,6 @@
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		13B07FC11A68108700A75B9A /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FC31A68108700A75B9A /* assets */; };
-		7C0F00000000000000000001 /* Feather.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000011 /* Feather.ttf */; };
-		7C0F00000000000000000002 /* FontAwesome.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000012 /* FontAwesome.ttf */; };
-		7C0F00000000000000000003 /* Ionicons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000013 /* Ionicons.ttf */; };
-		7C0F00000000000000000004 /* MaterialCommunityIcons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000014 /* MaterialCommunityIcons.ttf */; };
-		7C0F00000000000000000005 /* MaterialIcons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000015 /* MaterialIcons.ttf */; };
 		16E8CDA4E1A14C7FABBDE038 /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = EC55A420234F4D3791336DC1 /* MainInterface.storyboard */; };
 		34B76A09326044BBB7A58CB5 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08EA97E48C5243729DB8EE3B /* ShareViewController.swift */; };
 		3C1C03A00C6946478E12DD89 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */; };
@@ -22,6 +17,11 @@
 		55009D25EEBEA6F588CCE93B /* libPods-SOONLOG.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 66708DC70A49CD96870F2473 /* libPods-SOONLOG.a */; };
 		7C04C8EC4B6F4E8E9CE51101 /* IdeaBoardsModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C04C8EA4B6F4E8E9CE51101 /* IdeaBoardsModule.swift */; };
 		7C04C8ED4B6F4E8E9CE51101 /* IdeaBoardsModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 7C04C8EB4B6F4E8E9CE51101 /* IdeaBoardsModule.m */; };
+		7C0F00000000000000000001 /* Feather.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000011 /* Feather.ttf */; };
+		7C0F00000000000000000002 /* FontAwesome.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000012 /* FontAwesome.ttf */; };
+		7C0F00000000000000000003 /* Ionicons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000013 /* Ionicons.ttf */; };
+		7C0F00000000000000000004 /* MaterialCommunityIcons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000014 /* MaterialCommunityIcons.ttf */; };
+		7C0F00000000000000000005 /* MaterialIcons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7C0F00000000000000000015 /* MaterialIcons.ttf */; };
 		A4C8C2C80B24457C92A9D032 /* ShareExtensionPreprocessor.js in Resources */ = {isa = PBXBuildFile; fileRef = A142CE13B04A4693A1D68415 /* ShareExtensionPreprocessor.js */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		DDE089907FF6E03CAF8DF800 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */; };
@@ -60,11 +60,6 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = SOONLOG/Info.plist; sourceTree = "<group>"; };
 		13B07FC21A68108700A75B9A /* main.jsbundle */ = {isa = PBXFileReference; lastKnownFileType = text.javascript; name = main.jsbundle; path = SOONLOG/main.jsbundle; sourceTree = "<group>"; };
 		13B07FC31A68108700A75B9A /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = SOONLOG/assets; sourceTree = "<group>"; };
-		7C0F00000000000000000011 /* Feather.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = Feather.ttf; path = SOONLOG/Feather.ttf; sourceTree = "<group>"; };
-		7C0F00000000000000000012 /* FontAwesome.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = FontAwesome.ttf; path = SOONLOG/FontAwesome.ttf; sourceTree = "<group>"; };
-		7C0F00000000000000000013 /* Ionicons.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = Ionicons.ttf; path = SOONLOG/Ionicons.ttf; sourceTree = "<group>"; };
-		7C0F00000000000000000014 /* MaterialCommunityIcons.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = MaterialCommunityIcons.ttf; path = SOONLOG/MaterialCommunityIcons.ttf; sourceTree = "<group>"; };
-		7C0F00000000000000000015 /* MaterialIcons.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = MaterialIcons.ttf; path = SOONLOG/MaterialIcons.ttf; sourceTree = "<group>"; };
 		15E39999CA92478FB300CA58 /* ShareExtension.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ShareExtension.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 		3E542E8D3E53F8ED8E4CC5DF /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SOONLOG/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = PrivacyInfo.xcprivacy; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -73,6 +68,11 @@
 		73B2750F5CF14540A64500F5 /* ShareExtension-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "ShareExtension-Info.plist"; path = "ShareExtension-Info.plist"; sourceTree = "<group>"; };
 		7C04C8EA4B6F4E8E9CE51101 /* IdeaBoardsModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IdeaBoardsModule.swift; path = SOONLOG/IdeaBoardsModule.swift; sourceTree = "<group>"; };
 		7C04C8EB4B6F4E8E9CE51101 /* IdeaBoardsModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = IdeaBoardsModule.m; path = SOONLOG/IdeaBoardsModule.m; sourceTree = "<group>"; };
+		7C0F00000000000000000011 /* Feather.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = Feather.ttf; path = SOONLOG/Feather.ttf; sourceTree = "<group>"; };
+		7C0F00000000000000000012 /* FontAwesome.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = FontAwesome.ttf; path = SOONLOG/FontAwesome.ttf; sourceTree = "<group>"; };
+		7C0F00000000000000000013 /* Ionicons.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = Ionicons.ttf; path = SOONLOG/Ionicons.ttf; sourceTree = "<group>"; };
+		7C0F00000000000000000014 /* MaterialCommunityIcons.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = MaterialCommunityIcons.ttf; path = SOONLOG/MaterialCommunityIcons.ttf; sourceTree = "<group>"; };
+		7C0F00000000000000000015 /* MaterialIcons.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = MaterialIcons.ttf; path = SOONLOG/MaterialIcons.ttf; sourceTree = "<group>"; };
 		A142CE13B04A4693A1D68415 /* ShareExtensionPreprocessor.js */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ShareExtensionPreprocessor.js; path = ShareExtensionPreprocessor.js; sourceTree = "<group>"; };
 		A4A48C389423C684B4763FB1 /* Pods-SOONLOG.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SOONLOG.release.xcconfig"; path = "Target Support Files/Pods-SOONLOG/Pods-SOONLOG.release.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = SOONLOG/SplashScreen.storyboard; sourceTree = "<group>"; };
@@ -225,7 +225,6 @@
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
-				B00F00D1234567890ABCDEFA /* Bundle React Native code and images */,
 				A8B2373F91F7427BA40FAC0E /* Copy Files */,
 				CF59A2A3D9C6A30DA1CF5DAC /* [CP] Copy Pods Resources */,
 				3ACC7C67438F54DC7DB42BEB /* Copy GoogleMaps.bundle */,
@@ -394,21 +393,6 @@
 			shellPath = /bin/bash;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SOONLOG/Pods-SOONLOG-resources.sh\"\n";
 			showEnvVarsInLog = 0;
-		};
-		B00F00D1234567890ABCDEFA /* Bundle React Native code and images */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-			);
-			name = "Bundle React Native code and images";
-			outputPaths = (
-				"$(CONFIGURATION_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/main.jsbundle",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "set -e\nexport PROJECT_ROOT=\"$PROJECT_DIR/..\"\nexport NODE_BINARY=\"${NODE_BINARY:-$(command -v node)}\"\nexport REACT_NATIVE_PATH=\"$PROJECT_ROOT/node_modules/react-native\"\nexport ENTRY_FILE=\"$(\"$NODE_BINARY\" \"$(\"$NODE_BINARY\" --print \"require.resolve('expo/scripts/resolveAppEntry')\" | tail -n 1)\" \"$PROJECT_ROOT\" ios absolute | tail -n 1)\"\nexport BUNDLE_COMMAND=\"export:embed\"\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
