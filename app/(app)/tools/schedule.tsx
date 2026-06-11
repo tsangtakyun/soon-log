@@ -14,15 +14,22 @@
 //   status text DEFAULT '即將到來',
 //   created_at timestamptz DEFAULT now()
 // );
+// Optional shared production fields:
+// ALTER TABLE schedules ADD COLUMN IF NOT EXISTS script_doc_id uuid;
+// ALTER TABLE schedules ADD COLUMN IF NOT EXISTS script_doc_title text;
+// ALTER TABLE schedules ADD COLUMN IF NOT EXISTS memo text;
+// ALTER TABLE schedules ADD COLUMN IF NOT EXISTS reference_images jsonb DEFAULT '[]'::jsonb;
 
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Feather } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -46,6 +53,13 @@ type ScheduleType = '拍攝' | '截止日' | '會議' | '其他';
 type ScheduleStatus = '即將到來' | '進行中' | '已完成' | '已取消';
 type ViewMode = 'list' | 'calendar';
 
+type CoreDoc = {
+  id: string;
+  title: string;
+  template_type?: string | null;
+  created_at?: string | null;
+};
+
 type ScheduleRecord = {
   id: string;
   workspace_id?: string | null;
@@ -63,6 +77,10 @@ type ScheduleRecord = {
   start_at?: string | null;
   end_at?: string | null;
   created_at?: string | null;
+  script_doc_id?: string | null;
+  script_doc_title?: string | null;
+  memo?: string | null;
+  reference_images?: string[] | string | null;
 };
 
 type ScheduleDraft = {
@@ -73,6 +91,10 @@ type ScheduleDraft = {
   endTime: Date | null;
   location: string;
   notes: string;
+  scriptDocId: string;
+  scriptDocTitle: string;
+  memo: string;
+  referenceImages: string[];
   reminder: boolean;
   status: ScheduleStatus;
 };
@@ -80,6 +102,8 @@ type ScheduleDraft = {
 const TYPES: ScheduleType[] = ['拍攝', '截止日', '會議', '其他'];
 const STATUSES: ScheduleStatus[] = ['即將到來', '進行中', '已完成', '已取消'];
 const TYPE_TABS = ['全部', ...STATUSES] as const;
+const SCRIPT_DOC_TYPES = ['ig_script', 'youtube_script', 'rundown', 'script'] as const;
+const SOON_CORE_DOCS_URL = 'https://soon-core.vercel.app/docs';
 
 const typeColors: Record<ScheduleType, { bg: string; text: string }> = {
   拍攝: { bg: '#FBF4EE', text: colors.primary },
@@ -106,6 +130,10 @@ function newDraft(): ScheduleDraft {
     endTime: null,
     location: '',
     notes: '',
+    scriptDocId: '',
+    scriptDocTitle: '',
+    memo: '',
+    referenceImages: [],
     reminder: false,
     status: '即將到來'
   };
@@ -212,6 +240,35 @@ function visibleNotes(item: ScheduleRecord) {
     .trim();
 }
 
+function noteValue(item: ScheduleRecord, label: string) {
+  const value = item.notes ?? item.description ?? '';
+  const prefixA = `${label}：`;
+  const prefixB = `${label}:`;
+  const line = value.split('\n').find((entry) => {
+    const trimmed = entry.trim();
+    return trimmed.startsWith(prefixA) || trimmed.startsWith(prefixB);
+  });
+  if (!line) return '';
+  return line.replace(prefixA, '').replace(prefixB, '').trim();
+}
+
+function referenceImagesFor(item: ScheduleRecord) {
+  const raw = item.reference_images;
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function isMissingExtraColumnError(error: unknown) {
+  const message = error instanceof Error ? error.message : String((error as { message?: string } | null)?.message ?? '');
+  return ['script_doc_id', 'script_doc_title', 'memo', 'reference_images'].some((column) => message.includes(column));
+}
+
 async function openLocationInMaps(location: string) {
   const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
   try {
@@ -219,6 +276,25 @@ async function openLocationInMaps(location: string) {
   } catch {
     Alert.alert('未能開啟地圖', '請稍後再試。');
   }
+}
+
+async function openCoreDoc(docId: string) {
+  const url = `${SOON_CORE_DOCS_URL}?open=${encodeURIComponent(docId)}`;
+  try {
+    await Linking.openURL(url);
+  } catch {
+    Alert.alert('未能開啟劇本', '請稍後再試。');
+  }
+}
+
+function base64ToArrayBuffer(base64: string) {
+  const cleanBase64 = base64.replace(/[^A-Za-z0-9+/=]/g, '');
+  const binaryString = globalThis.atob(cleanBase64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let index = 0; index < binaryString.length; index += 1) {
+    bytes[index] = binaryString.charCodeAt(index);
+  }
+  return bytes.buffer;
 }
 
 function formatButtonDate(date: Date) {
@@ -240,6 +316,10 @@ function draftFromSchedule(item: ScheduleRecord): ScheduleDraft {
     endTime: parseTime(item.end_time, date) ?? parseDate(item.end_at),
     location: item.location ?? '',
     notes: item.notes ?? item.description ?? '',
+    scriptDocId: item.script_doc_id ?? '',
+    scriptDocTitle: item.script_doc_title ?? '',
+    memo: item.memo ?? '',
+    referenceImages: referenceImagesFor(item),
     reminder: !!item.reminder,
     status: normalizeStatus(item)
   };
@@ -321,7 +401,11 @@ function Chip({
 function ScheduleCard({ item, onPress }: { item: ScheduleRecord; onPress: () => void }) {
   const type = normalizeType(item.type);
   const status = normalizeStatus(item);
-  const notePreview = visibleNotes(item);
+  const notePreview = item.memo || visibleNotes(item);
+  const tripName = noteValue(item, '行程');
+  const platform = noteValue(item, '平台');
+  const referenceImages = referenceImagesFor(item);
+  const scriptTitle = item.script_doc_title || (item.script_doc_id ? '已連結劇本' : '');
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.86} style={styles.card}>
@@ -344,7 +428,27 @@ function ScheduleCard({ item, onPress }: { item: ScheduleRecord; onPress: () => 
           <Text numberOfLines={1} style={styles.locationText}>{item.location}</Text>
         </TouchableOpacity>
       ) : null}
-      {notePreview ? <Text numberOfLines={2} style={styles.notesText}>{notePreview}</Text> : null}
+      {tripName ? <Text numberOfLines={1} style={styles.notesText}>行程：{tripName}</Text> : null}
+      {platform ? <Text numberOfLines={1} style={styles.notesText}>平台：{platform}</Text> : null}
+      {scriptTitle ? (
+        <TouchableOpacity
+          onPress={() => item.script_doc_id ? openCoreDoc(item.script_doc_id) : undefined}
+          activeOpacity={0.75}
+          style={styles.inlineMeta}
+        >
+          <Feather name="file-text" size={13} color={colors.primary} />
+          <Text numberOfLines={1} style={styles.scriptLinkText}>劇本：{scriptTitle}</Text>
+        </TouchableOpacity>
+      ) : null}
+      {notePreview ? <Text numberOfLines={2} style={styles.notesText}>備忘錄：{notePreview}</Text> : null}
+      {referenceImages.length > 0 ? (
+        <View style={styles.referencePreviewRow}>
+          {referenceImages.slice(0, 3).map((uri) => (
+            <Image key={uri} source={{ uri }} style={styles.referencePreviewImage} />
+          ))}
+          {referenceImages.length > 3 ? <Text style={styles.referenceMoreText}>+{referenceImages.length - 3}</Text> : null}
+        </View>
+      ) : null}
     </TouchableOpacity>
   );
 }
@@ -353,22 +457,32 @@ function ScheduleSheet({
   visible,
   mode,
   draft,
+  docs,
+  docsLoading,
+  uploadingImage,
   saving,
   deleting,
   onChange,
   onClose,
   onSave,
-  onDelete
+  onDelete,
+  onPickImage,
+  onRemoveImage
 }: {
   visible: boolean;
   mode: 'add' | 'detail';
   draft: ScheduleDraft;
+  docs: CoreDoc[];
+  docsLoading: boolean;
+  uploadingImage: boolean;
   saving: boolean;
   deleting?: boolean;
   onChange: (draft: ScheduleDraft) => void;
   onClose: () => void;
   onSave: () => void;
   onDelete?: () => void;
+  onPickImage: () => void;
+  onRemoveImage: (uri: string) => void;
 }) {
   const insets = useSafeAreaInsets();
   const [picker, setPicker] = useState<'date' | 'startTime' | 'endTime' | null>(null);
@@ -461,16 +575,59 @@ function ScheduleSheet({
                 style={styles.input}
               />
 
-              <FieldLabel>備註</FieldLabel>
+              <FieldLabel>劇本</FieldLabel>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.docPickerRow}>
+                <Chip
+                  label="未連結"
+                  active={!draft.scriptDocId}
+                  onPress={() => onChange({ ...draft, scriptDocId: '', scriptDocTitle: '' })}
+                />
+                {docsLoading ? (
+                  <View style={styles.docLoadingPill}><ActivityIndicator size="small" color={colors.primary} /></View>
+                ) : docs.length === 0 ? (
+                  <View style={styles.docEmptyPill}><Text style={styles.docEmptyText}>文件中心暫時未有劇本</Text></View>
+                ) : docs.map((doc) => (
+                  <Chip
+                    key={doc.id}
+                    label={doc.title || '未命名文件'}
+                    active={draft.scriptDocId === doc.id}
+                    onPress={() => onChange({ ...draft, scriptDocId: doc.id, scriptDocTitle: doc.title || '未命名文件' })}
+                  />
+                ))}
+              </ScrollView>
+              {draft.scriptDocId ? (
+                <TouchableOpacity onPress={() => openCoreDoc(draft.scriptDocId)} style={styles.openDocButton}>
+                  <Feather name="external-link" size={15} color={colors.primary} />
+                  <Text style={styles.openDocText}>開啟已連結劇本</Text>
+                </TouchableOpacity>
+              ) : null}
+
+              <FieldLabel>備忘錄</FieldLabel>
               <TextInput
-                value={draft.notes}
-                onChangeText={(notes) => onChange({ ...draft, notes })}
-                placeholder="拍攝內容、準備事項、提醒..."
+                value={draft.memo}
+                onChangeText={(memo) => onChange({ ...draft, memo })}
+                placeholder="拍攝重點、shot list、現場提醒..."
                 placeholderTextColor="#9ca3af"
                 style={[styles.input, styles.textarea]}
                 multiline
                 textAlignVertical="top"
               />
+
+              <FieldLabel>Reference 圖</FieldLabel>
+              <View style={styles.referencePickerRow}>
+                {draft.referenceImages.map((uri) => (
+                  <View key={uri} style={styles.referenceThumbWrap}>
+                    <Image source={{ uri }} style={styles.referenceThumb} />
+                    <TouchableOpacity onPress={() => onRemoveImage(uri)} style={styles.referenceRemoveButton}>
+                      <Feather name="x" size={13} color="#ffffff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <TouchableOpacity onPress={onPickImage} disabled={uploadingImage} style={styles.addReferenceButton}>
+                  {uploadingImage ? <ActivityIndicator color={colors.primary} /> : <Feather name="image" size={22} color={colors.primary} />}
+                  <Text style={styles.addReferenceText}>上載圖片</Text>
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity onPress={() => onChange({ ...draft, reminder: !draft.reminder })} style={styles.toggleRow}>
                 <Text style={styles.toggleLabel}>提醒</Text>
@@ -559,14 +716,17 @@ export default function ScheduleToolScreen() {
   const { user } = useAuth();
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [schedules, setSchedules] = useState<ScheduleRecord[]>([]);
+  const [docs, setDocs] = useState<CoreDoc[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [activeStatus, setActiveStatus] = useState<typeof TYPE_TABS[number]>('全部');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [visibleMonth, setVisibleMonth] = useState(new Date());
   const [loading, setLoading] = useState(true);
+  const [docsLoading, setDocsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<ScheduleRecord | null>(null);
   const [draft, setDraft] = useState<ScheduleDraft>(newDraft());
@@ -655,20 +815,59 @@ export default function ScheduleToolScreen() {
     }
   }, [user, workspaceId]);
 
+  const loadDocs = useCallback(async () => {
+    if (!user) return;
+    setDocsLoading(true);
+    try {
+      const id = workspaceId ?? await resolveWorkspaceId(user.id, user.email);
+      setWorkspaceId(id);
+
+      const records = new Map<string, CoreDoc>();
+      if (id) {
+        const { data } = await supabase
+          .from('docs')
+          .select('id,title,template_type,created_at')
+          .eq('workspace_id', id)
+          .in('template_type', [...SCRIPT_DOC_TYPES])
+          .order('created_at', { ascending: false })
+          .limit(40);
+        (data as CoreDoc[] | null)?.forEach((doc) => records.set(doc.id, doc));
+      }
+
+      const { data: rundownDocs } = await supabase
+        .from('docs')
+        .select('id,title,template_type,created_at')
+        .is('workspace_id', null)
+        .eq('template_type', 'rundown')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      (rundownDocs as CoreDoc[] | null)?.forEach((doc) => records.set(doc.id, doc));
+
+      setDocs(Array.from(records.values()));
+    } catch {
+      setDocs([]);
+    } finally {
+      setDocsLoading(false);
+    }
+  }, [user, workspaceId]);
+
   useEffect(() => {
     loadSchedules();
-  }, [loadSchedules]);
+    loadDocs();
+  }, [loadDocs, loadSchedules]);
 
   useFocusEffect(
     useCallback(() => {
       loadSchedules(false);
-    }, [loadSchedules])
+      loadDocs();
+    }, [loadDocs, loadSchedules])
   );
 
   async function onRefresh() {
     setRefreshing(true);
     try {
       await loadSchedules(false);
+      await loadDocs();
     } finally {
       setRefreshing(false);
     }
@@ -684,8 +883,8 @@ export default function ScheduleToolScreen() {
     setDraft(draftFromSchedule(item));
   }
 
-  function payloadFromDraft() {
-    return {
+  function payloadFromDraft(includeExtras = true) {
+    const basePayload = {
       title: draft.title.trim(),
       type: draft.type,
       date: dateKey(draft.date),
@@ -696,6 +895,60 @@ export default function ScheduleToolScreen() {
       reminder: draft.reminder,
       status: draft.status
     };
+    if (!includeExtras) return basePayload;
+    return {
+      ...basePayload,
+      script_doc_id: draft.scriptDocId || null,
+      script_doc_title: draft.scriptDocTitle || null,
+      memo: draft.memo.trim() || null,
+      reference_images: draft.referenceImages
+    };
+  }
+
+  async function pickReferenceImage() {
+    if (!user) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('需要相簿權限', '請允許 EGG 存取相簿，先可以上載 reference 圖。');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: false,
+      quality: 0.82,
+      base64: true
+    });
+
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!asset?.base64) return;
+
+    setUploadingImage(true);
+    try {
+      const contentType = asset.mimeType ?? 'image/jpeg';
+      const extension = contentType.includes('png') ? 'png' : 'jpg';
+      const fileName = `schedule-references/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+      const { error } = await supabase.storage
+        .from('log-media')
+        .upload(fileName, base64ToArrayBuffer(asset.base64), { contentType, upsert: false });
+      if (error) throw error;
+      const { data } = supabase.storage.from('log-media').getPublicUrl(fileName);
+      if (!data.publicUrl) throw new Error('未能取得圖片網址');
+      setDraft((current) => ({ ...current, referenceImages: [...current.referenceImages, data.publicUrl] }));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '請稍後再試';
+      Alert.alert('上載失敗', message);
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  function removeReferenceImage(uri: string) {
+    setDraft((current) => ({
+      ...current,
+      referenceImages: current.referenceImages.filter((imageUri) => imageUri !== uri)
+    }));
   }
 
   async function saveNewSchedule() {
@@ -714,13 +967,22 @@ export default function ScheduleToolScreen() {
       };
       let { error } = await supabase.from('schedules').insert(payload);
 
+      if (error && isMissingExtraColumnError(error)) {
+        ({ error } = await supabase.from('schedules').insert({
+          ...payloadFromDraft(false),
+          notes: draft.memo.trim() || draft.notes.trim() || null,
+          workspace_id: workspaceId,
+          user_id: user.id
+        }));
+      }
+
       if (error) {
         const startAt = combineDateAndTime(draft.date, draft.startTime);
         const endAt = draft.endTime ? combineDateAndTime(draft.date, draft.endTime) : null;
         ({ error } = await supabase.from('schedules').insert({
           user_id: user.id,
           title: draft.title.trim(),
-          description: draft.notes.trim() || null,
+          description: draft.memo.trim() || draft.notes.trim() || null,
           location: draft.location.trim() || null,
           start_at: startAt.toISOString(),
           end_at: endAt ? endAt.toISOString() : null,
@@ -749,12 +1011,19 @@ export default function ScheduleToolScreen() {
     setSaving(true);
     try {
       let { error } = await supabase.from('schedules').update(payloadFromDraft()).eq('id', selectedSchedule.id);
+      if (error && isMissingExtraColumnError(error)) {
+        ({ error } = await supabase.from('schedules').update({
+          ...payloadFromDraft(false),
+          notes: draft.memo.trim() || draft.notes.trim() || null
+        }).eq('id', selectedSchedule.id));
+      }
+
       if (error) {
         const startAt = combineDateAndTime(draft.date, draft.startTime);
         const endAt = draft.endTime ? combineDateAndTime(draft.date, draft.endTime) : null;
         ({ error } = await supabase.from('schedules').update({
           title: draft.title.trim(),
-          description: draft.notes.trim() || null,
+          description: draft.memo.trim() || draft.notes.trim() || null,
           location: draft.location.trim() || null,
           start_at: startAt.toISOString(),
           end_at: endAt ? endAt.toISOString() : null,
@@ -890,22 +1159,32 @@ export default function ScheduleToolScreen() {
         visible={showAddModal}
         mode="add"
         draft={draft}
+        docs={docs}
+        docsLoading={docsLoading}
+        uploadingImage={uploadingImage}
         saving={saving}
         onChange={setDraft}
         onClose={() => setShowAddModal(false)}
         onSave={saveNewSchedule}
+        onPickImage={pickReferenceImage}
+        onRemoveImage={removeReferenceImage}
       />
 
       <ScheduleSheet
         visible={!!selectedSchedule}
         mode="detail"
         draft={draft}
+        docs={docs}
+        docsLoading={docsLoading}
+        uploadingImage={uploadingImage}
         saving={saving}
         deleting={deleting}
         onChange={setDraft}
         onClose={() => setSelectedSchedule(null)}
         onSave={updateSchedule}
         onDelete={confirmDeleteSchedule}
+        onPickImage={pickReferenceImage}
+        onRemoveImage={removeReferenceImage}
       />
     </View>
   );
@@ -1104,12 +1383,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textDecorationLine: 'underline'
   },
+  scriptLinkText: {
+    flex: 1,
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    textDecorationLine: 'underline'
+  },
   notesText: {
     marginTop: 8,
     color: colors.textMuted,
     fontFamily: fonts.body,
     fontSize: 13,
     lineHeight: 19
+  },
+  referencePreviewRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  referencePreviewImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: '#f3f4f6'
+  },
+  referenceMoreText: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
   },
   loading: {
     flex: 1,
@@ -1187,6 +1490,88 @@ const styles = StyleSheet.create({
   textarea: {
     minHeight: 110,
     lineHeight: 21
+  },
+  docPickerRow: {
+    gap: 8,
+    paddingRight: 20
+  },
+  docLoadingPill: {
+    minWidth: 64,
+    minHeight: 38,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  docEmptyPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    paddingHorizontal: 13,
+    paddingVertical: 9
+  },
+  docEmptyText: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13
+  },
+  openDocButton: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  openDocText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13
+  },
+  referencePickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10
+  },
+  referenceThumbWrap: {
+    width: 76,
+    height: 76,
+    borderRadius: 14
+  },
+  referenceThumb: {
+    width: 76,
+    height: 76,
+    borderRadius: 14,
+    backgroundColor: '#f3f4f6'
+  },
+  referenceRemoveButton: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary
+  },
+  addReferenceButton: {
+    width: 96,
+    height: 76,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.bodyBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#fafafa'
+  },
+  addReferenceText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 12
   },
   chipWrap: {
     flexDirection: 'row',
