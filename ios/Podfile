@@ -1,6 +1,7 @@
 require File.join(File.dirname(`node --print "require.resolve('expo/package.json')"`), "scripts/autolinking")
 require File.join(File.dirname(`node --print "require.resolve('react-native/package.json')"`), "scripts/react_native_pods")
 
+require 'fileutils'
 require 'json'
 podfile_properties = JSON.parse(File.read(File.join(__dir__, 'Podfile.properties.json'))) rescue {}
 
@@ -62,6 +63,25 @@ target 'SOONLOG' do
       current << value unless current.include?(value)
       settings[key] = current
     end
+
+    ensure_folly_detail_headers = lambda do
+      source_dir = File.join(__dir__, 'Pods/RCT-Folly/folly/memory/detail')
+      public_dir = File.join(__dir__, 'Pods/Headers/Public/RCT-Folly/folly/memory/detail')
+      private_dir = File.join(__dir__, 'Pods/Headers/Private/RCT-Folly/folly/memory/detail')
+
+      if Dir.exist?(source_dir)
+        [public_dir, private_dir].each do |headers_dir|
+          FileUtils.mkdir_p(headers_dir)
+          Dir.glob(File.join(source_dir, '*.h')).each do |source|
+            destination = File.join(headers_dir, File.basename(source))
+            FileUtils.rm_f(destination)
+            FileUtils.ln_s(source, destination)
+          end
+        end
+      end
+    end
+
+    ensure_folly_detail_headers.call
 
     installer.pods_project.targets.each do |target|
       target.shell_script_build_phases.each do |phase|

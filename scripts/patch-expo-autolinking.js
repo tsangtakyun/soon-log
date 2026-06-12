@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { execFileSync } = require('child_process');
 
 const autolinkingTarget = path.join(
   __dirname,
@@ -543,6 +545,61 @@ function patchExpoShareIntentWebUrls() {
   console.log('Patched expo-share-intent iOS weburls batch parsing');
 }
 
+function patchReactNativeScreensMissingIosFiles() {
+  const screensRoot = path.join(
+    __dirname,
+    '..',
+    'node_modules',
+    'react-native-screens'
+  );
+  const screensDir = path.join(screensRoot, 'ios');
+
+  if (!fs.existsSync(screensDir)) {
+    return;
+  }
+
+  const missingFiles = [
+    'ios/RNSScreen.h',
+    'ios/RNSModule.h',
+    'ios/RNSPercentDrivenInteractiveTransition.mm',
+    'ios/RNSScreenStackHeaderSubview.mm',
+  ].filter((relativePath) => !fs.existsSync(path.join(screensRoot, relativePath)));
+
+  if (missingFiles.length === 0) {
+    return;
+  }
+
+  const pkg = require(path.join(screensRoot, 'package.json'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'soon-rnscreens-'));
+
+  try {
+    const packedName = execFileSync(
+      'npm',
+      ['pack', `react-native-screens@${pkg.version}`, '--silent', '--pack-destination', tmpDir],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+    )
+      .trim()
+      .split('\n')
+      .pop();
+    const tarballPath = path.join(tmpDir, packedName);
+
+    for (const relativePath of missingFiles) {
+      const destination = path.join(screensRoot, relativePath);
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      const fileContents = execFileSync('tar', ['-xOf', tarballPath, `package/${relativePath}`]);
+      fs.writeFileSync(destination, fileContents);
+    }
+
+    console.log(`Patched react-native-screens missing iOS files: ${missingFiles.join(', ')}`);
+  } catch (error) {
+    console.warn(
+      `react-native-screens missing iOS files patch skipped: ${error.message || String(error)}`
+    );
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
 removeMacDuplicateFiles();
 patchExpoAutolinking();
 patchExpoDevMenuSwiftImport();
@@ -554,3 +611,4 @@ patchExpoImageLoaderReactImport();
 patchExpoRouterRootUrlScheme();
 patchExpoLinkingManifestFallback();
 patchExpoShareIntentWebUrls();
+patchReactNativeScreensMissingIosFiles();
