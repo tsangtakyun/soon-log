@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -20,7 +21,6 @@ import { BackHeader } from '@/components/BackHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { generateAiText } from '@/lib/aiGenerate';
 import { deductCredits, getCredits } from '@/lib/credits';
-import { resolveScriptOwnerId } from '@/lib/scriptIdentity';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
@@ -37,6 +37,7 @@ type Option<T extends string> = {
 
 type ScriptOption = Option<HookKey> | Option<TransitionKey> | Option<EndingKey>;
 type OptionPickerKind = 'hook' | 'transition' | 'ending';
+type ScriptInsertPayload = Record<string, string | null>;
 
 type Draft = {
   brand: string;
@@ -115,6 +116,17 @@ const emptyDraft: Draft = {
 
 function paramString(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] || '' : value || '';
+}
+
+function formatUnknownError(err: unknown, fallback = '請稍後再試') {
+  if (err instanceof Error && err.message) return err.message;
+  if (err && typeof err === 'object') {
+    const maybeError = err as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown };
+    const parts = [maybeError.message, maybeError.details, maybeError.hint, maybeError.code]
+      .filter((part): part is string => typeof part === 'string' && part.trim().length > 0);
+    if (parts.length > 0) return parts.join('\n');
+  }
+  return fallback;
 }
 
 function selectedOption<T extends string>(options: Option<T>[], key: T) {
@@ -451,10 +463,24 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
       setGeneratedScript(text.trim());
       await refreshCreditBalance();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '請稍後再試';
-      Alert.alert('生成失敗', message);
+      Alert.alert('生成失敗', formatUnknownError(err));
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function copyGeneratedScript() {
+    const script = generatedScript.trim();
+    if (!script) {
+      Alert.alert('未有劇本', '請先生成劇本。');
+      return;
+    }
+
+    try {
+      await Clipboard.setStringAsync(script);
+      Alert.alert('已複製', '劇本已複製到剪貼板。');
+    } catch (err: unknown) {
+      Alert.alert('複製失敗', formatUnknownError(err));
     }
   }
 
@@ -467,10 +493,11 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
 
     setSaving(true);
     try {
-      const scriptOwnerId = await resolveScriptOwnerId(user.id, user.email);
-      const workspaceId = await resolveWorkspaceId(scriptOwnerId, user.email);
-      const payload = {
-        user_id: scriptOwnerId,
+      const workspaceId = await resolveWorkspaceId(user.id, user.email);
+      const scriptText = generatedScript.trim();
+      const now = new Date().toISOString();
+      const basePayload = {
+        user_id: user.id,
         workspace_id: workspaceId,
         title: draft.topic.trim() || draft.brand.trim() || 'IG Reel 劇本',
         brand: draft.brand.trim() || null,
@@ -480,34 +507,65 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
         hook_code: draft.hookStyle,
         trans_code: draft.transitionStyle,
         ending_code: draft.endingStyle,
-        ai_draft: generatedScript.trim(),
-        qc_final: generatedScript.trim(),
+        ai_draft: scriptText,
+        qc_final: scriptText,
+        content: scriptText,
         model: 'claude-sonnet-4-20250514',
-        generated_at: new Date().toISOString()
+        generated_at: now
       };
 
-      let { error } = await supabase.from('scripts').insert(payload);
-      if (error) {
-        ({ error } = await supabase.from('scripts').insert({
-          user_id: scriptOwnerId,
-          workspace_id: workspaceId,
-          title: payload.title,
-          brand: payload.brand,
-          industry: payload.industry,
-          topic: payload.topic,
-          background: payload.background,
-          hook_code: payload.hook_code,
-          trans_code: payload.trans_code,
-          ending_code: payload.ending_code,
-          ai_draft: payload.ai_draft,
-          qc_final: payload.qc_final
-        }));
+      const insertAttempts: ScriptInsertPayload[] = [
+        basePayload,
+        {
+          user_id: basePayload.user_id,
+          workspace_id: basePayload.workspace_id,
+          title: basePayload.title,
+          brand: basePayload.brand,
+          industry: basePayload.industry,
+          topic: basePayload.topic,
+          background: basePayload.background,
+          hook_code: basePayload.hook_code,
+          trans_code: basePayload.trans_code,
+          ending_code: basePayload.ending_code,
+          ai_draft: basePayload.ai_draft,
+          qc_final: basePayload.qc_final
+        },
+        {
+          user_id: basePayload.user_id,
+          title: basePayload.title,
+          brand: basePayload.brand,
+          industry: basePayload.industry,
+          topic: basePayload.topic,
+          background: basePayload.background,
+          hook_code: basePayload.hook_code,
+          trans_code: basePayload.trans_code,
+          ending_code: basePayload.ending_code,
+          ai_draft: basePayload.ai_draft,
+          qc_final: basePayload.qc_final
+        },
+        {
+          user_id: basePayload.user_id,
+          title: basePayload.title,
+          content: basePayload.content,
+          ai_draft: basePayload.ai_draft,
+          qc_final: basePayload.qc_final
+        }
+      ];
+
+      let lastError: unknown = null;
+      let saved = false;
+      for (const attempt of insertAttempts) {
+        const { error } = await supabase.from('scripts').insert(attempt);
+        if (!error) {
+          saved = true;
+          break;
+        }
+        lastError = error;
       }
-      if (error) throw error;
+      if (!saved) throw lastError;
       Alert.alert('已儲存', '劇本已加入歷史記錄。');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '請稍後再試';
-      Alert.alert('儲存失敗', message);
+      Alert.alert('儲存失敗', formatUnknownError(err));
     } finally {
       setSaving(false);
     }
@@ -661,7 +719,15 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
             <View style={styles.resultCard}>
               <View style={styles.resultHeader}>
                 <Text style={styles.resultTitle}>生成結果</Text>
-                <Feather name="file-text" size={18} color={colors.primary} />
+                <TouchableOpacity
+                  onPress={copyGeneratedScript}
+                  accessibilityRole="button"
+                  accessibilityLabel="複製劇本"
+                  hitSlop={10}
+                  style={styles.copyIconButton}
+                >
+                  <Feather name="copy" size={18} color={colors.primary} />
+                </TouchableOpacity>
               </View>
               <Text style={styles.scriptText}>{generatedScript}</Text>
               <View style={styles.actionRow}>
@@ -675,10 +741,10 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
                 <TouchableOpacity onPress={saveScript} disabled={saving} style={styles.secondaryButton}>
                   {saving ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.secondaryButtonText}>儲存</Text>}
                 </TouchableOpacity>
-                <TouchableOpacity onPress={generateScript} disabled={generating} style={styles.regenerateButton}>
-                  <Text style={styles.regenerateButtonText}>重新生成</Text>
-                </TouchableOpacity>
               </View>
+              <TouchableOpacity onPress={generateScript} disabled={generating} style={[styles.regenerateButton, generating && styles.disabledButton]}>
+                <Text style={styles.regenerateButtonText}>重新生成</Text>
+              </TouchableOpacity>
             </View>
           ) : null}
         </ScrollView>
@@ -962,6 +1028,14 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 17
   },
+  copyIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8F4EF',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
   scriptText: {
     color: '#1f2937',
     fontFamily: fonts.body,
@@ -987,11 +1061,11 @@ const styles = StyleSheet.create({
     fontSize: 13
   },
   regenerateButton: {
-    flex: 1.4,
     borderRadius: 12,
     backgroundColor: colors.primary,
     paddingVertical: 11,
-    alignItems: 'center'
+    alignItems: 'center',
+    marginTop: 8
   },
   regenerateButtonText: {
     color: '#ffffff',

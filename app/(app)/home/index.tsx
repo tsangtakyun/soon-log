@@ -35,6 +35,7 @@ type Trend = {
   icon: string | null;
   heat_score: number | null;
   angles: TrendAngle[];
+  deadline_at?: string | null;
 };
 
 function isImageIcon(value: string | null | undefined) {

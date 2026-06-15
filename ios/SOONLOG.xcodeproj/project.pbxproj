@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		13B07FC11A68108700A75B9A /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FC31A68108700A75B9A /* assets */; };
+		13B07FC41A68108700A75B9A /* main.jsbundle in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FC21A68108700A75B9A /* main.jsbundle */; };
 		16E8CDA4E1A14C7FABBDE038 /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = EC55A420234F4D3791336DC1 /* MainInterface.storyboard */; };
 		34B76A09326044BBB7A58CB5 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08EA97E48C5243729DB8EE3B /* ShareViewController.swift */; };
 		3C1C03A00C6946478E12DD89 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4CEB794B2D7A41E9880C7409 /* PrivacyInfo.xcprivacy */; };
@@ -302,6 +303,7 @@
 			files = (
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FC11A68108700A75B9A /* assets in Resources */,
+				13B07FC41A68108700A75B9A /* main.jsbundle in Resources */,
 				7C0F00000000000000000001 /* Feather.ttf in Resources */,
 				7C0F00000000000000000002 /* FontAwesome.ttf in Resources */,
 				7C0F00000000000000000003 /* Ionicons.ttf in Resources */,
@@ -357,7 +359,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nexport PROJECT_ROOT=\"$PROJECT_DIR/..\"\nexport NODE_BINARY=\"${NODE_BINARY:-$(command -v node)}\"\nexport REACT_NATIVE_PATH=\"$PROJECT_ROOT/node_modules/react-native\"\nexport ENTRY_FILE=\"$(\"$NODE_BINARY\" \"$(\"$NODE_BINARY\" --print \"require.resolve('expo/scripts/resolveAppEntry')\" | tail -n 1)\" \"$PROJECT_ROOT\" ios absolute | tail -n 1)\"\nexport BUNDLE_COMMAND=\"export:embed\"\n# Physical-device Debug builds still embed a fallback JS bundle. Keep that bundle production-like so it does not try to open React DevTools websockets in embedded environments.\nexport EXTRA_PACKAGER_ARGS=\"$EXTRA_PACKAGER_ARGS --dev false\"\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
+			shellScript = "set -e\nexport PROJECT_ROOT=\"$PROJECT_DIR/..\"\nexport NODE_BINARY=\"${NODE_BINARY:-$(command -v node)}\"\nexport REACT_NATIVE_PATH=\"$PROJECT_ROOT/node_modules/react-native\"\nexport ENTRY_FILE=\"$PROJECT_ROOT/index.js\"\nexport BUNDLE_COMMAND=\"export:embed\"\nif [ \"$CONFIGURATION\" = \"Debug\" ]; then\n  export SKIP_BUNDLING=1\nfi\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
 		};
 		CF59A2A3D9C6A30DA1CF5DAC /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;

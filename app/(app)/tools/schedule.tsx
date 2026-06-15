@@ -22,6 +22,7 @@
 
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Feather } from '@expo/vector-icons';
+import { decode } from 'base64-arraybuffer';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -60,6 +61,15 @@ type CoreDoc = {
   created_at?: string | null;
 };
 
+type ReferenceImagePayload = {
+  url?: string;
+  uri?: string;
+  publicUrl?: string;
+  public_url?: string;
+  thumb?: string;
+  thumbnail?: string;
+};
+
 type ScheduleRecord = {
   id: string;
   workspace_id?: string | null;
@@ -80,7 +90,7 @@ type ScheduleRecord = {
   script_doc_id?: string | null;
   script_doc_title?: string | null;
   memo?: string | null;
-  reference_images?: string[] | string | null;
+  reference_images?: string[] | ReferenceImagePayload[] | string | null;
 };
 
 type ScheduleDraft = {
@@ -154,19 +164,43 @@ function legacyType(value: ScheduleType) {
   return 'other';
 }
 
+function normalizeStoredStatus(value?: string | null): ScheduleStatus | null {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return null;
+  if (value === '即將到來' || normalized === 'upcoming' || normalized === 'scheduled' || normalized === 'pending') return '即將到來';
+  if (value === '進行中' || normalized === 'in_progress' || normalized === 'in-progress' || normalized === 'ongoing') return '進行中';
+  if (value === '已完成' || normalized === 'completed' || normalized === 'complete' || normalized === 'done' || normalized === 'finished') return '已完成';
+  if (value === '已取消' || normalized === 'cancelled' || normalized === 'canceled' || normalized === 'cancel') return '已取消';
+  return null;
+}
+
 function normalizeStatus(item: ScheduleRecord): ScheduleStatus {
-  const value = item.status;
-  if (value === '即將到來' || value === '進行中' || value === '已完成' || value === '已取消') return value;
+  const stored = normalizeStoredStatus(item.status);
+  if (stored === '已取消' || stored === '已完成') return stored;
+
   const start = getScheduleDate(item);
   const end = getEndDate(item);
   const now = new Date();
   if (end && end < now) return '已完成';
+  if (!end && isBeforeToday(start, now)) return '已完成';
   if (start <= now && (!end || end >= now)) return '進行中';
-  return '即將到來';
+  return stored ?? '即將到來';
 }
 
 function dateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0')
+  ].join('-');
+}
+
+function isBeforeToday(date: Date, now = new Date()) {
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  return target < today;
 }
 
 function timeValue(date: Date | null) {
@@ -235,7 +269,15 @@ function visibleNotes(item: ScheduleRecord) {
   const value = item.notes ?? item.description ?? '';
   return value
     .split('\n')
-    .filter((line) => !line.trim().startsWith('來源：') && !line.trim().startsWith('來源:'))
+    .filter((line) => {
+      const trimmed = line.trim();
+      return !trimmed.startsWith('來源：') &&
+        !trimmed.startsWith('來源:') &&
+        !trimmed.startsWith('行程：') &&
+        !trimmed.startsWith('行程:') &&
+        !trimmed.startsWith('平台：') &&
+        !trimmed.startsWith('平台:');
+    })
     .join('\n')
     .trim();
 }
@@ -252,16 +294,44 @@ function noteValue(item: ScheduleRecord, label: string) {
   return line.replace(prefixA, '').replace(prefixB, '').trim();
 }
 
-function referenceImagesFor(item: ScheduleRecord) {
-  const raw = item.reference_images;
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw.filter(Boolean);
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
-  } catch {
-    return [];
+function normalizeReferenceImageUrl(value: unknown) {
+  if (typeof value === 'string') return value.trim();
+  if (value && typeof value === 'object') {
+    const image = value as ReferenceImagePayload;
+    const candidate = image.url ?? image.uri ?? image.publicUrl ?? image.public_url ?? image.thumb ?? image.thumbnail;
+    return typeof candidate === 'string' ? candidate.trim() : '';
   }
+  return '';
+}
+
+function parseReferenceImageInput(raw: unknown): unknown[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed;
+      if (parsed && typeof parsed === 'object') return [parsed];
+      return [trimmed];
+    } catch {
+      return [trimmed];
+    }
+  }
+  if (typeof raw === 'object') return [raw];
+  return [];
+}
+
+function normalizeReferenceImages(raw: unknown) {
+  const urls = parseReferenceImageInput(raw)
+    .map(normalizeReferenceImageUrl)
+    .filter((url): url is string => Boolean(url));
+  return Array.from(new Set(urls));
+}
+
+function referenceImagesFor(item: ScheduleRecord) {
+  return normalizeReferenceImages(item.reference_images);
 }
 
 function isMissingExtraColumnError(error: unknown) {
@@ -289,12 +359,7 @@ async function openCoreDoc(docId: string) {
 
 function base64ToArrayBuffer(base64: string) {
   const cleanBase64 = base64.replace(/[^A-Za-z0-9+/=]/g, '');
-  const binaryString = globalThis.atob(cleanBase64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let index = 0; index < binaryString.length; index += 1) {
-    bytes[index] = binaryString.charCodeAt(index);
-  }
-  return bytes.buffer;
+  return decode(cleanBase64);
 }
 
 function formatButtonDate(date: Date) {
@@ -442,11 +507,14 @@ function ScheduleCard({ item, onPress }: { item: ScheduleRecord; onPress: () => 
       ) : null}
       {notePreview ? <Text numberOfLines={2} style={styles.notesText}>備忘錄：{notePreview}</Text> : null}
       {referenceImages.length > 0 ? (
-        <View style={styles.referencePreviewRow}>
-          {referenceImages.slice(0, 3).map((uri) => (
-            <Image key={uri} source={{ uri }} style={styles.referencePreviewImage} />
-          ))}
-          {referenceImages.length > 3 ? <Text style={styles.referenceMoreText}>+{referenceImages.length - 3}</Text> : null}
+        <View style={styles.referencePreviewCard}>
+          <Image source={{ uri: referenceImages[0] }} style={styles.referencePreviewHero} resizeMode="cover" />
+          {referenceImages.length > 1 ? (
+            <View style={styles.referencePreviewBadge}>
+              <Feather name="image" size={12} color="#ffffff" />
+              <Text style={styles.referencePreviewBadgeText}>{referenceImages.length}</Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
     </TouchableOpacity>
@@ -556,6 +624,9 @@ function ScheduleSheet({
                   value={pickerValue}
                   mode={picker === 'date' ? 'date' : 'time'}
                   display={Platform.OS === 'ios' ? (picker === 'date' ? 'inline' : 'spinner') : 'default'}
+                  themeVariant="light"
+                  textColor={colors.text}
+                  accentColor={colors.primary}
                   onChange={(_, selected) => {
                     if (Platform.OS !== 'ios') setPicker(null);
                     if (!selected) return;
@@ -735,9 +806,11 @@ export default function ScheduleToolScreen() {
     return [...schedules].sort((a, b) => {
       const statusA = normalizeStatus(a);
       const statusB = normalizeStatus(b);
+      const timeDiff = getScheduleDate(a).getTime() - getScheduleDate(b).getTime();
+      if (timeDiff !== 0) return timeDiff;
       if (statusA === '已完成' && statusB !== '已完成') return 1;
       if (statusB === '已完成' && statusA !== '已完成') return -1;
-      return getScheduleDate(a).getTime() - getScheduleDate(b).getTime();
+      return a.title.localeCompare(b.title);
     });
   }, [schedules]);
 
@@ -753,7 +826,7 @@ export default function ScheduleToolScreen() {
       const date = getScheduleDate(item);
       const key = dateKey(date);
       if (key !== previous) {
-        rows.push({ kind: 'header', key: `header-${key}`, title: formatDateHeader(date) });
+        rows.push({ kind: 'header', key: `header-${key}-${rows.length}`, title: formatDateHeader(date) });
         previous = key;
       }
       rows.push({ kind: 'item', key: item.id, item });
@@ -901,7 +974,7 @@ export default function ScheduleToolScreen() {
       script_doc_id: draft.scriptDocId || null,
       script_doc_title: draft.scriptDocTitle || null,
       memo: draft.memo.trim() || null,
-      reference_images: draft.referenceImages
+      reference_images: normalizeReferenceImages(draft.referenceImages)
     };
   }
 
@@ -928,14 +1001,17 @@ export default function ScheduleToolScreen() {
     try {
       const contentType = asset.mimeType ?? 'image/jpeg';
       const extension = contentType.includes('png') ? 'png' : 'jpg';
-      const fileName = `schedule-references/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+      const fileName = `logs/schedule-references/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
       const { error } = await supabase.storage
         .from('log-media')
         .upload(fileName, base64ToArrayBuffer(asset.base64), { contentType, upsert: false });
       if (error) throw error;
       const { data } = supabase.storage.from('log-media').getPublicUrl(fileName);
       if (!data.publicUrl) throw new Error('未能取得圖片網址');
-      setDraft((current) => ({ ...current, referenceImages: [...current.referenceImages, data.publicUrl] }));
+      setDraft((current) => ({
+        ...current,
+        referenceImages: normalizeReferenceImages([...current.referenceImages, data.publicUrl])
+      }));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '請稍後再試';
       Alert.alert('上載失敗', message);
@@ -947,7 +1023,7 @@ export default function ScheduleToolScreen() {
   function removeReferenceImage(uri: string) {
     setDraft((current) => ({
       ...current,
-      referenceImages: current.referenceImages.filter((imageUri) => imageUri !== uri)
+      referenceImages: normalizeReferenceImages(current.referenceImages).filter((imageUri) => imageUri !== uri)
     }));
   }
 
@@ -982,10 +1058,15 @@ export default function ScheduleToolScreen() {
         ({ error } = await supabase.from('schedules').insert({
           user_id: user.id,
           title: draft.title.trim(),
+          date: dateKey(draft.date),
+          start_time: timeValue(draft.startTime),
+          end_time: timeValue(draft.endTime),
           description: draft.memo.trim() || draft.notes.trim() || null,
           location: draft.location.trim() || null,
           start_at: startAt.toISOString(),
           end_at: endAt ? endAt.toISOString() : null,
+          status: draft.status,
+          reminder: draft.reminder,
           type: legacyType(draft.type)
         }));
       }
@@ -1010,28 +1091,69 @@ export default function ScheduleToolScreen() {
 
     setSaving(true);
     try {
-      let { error } = await supabase.from('schedules').update(payloadFromDraft()).eq('id', selectedSchedule.id);
+      const startAt = combineDateAndTime(draft.date, draft.startTime);
+      const endAt = draft.endTime ? combineDateAndTime(draft.date, draft.endTime) : null;
+      const visibleMemo = draft.memo.trim();
+      const visibleNotesText = draft.notes.trim();
+      const fallbackText = visibleMemo || visibleNotesText || null;
+      const nextDate = dateKey(draft.date);
+      const nextStartTime = timeValue(draft.startTime);
+      const nextEndTime = timeValue(draft.endTime);
+      const nextReferenceImages = normalizeReferenceImages(draft.referenceImages);
+
+      let { error } = await supabase.from('schedules').update({
+        ...payloadFromDraft(),
+        notes: visibleNotesText || null,
+        start_at: startAt.toISOString(),
+        end_at: endAt ? endAt.toISOString() : null
+      }).eq('id', selectedSchedule.id);
+
       if (error && isMissingExtraColumnError(error)) {
         ({ error } = await supabase.from('schedules').update({
           ...payloadFromDraft(false),
-          notes: draft.memo.trim() || draft.notes.trim() || null
+          notes: fallbackText,
+          start_at: startAt.toISOString(),
+          end_at: endAt ? endAt.toISOString() : null
         }).eq('id', selectedSchedule.id));
       }
 
       if (error) {
-        const startAt = combineDateAndTime(draft.date, draft.startTime);
-        const endAt = draft.endTime ? combineDateAndTime(draft.date, draft.endTime) : null;
         ({ error } = await supabase.from('schedules').update({
           title: draft.title.trim(),
-          description: draft.memo.trim() || draft.notes.trim() || null,
+          date: nextDate,
+          start_time: nextStartTime,
+          end_time: nextEndTime,
+          description: fallbackText,
           location: draft.location.trim() || null,
           start_at: startAt.toISOString(),
           end_at: endAt ? endAt.toISOString() : null,
+          status: draft.status,
+          reminder: draft.reminder,
           type: legacyType(draft.type)
         }).eq('id', selectedSchedule.id));
       }
 
       if (error) throw error;
+      const updatedSchedule: ScheduleRecord = {
+        ...selectedSchedule,
+        title: draft.title.trim(),
+        type: draft.type,
+        date: nextDate,
+        start_time: nextStartTime,
+        end_time: nextEndTime,
+        location: draft.location.trim() || null,
+        notes: visibleNotesText || null,
+        description: fallbackText,
+        reminder: draft.reminder,
+        status: draft.status,
+        start_at: startAt.toISOString(),
+        end_at: endAt ? endAt.toISOString() : null,
+        script_doc_id: draft.scriptDocId || null,
+        script_doc_title: draft.scriptDocTitle || null,
+        memo: visibleMemo || null,
+        reference_images: nextReferenceImages
+      };
+      setSchedules((current) => current.map((item) => (item.id === selectedSchedule.id ? updatedSchedule : item)));
       setSelectedSchedule(null);
       await loadSchedules(false);
     } catch (err: unknown) {
@@ -1397,22 +1519,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19
   },
-  referencePreviewRow: {
-    marginTop: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8
-  },
-  referencePreviewImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
+  referencePreviewCard: {
+    marginTop: 12,
+    height: 150,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     backgroundColor: '#f3f4f6'
   },
-  referenceMoreText: {
-    color: colors.textMuted,
+  referencePreviewHero: {
+    width: '100%',
+    height: '100%'
+  },
+  referencePreviewBadge: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)'
+  },
+  referencePreviewBadgeText: {
+    color: '#ffffff',
     fontFamily: fonts.bodyBold,
-    fontSize: 12
+    fontSize: 11
   },
   loading: {
     flex: 1,
