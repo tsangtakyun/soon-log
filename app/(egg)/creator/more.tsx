@@ -130,6 +130,12 @@ export default function EggMoreScreen() {
 
       <MenuSection title="商務工具">
         <MenuItem
+          icon="shopping-bag"
+          title="數位產品"
+          description="管理產品、服務、售價及公開狀態"
+          onPress={() => router.push("/creator/products" as never)}
+        />
+        <MenuItem
           icon="briefcase"
           title="合作機會"
           description="查看品牌邀請、申請及合作紀錄"

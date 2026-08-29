@@ -69,8 +69,9 @@ export async function loadEggBootstrap(
     data: { session },
   } = await supabase.auth.getSession();
   if (!session?.access_token) throw new Error("請先登入");
-  const selectedId =
-    workspaceId ?? (await AsyncStorage.getItem(activeWorkspaceKey));
+  // Only send a workspace ID when the user actively switches. Otherwise the
+  // server preference is canonical, so a choice made on web is reflected here.
+  const selectedId = workspaceId ?? null;
   const response = await fetch(`${apiBase}/api/mobile/bootstrap`, {
     headers: {
       authorization: `Bearer ${session.access_token}`,
@@ -232,6 +233,43 @@ export async function uploadEggAvatar(uri: string, mimeType = "image/jpeg") {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || "頭像上傳失敗");
   return result.avatarUrl as string;
+}
+
+export type EggProduct = {
+  id: string;
+  title: string;
+  description: string | null;
+  price: number | null;
+  currency: string | null;
+  product_type: "physical" | "digital" | "service" | "workshop" | "other";
+  thumbnail_url: string | null;
+  external_url: string | null;
+  stock: number | null;
+  is_unlimited_stock: boolean | null;
+  is_active: boolean | null;
+};
+
+export async function loadEggProducts() {
+  const response = await fetch(`${apiBase}/api/mobile/products`, {
+    headers: await eggAuthHeaders(),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "未能載入產品");
+  return result as { products: EggProduct[]; canEdit: boolean };
+}
+
+export async function saveEggProduct(payload: Record<string, unknown>) {
+  const response = await fetch(`${apiBase}/api/mobile/products`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(await eggAuthHeaders()),
+    },
+    body: JSON.stringify(payload),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "未能更新產品");
+  return result;
 }
 
 export type EggScript = {
