@@ -102,6 +102,14 @@ export type EggTopicIdea = {
   content_format: string;
   saved: boolean;
   want_to_create: boolean;
+  why_now?: string;
+  hook?: string;
+  suggested_angles?: string[];
+  countries?: string[];
+  regions?: string[];
+  localities?: string[];
+  directions?: string[];
+  recommended?: boolean;
 };
 
 export async function loadEggTopics() {
