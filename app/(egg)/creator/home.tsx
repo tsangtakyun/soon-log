@@ -64,13 +64,13 @@ export default function EggHomeScreen() {
           ))}
         </View>
       ) : null}
-      <View style={eggStyles.card}>
+      <Pressable onPress={() => router.push('/creator/topics' as never)} style={eggStyles.card} accessibilityRole="button" accessibilityLabel="查看題材靈感庫">
         <View style={eggStyles.sectionHeader}>
           <Text style={eggStyles.cardTitle}>題材靈感</Text>
-          <View style={styles.comingSoon}><Text style={styles.comingSoonText}>準備中</Text></View>
+          <Text style={eggStyles.link}>換一批靈感 →</Text>
         </View>
-        <Text style={eggStyles.body}>SOON 團隊正建立共用題材庫。之後你可以持續換一批靈感、收藏題材，再直接建立劇本。</Text>
-      </View>
+        <Text style={eggStyles.body}>瀏覽 SOON 整理嘅新題材，收藏、略過，或者直接開始寫劇本。</Text>
+      </Pressable>
       <View style={eggStyles.card}>
         <View style={eggStyles.sectionHeader}><Text style={eggStyles.cardTitle}>待處理合作</Text><Feather name="briefcase" size={19} color={colors.textMuted} /></View>
         <View style={eggStyles.row}><Text style={eggStyles.body}>品牌邀請及申請</Text><Text style={eggStyles.metric}>{data?.metrics?.pendingDeals ?? 0}</Text></View>

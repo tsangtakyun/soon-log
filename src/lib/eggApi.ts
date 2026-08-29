@@ -89,6 +89,38 @@ export async function rememberEggWorkspace(workspaceId: string) {
   await AsyncStorage.setItem(activeWorkspaceKey, workspaceId);
 }
 
+export type EggTopicIdea = {
+  id: string;
+  title: string;
+  summary: string | null;
+  source_name: string | null;
+  source_url: string | null;
+  image_url: string | null;
+  platform: string;
+  category: string;
+  tags: string[];
+  content_format: string;
+  saved: boolean;
+  want_to_create: boolean;
+};
+
+export async function loadEggTopics() {
+  const response = await fetch(`${apiBase}/api/mobile/topics`, { headers: await eggAuthHeaders() });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "未能載入題材靈感");
+  return (result.ideas ?? []) as EggTopicIdea[];
+}
+
+export async function updateEggTopic(ideaId: string, action: "save" | "create" | "dismiss") {
+  const response = await fetch(`${apiBase}/api/mobile/topics`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await eggAuthHeaders()) },
+    body: JSON.stringify({ ideaId, action }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "未能儲存操作");
+}
+
 export type EggTeamMember = {
   user_id: string;
   email: string;

@@ -64,6 +64,7 @@ export default function EggCreatorLayout() {
       <Tabs.Screen name="creator/team" options={{ href: null }} />
       <Tabs.Screen name="creator/settings" options={{ href: null }} />
       <Tabs.Screen name="creator/products" options={{ href: null }} />
+      <Tabs.Screen name="creator/topics" options={{ href: null }} />
     </Tabs>
   );
 }

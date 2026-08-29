@@ -120,6 +120,12 @@ export default function EggMoreScreen() {
 
       <MenuSection title="創作工具">
         <MenuItem
+          icon="zap"
+          title="題材靈感庫"
+          description="收藏新題材，或者直接開始寫劇本"
+          onPress={() => router.push("/creator/topics" as never)}
+        />
+        <MenuItem
           icon="film"
           title="字幕工作台"
           description="影片轉錄、字幕校對及匯出"
