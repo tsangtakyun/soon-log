@@ -168,7 +168,7 @@ target 'SOONLOG' do
         end
 
         target.shell_script_build_phases.each do |phase|
-          next unless ['[Expo] Configure project', 'Bundle React Native code and images'].include?(phase.name)
+          next unless phase.name == '[Expo] Configure project'
 
           phase.remove_from_project
         end
@@ -259,8 +259,7 @@ post_integrate do |installer|
       target.shell_script_build_phases.each do |phase|
         next unless [
           '[CP] Check Pods Manifest.lock',
-          '[Expo] Configure project',
-          'Bundle React Native code and images'
+          '[Expo] Configure project'
         ].include?(phase.name)
 
         phase.remove_from_project

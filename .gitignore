@@ -23,3 +23,5 @@ android/build/
 android/app/build/
 
 .DS_Store
+.codex-npm-cache/
+.codex-tmp/

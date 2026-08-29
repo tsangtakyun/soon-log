@@ -1,1328 +1,754 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { Feather } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Feather } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
+import * as ImagePicker from "expo-image-picker";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BackHeader } from '@/components/BackHeader';
-import { useAuth } from '@/hooks/useAuth';
-import { generateAiText } from '@/lib/aiGenerate';
-import { deductCredits, getCredits } from '@/lib/credits';
-import { supabase } from '@/lib/supabase';
-import { fonts } from '@/lib/theme';
-import { colors } from '@/theme/colors';
+  View,
+} from "react-native";
+import { BackHeader } from "@/components/BackHeader";
+import {
+  createEggReplyProject,
+  generateEggReply,
+  loadEggReplyWorkspace,
+  type EggReplyBrief,
+  type EggReplyMessage,
+  type EggReplyProject,
+} from "@/lib/eggApi";
 
-type InboxFilter = '全部' | '電郵' | '訊息' | '粉絲';
-type StatusFilter = '全部' | '未回覆' | '進行中' | '已解決';
-type InboxType = 'email' | 'message' | 'fan';
-type ReplyStatus = 'pending' | 'in_progress' | 'resolved';
+type Panel = "projects" | "brief" | "chat";
+type Attachment = { data: string; mediaType: string; name: string };
 
-type ReplyThread = {
-  id: string;
-  workspace_id?: string | null;
-  inbox_type?: string | null;
-  sender_name?: string | null;
-  sender_handle?: string | null;
-  original_message: string;
-  ai_reply?: string | null;
-  user_edited_reply?: string | null;
-  status?: string | null;
-  tags?: string[] | null;
-  notes?: string | null;
-  follow_up_date?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  created_by?: string | null;
-};
+export default function ReplyCentreScreen() {
+  const [projects, setProjects] = useState<EggReplyProject[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<EggReplyMessage[]>([]);
+  const [panel, setPanel] = useState<Panel>("chat");
+  const [input, setInput] = useState("");
+  const [image, setImage] = useState<Attachment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const [newProjectVisible, setNewProjectVisible] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const activeProject = useMemo(
+    () =>
+      projects.find((project) => project.id === activeId) ??
+      projects[0] ??
+      null,
+    [activeId, projects],
+  );
 
-type MessageDraft = {
-  inboxType: InboxType;
-  senderName: string;
-  senderHandle: string;
-  originalMessage: string;
-  aiReply: string;
-  userEditedReply: string;
-  status: ReplyStatus;
-  tagsText: string;
-  notes: string;
-  followUpDate: Date | null;
-};
+  const load = useCallback(async (projectId?: string, quiet = false) => {
+    if (!quiet) setLoading(true);
+    setError("");
+    try {
+      const result = await loadEggReplyWorkspace(projectId);
+      setProjects(result.projects);
+      setActiveId(result.activeProjectId);
+      setMessages(result.messages);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "未能載入回覆中心");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
-const INBOX_TABS: InboxFilter[] = ['全部', '電郵', '訊息', '粉絲'];
-const STATUS_FILTERS: StatusFilter[] = ['全部', '未回覆', '進行中', '已解決'];
-const INBOX_OPTIONS: Array<{ label: InboxFilter; value: InboxType }> = [
-  { label: '電郵', value: 'email' },
-  { label: '訊息', value: 'message' },
-  { label: '粉絲', value: 'fan' }
-];
-const STATUS_OPTIONS: Array<{ label: StatusFilter; value: ReplyStatus }> = [
-  { label: '未回覆', value: 'pending' },
-  { label: '進行中', value: 'in_progress' },
-  { label: '已解決', value: 'resolved' }
-];
+  useFocusEffect(
+    useCallback(() => {
+      void load(activeId ?? undefined);
+    }, [activeId, load]),
+  );
 
-const inboxColors: Record<InboxType, { bg: string; text: string }> = {
-  email: { bg: '#eff6ff', text: '#2563eb' },
-  message: { bg: '#f5f3ff', text: '#7c3aed' },
-  fan: { bg: '#fdf2f8', text: '#db2777' }
-};
+  async function createProject() {
+    const name = newProjectName.trim();
+    if (!name) return;
+    try {
+      const project = await createEggReplyProject(name);
+      setProjects((current) => [project, ...current]);
+      setActiveId(project.id);
+      setMessages([]);
+      setNewProjectName("");
+      setNewProjectVisible(false);
+      setPanel("chat");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "建立 Project 失敗");
+    }
+  }
 
-const statusColors: Record<ReplyStatus, { bg: string; text: string }> = {
-  pending: { bg: '#fef2f2', text: '#dc2626' },
-  in_progress: { bg: '#fff7ed', text: '#ea580c' },
-  resolved: { bg: '#ecfdf5', text: '#059669' }
-};
+  async function chooseImage() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted)
+      return Alert.alert("需要相片權限", "請允許 SOON-EGG 選取品牌查詢截圖。");
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.72,
+      base64: true,
+    });
+    const asset = result.canceled ? null : result.assets[0];
+    if (!asset?.base64) return;
+    if (asset.base64.length > 4_000_000)
+      return Alert.alert("圖片太大", "請先裁剪截圖或選擇較細圖片。");
+    setImage({
+      data: asset.base64,
+      mediaType: asset.mimeType || "image/jpeg",
+      name: asset.fileName || "品牌查詢截圖",
+    });
+  }
 
-const emptyDraft: MessageDraft = {
-  inboxType: 'fan',
-  senderName: '',
-  senderHandle: '',
-  originalMessage: '',
-  aiReply: '',
-  userEditedReply: '',
-  status: 'pending',
-  tagsText: '',
-  notes: '',
-  followUpDate: null
-};
+  async function send() {
+    if (!activeProject || sending) return;
+    const clean =
+      input.trim() || (image ? "請閱讀截圖，整理查詢並草擬第一輪回覆。" : "");
+    if (!clean) return;
+    const attachment = image;
+    const optimistic: EggReplyMessage = {
+      role: "user",
+      content: attachment ? `${clean}\n\n[已附上截圖]` : clean,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((current) => [...current, optimistic]);
+    setInput("");
+    setImage(null);
+    setSending(true);
+    setError("");
+    try {
+      const result = await generateEggReply({
+        projectId: activeProject.id,
+        message: clean,
+        history: messages
+          .slice(-6)
+          .map(({ role, content }) => ({ role, content })),
+        image: attachment
+          ? { data: attachment.data, mediaType: attachment.mediaType }
+          : undefined,
+      });
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: result.reply,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+      setProjects((current) =>
+        current.map((project) =>
+          project.id === activeProject.id
+            ? {
+                ...project,
+                brief: result.brief,
+                updated_at: new Date().toISOString(),
+              }
+            : project,
+        ),
+      );
+      if (result.warning) setError(result.warning);
+    } catch (cause) {
+      setMessages((current) =>
+        current.filter((message) => message !== optimistic),
+      );
+      setInput(clean);
+      setImage(attachment);
+      setError(cause instanceof Error ? cause.message : "AI 暫時處理唔到");
+    } finally {
+      setSending(false);
+    }
+  }
 
-function normalizeInboxType(value?: string | null): InboxType {
-  if (value === 'email') return 'email';
-  if (value === 'message') return 'message';
-  return 'fan';
-}
-
-function inboxLabel(value?: string | null) {
-  const normalized = normalizeInboxType(value);
-  if (normalized === 'email') return '電郵';
-  if (normalized === 'message') return '訊息';
-  return '粉絲';
-}
-
-function normalizeStatus(value?: string | null): ReplyStatus {
-  if (value === 'resolved' || value === 'replied' || value === 'done') return 'resolved';
-  if (value === 'in_progress' || value === 'follow_up' || value === 'important') return 'in_progress';
-  return 'pending';
-}
-
-function statusLabel(value?: string | null) {
-  const normalized = normalizeStatus(value);
-  if (normalized === 'resolved') return '已解決';
-  if (normalized === 'in_progress') return '進行中';
-  return '未回覆';
-}
-
-function filterToInbox(value: InboxFilter) {
-  if (value === '電郵') return 'email';
-  if (value === '訊息') return 'message';
-  if (value === '粉絲') return 'fan';
-  return null;
-}
-
-function filterToStatus(value: StatusFilter) {
-  if (value === '未回覆') return 'pending';
-  if (value === '進行中') return 'in_progress';
-  if (value === '已解決') return 'resolved';
-  return null;
-}
-
-function relativeTime(value?: string | null) {
-  if (!value) return '';
-  const diff = Date.now() - new Date(value).getTime();
-  const minutes = Math.max(1, Math.floor(diff / 60000));
-  if (minutes < 60) return `${minutes}分鐘前`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}小時前`;
-  return `${Math.floor(hours / 24)}日前`;
-}
-
-function firstLetter(value?: string | null) {
-  const clean = value?.trim();
-  return clean ? clean.slice(0, 1).toUpperCase() : '?';
-}
-
-function parseDate(value?: string | null) {
-  if (!value) return null;
-  const parsed = new Date(`${value}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function formatDate(value: Date | null) {
-  if (!value) return '選擇日期';
-  return new Intl.DateTimeFormat('zh-HK', { year: 'numeric', month: 'short', day: 'numeric' }).format(value);
-}
-
-function dateKey(value: Date | null) {
-  if (!value) return null;
-  return value.toISOString().slice(0, 10);
-}
-
-function tagsToText(tags?: string[] | null) {
-  return (tags ?? []).join(', ');
-}
-
-function textToTags(value: string) {
-  return value
-    .split(',')
-    .map((tag) => tag.trim())
-    .filter(Boolean);
-}
-
-function draftFromThread(thread: ReplyThread): MessageDraft {
-  const aiReply = thread.ai_reply ?? '';
-  return {
-    inboxType: normalizeInboxType(thread.inbox_type),
-    senderName: thread.sender_name ?? '',
-    senderHandle: thread.sender_handle ?? '',
-    originalMessage: thread.original_message ?? '',
-    aiReply,
-    userEditedReply: thread.user_edited_reply || aiReply,
-    status: normalizeStatus(thread.status),
-    tagsText: tagsToText(thread.tags),
-    notes: thread.notes ?? '',
-    followUpDate: parseDate(thread.follow_up_date)
-  };
-}
-
-async function resolveWorkspaceId(userId: string, email?: string | null) {
-  const { data: membership } = await supabase
-    .from('workspace_members')
-    .select('workspace_id')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .limit(1)
-    .maybeSingle();
-
-  if (membership?.workspace_id) return membership.workspace_id as string;
-
-  const { data: workspace } = await supabase
-    .from('workspaces')
-    .select('id')
-    .eq('owner_id', userId)
-    .limit(1)
-    .maybeSingle();
-
-  if (workspace?.id) return workspace.id as string;
-
-  const { data: created, error } = await supabase
-    .from('workspaces')
-    .insert({
-      name: 'SOON-LOG',
-      type: 'mixed',
-      owner: email ?? null,
-      owner_id: userId
-    })
-    .select('id')
-    .maybeSingle();
-
-  if (error || !created?.id) return null;
-
-  await supabase.from('workspace_members').insert({
-    workspace_id: created.id,
-    user_id: userId,
-    email: email ?? null,
-    role: 'owner',
-    status: 'active',
-    invited_by: userId
-  });
-
-  return created.id as string;
-}
-
-function Badge({ label, color }: { label: string; color: { bg: string; text: string } }) {
   return (
-    <View style={[styles.badge, { backgroundColor: color.bg }]}>
-      <Text style={[styles.badgeText, { color: color.text }]}>{label}</Text>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={8}
+    >
+      <BackHeader title="回覆中心" backTo="/(egg)/creator/home" />
+      <View style={styles.segment}>
+        {(
+          [
+            ["projects", "Projects"],
+            ["brief", "Brief"],
+            ["chat", "AI 回覆"],
+          ] as const
+        ).map(([value, label]) => (
+          <TouchableOpacity
+            key={value}
+            style={[
+              styles.segmentButton,
+              panel === value && styles.segmentActive,
+            ]}
+            onPress={() => setPanel(value)}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                panel === value && styles.segmentTextActive,
+              ]}
+            >
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={() => void load(activeId ?? undefined)}>
+            <Text style={styles.retry}>重試</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color="#6b2218" />
+          <Text style={styles.muted}>正在同步網站資料…</Text>
+        </View>
+      ) : (
+        <>
+          {panel === "projects" ? (
+            <ProjectsPanel
+              projects={projects}
+              activeId={activeProject?.id}
+              onSelect={(id) => {
+                setPanel("chat");
+                void load(id);
+              }}
+              onAdd={() => setNewProjectVisible(true)}
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                void load(activeId ?? undefined, true);
+              }}
+            />
+          ) : null}
+          {panel === "brief" ? <BriefPanel project={activeProject} /> : null}
+          {panel === "chat" ? (
+            <ChatPanel
+              project={activeProject}
+              messages={messages}
+              input={input}
+              image={image}
+              sending={sending}
+              onInput={setInput}
+              onImage={chooseImage}
+              onRemoveImage={() => setImage(null)}
+              onSend={send}
+              onShowProjects={() => setPanel("projects")}
+            />
+          ) : null}
+        </>
+      )}
+      <Modal
+        visible={newProjectVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNewProjectVisible(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setNewProjectVisible(false)}
+        >
+          <Pressable style={styles.modalCard} onPress={() => undefined}>
+            <Text style={styles.modalTitle}>建立 Project</Text>
+            <TextInput
+              autoFocus
+              value={newProjectName}
+              onChangeText={(value) => setNewProjectName(value.slice(0, 80))}
+              placeholder="品牌／聯絡人名稱"
+              style={styles.input}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity onPress={() => setNewProjectVisible(false)}>
+                <Text style={styles.cancel}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => void createProject()}
+              >
+                <Text style={styles.primaryText}>建立</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </KeyboardAvoidingView>
+  );
+}
+
+function ProjectsPanel({
+  projects,
+  activeId,
+  onSelect,
+  onAdd,
+  refreshing,
+  onRefresh,
+}: {
+  projects: EggReplyProject[];
+  activeId?: string;
+  onSelect: (id: string) => void;
+  onAdd: () => void;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <ScrollView
+      style={styles.content}
+      contentContainerStyle={styles.contentPad}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={styles.heading}>Projects</Text>
+          <Text style={styles.muted}>網站與 App 共用同一份資料</Text>
+        </View>
+        <TouchableOpacity style={styles.primaryButton} onPress={onAdd}>
+          <Feather name="plus" size={16} color="white" />
+          <Text style={styles.primaryText}>新增</Text>
+        </TouchableOpacity>
+      </View>
+      {projects.length ? (
+        projects.map((project) => (
+          <TouchableOpacity
+            key={project.id}
+            style={[
+              styles.projectCard,
+              project.id === activeId && styles.projectActive,
+            ]}
+            onPress={() => onSelect(project.id)}
+          >
+            <View style={styles.projectIcon}>
+              <Feather name="folder" size={18} color="#6b2218" />
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.projectName}>{project.name}</Text>
+              <Text style={styles.muted} numberOfLines={1}>
+                {project.brief?.summary || "尚未建立 Brief"}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={20} color="#9ca3af" />
+          </TouchableOpacity>
+        ))
+      ) : (
+        <Empty
+          title="未有 Project"
+          text="新增品牌或聯絡人，然後貼入第一個查詢。"
+        />
+      )}
+    </ScrollView>
+  );
+}
+
+function BriefPanel({ project }: { project: EggReplyProject | null }) {
+  const brief = project?.brief;
+  return (
+    <ScrollView
+      style={styles.content}
+      contentContainerStyle={styles.contentPad}
+    >
+      <Text style={styles.heading}>Enquiry Brief</Text>
+      <Text style={styles.muted}>
+        {project?.name || "未選擇 Project"} · 每次生成後自動更新
+      </Text>
+      {!brief || !Object.keys(brief).length ? (
+        <Empty
+          title="尚未建立 Brief"
+          text="放入品牌查詢截圖或文字後，AI 會自動整理。"
+        />
+      ) : (
+        <View style={styles.briefCard}>
+          <BriefField label="查詢摘要" value={brief.summary} />
+          <BriefField label="品牌／Agency" value={brief.brand} />
+          <BriefField label="聯絡人" value={brief.contact} />
+          <BriefField label="合作類型" value={brief.collaborationType} />
+          <BriefField label="預算" value={brief.budget} />
+          <BriefField label="Timeline" value={brief.timeline} />
+          <BriefField
+            label="Deliverables"
+            value={brief.deliverables?.join("、")}
+          />
+          <BriefField label="廣告授權／使用權" value={brief.usageRights} />
+          <BriefField label="排他條款" value={brief.exclusivity} />
+          <BriefList label="缺失資料" items={brief.missing} />
+          <BriefList label="商業風險" items={brief.risks} warning />
+          <BriefList label="建議下一步" items={brief.nextSteps} />
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+function ChatPanel({
+  project,
+  messages,
+  input,
+  image,
+  sending,
+  onInput,
+  onImage,
+  onRemoveImage,
+  onSend,
+  onShowProjects,
+}: {
+  project: EggReplyProject | null;
+  messages: EggReplyMessage[];
+  input: string;
+  image: Attachment | null;
+  sending: boolean;
+  onInput: (value: string) => void;
+  onImage: () => void;
+  onRemoveImage: () => void;
+  onSend: () => void;
+  onShowProjects: () => void;
+}) {
+  return (
+    <View style={styles.flex}>
+      <View style={styles.chatHeader}>
+        <View style={styles.flex}>
+          <Text style={styles.heading}>{project?.name || "AI 客戶回覆"}</Text>
+          <Text style={styles.muted}>只會草擬回覆，不會自動傳送或接受合作</Text>
+        </View>
+        <TouchableOpacity onPress={onShowProjects}>
+          <Feather name="folder" size={20} color="#6b2218" />
+        </TouchableOpacity>
+      </View>
+      <ScrollView style={styles.flex} contentContainerStyle={styles.messages}>
+        {messages.length ? (
+          messages.map((message, index) => (
+            <MessageBubble
+              key={message.id || `${message.role}-${index}`}
+              message={message}
+            />
+          ))
+        ) : (
+          <Empty
+            title="放入品牌查詢截圖"
+            text="支援 WhatsApp、Instagram DM、Email 截圖或完整文字。"
+          />
+        )}
+        {sending ? (
+          <View style={styles.generating}>
+            <ActivityIndicator size="small" color="#6b2218" />
+            <Text style={styles.muted}>正在建立 Brief 及草擬回覆…</Text>
+          </View>
+        ) : null}
+      </ScrollView>
+      <View style={styles.composer}>
+        {image ? (
+          <View style={styles.attachment}>
+            <Feather name="image" size={18} color="#6b2218" />
+            <Text style={styles.attachmentName} numberOfLines={1}>
+              {image.name}
+            </Text>
+            <TouchableOpacity onPress={onRemoveImage}>
+              <Feather name="x" size={18} color="#6b7280" />
+            </TouchableOpacity>
+          </View>
+        ) : null}
+        <View style={styles.composerRow}>
+          <TouchableOpacity style={styles.iconButton} onPress={onImage}>
+            <Feather name="image" size={20} color="#6b2218" />
+          </TouchableOpacity>
+          <TextInput
+            style={styles.messageInput}
+            multiline
+            value={input}
+            onChangeText={(value) => onInput(value.slice(0, 8000))}
+            placeholder="貼上 Email／DM／WhatsApp…"
+          />
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              ((!input.trim() && !image) || sending || !project) &&
+                styles.disabled,
+            ]}
+            disabled={(!input.trim() && !image) || sending || !project}
+            onPress={onSend}
+          >
+            <Feather name="send" size={19} color="white" />
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 }
 
-function Chip({
-  label,
-  active,
-  onPress
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
+function MessageBubble({ message }: { message: EggReplyMessage }) {
+  const user = message.role === "user";
   return (
-    <TouchableOpacity onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-function FieldLabel({ children }: { children: string }) {
-  return <Text style={styles.fieldLabel}>{children}</Text>;
-}
-
-function MessageCard({ thread, onPress }: { thread: ReplyThread; onPress: () => void }) {
-  const inbox = normalizeInboxType(thread.inbox_type);
-  const status = normalizeStatus(thread.status);
-  const hasAi = Boolean(thread.ai_reply);
-
-  return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.86} style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{firstLetter(thread.sender_name)}</Text>
-        </View>
-        <View style={styles.senderBlock}>
-          <Text numberOfLines={1} style={styles.senderName}>{thread.sender_name || '未命名'}</Text>
-          {thread.sender_handle ? <Text numberOfLines={1} style={styles.senderHandle}>{thread.sender_handle}</Text> : null}
-        </View>
-        <Text style={styles.timeText}>{relativeTime(thread.updated_at || thread.created_at)}</Text>
-      </View>
-
-      <Text numberOfLines={2} style={styles.messagePreview}>{thread.original_message}</Text>
-
-      <View style={styles.cardFooter}>
-        <Badge label={statusLabel(status)} color={statusColors[status]} />
-        <Badge label={inboxLabel(inbox)} color={inboxColors[inbox]} />
-        {hasAi ? (
-          <View style={styles.aiBadge}>
-            <Feather name="zap" size={12} color={colors.primary} />
-            <Text style={styles.aiBadgeText}>AI</Text>
-          </View>
+    <View style={[styles.bubbleRow, user && styles.bubbleRowUser]}>
+      <View style={[styles.bubble, user ? styles.userBubble : styles.aiBubble]}>
+        <Text style={[styles.bubbleText, user && styles.userBubbleText]}>
+          {message.content}
+        </Text>
+        {!user ? (
+          <TouchableOpacity
+            style={styles.copyRow}
+            onPress={async () => {
+              await Clipboard.setStringAsync(message.content);
+              Alert.alert("已複製回覆草稿");
+            }}
+          >
+            <Feather name="copy" size={14} color="#6b7280" />
+            <Text style={styles.copyText}>複製草稿</Text>
+          </TouchableOpacity>
         ) : null}
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
-
-function MessageSheet({
-  visible,
-  mode,
-  draft,
-  saving,
-  deleting,
-  generating,
-  onChange,
-  onClose,
-  onSave,
-  onDelete,
-  onGenerate
+function BriefField({ label, value }: { label: string; value?: string }) {
+  return (
+    <View style={styles.briefField}>
+      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.body}>{value || "未提供"}</Text>
+    </View>
+  );
+}
+function BriefList({
+  label,
+  items,
+  warning,
 }: {
-  visible: boolean;
-  mode: 'add' | 'detail';
-  draft: MessageDraft;
-  saving: boolean;
-  deleting?: boolean;
-  generating?: boolean;
-  onChange: (draft: MessageDraft) => void;
-  onClose: () => void;
-  onSave: () => void;
-  onDelete?: () => void;
-  onGenerate?: () => void;
+  label: string;
+  items?: string[];
+  warning?: boolean;
 }) {
-  const insets = useSafeAreaInsets();
-  const [showDatePicker, setShowDatePicker] = useState(false);
-
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheetKeyboard}>
-          <View style={[styles.sheet, { paddingBottom: insets.bottom + 18 }]}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}>
-              <View>
-                <Text style={styles.sheetTitle}>{mode === 'add' ? '新增訊息' : '訊息詳情'}</Text>
-                <Text style={styles.sheetSubtitle}>{mode === 'add' ? '貼上 fans 或客戶訊息' : '生成、編輯同跟進回覆'}</Text>
-              </View>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <Feather name="x" size={22} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-              <FieldLabel>訊息來源</FieldLabel>
-              <View style={styles.chipWrap}>
-                {INBOX_OPTIONS.map((option) => (
-                  <Chip key={option.value} label={option.label} active={draft.inboxType === option.value} onPress={() => onChange({ ...draft, inboxType: option.value })} />
-                ))}
-              </View>
-
-              <FieldLabel>發送者名稱</FieldLabel>
-              <TextInput
-                value={draft.senderName}
-                onChangeText={(senderName) => onChange({ ...draft, senderName })}
-                placeholder="例如：Tommy / 客戶名稱"
-                placeholderTextColor="#9ca3af"
-                style={styles.input}
-              />
-
-              <FieldLabel>發送者帳號</FieldLabel>
-              <TextInput
-                value={draft.senderHandle}
-                onChangeText={(senderHandle) => onChange({ ...draft, senderHandle })}
-                placeholder="@handle"
-                placeholderTextColor="#9ca3af"
-                autoCapitalize="none"
-                style={styles.input}
-              />
-
-              <FieldLabel>訊息內容</FieldLabel>
-              <TextInput
-                value={draft.originalMessage}
-                onChangeText={(originalMessage) => onChange({ ...draft, originalMessage })}
-                placeholder="貼上原始訊息..."
-                placeholderTextColor="#9ca3af"
-                style={[styles.input, styles.messageInput]}
-                multiline
-                textAlignVertical="top"
-                editable={mode === 'add'}
-              />
-
-              {mode === 'detail' ? (
-                <>
-                  <View style={styles.sectionDivider} />
-                  <Text style={styles.sectionTitle}>AI 回覆</Text>
-                  {draft.aiReply ? <Text style={styles.aiReplyText}>{draft.aiReply}</Text> : <Text style={styles.emptyHint}>未有 AI 回覆</Text>}
-                  <TouchableOpacity onPress={onGenerate} disabled={generating} style={[styles.generateButton, generating && styles.disabledButton]}>
-                    {generating ? <ActivityIndicator color="#ffffff" /> : (
-                      <>
-                        <Feather name="zap" size={15} color="#ffffff" />
-                        <Text style={styles.generateButtonText}>AI 生成回覆</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                  <Text style={styles.creditHint}>每次 AI 生成扣 10 Credits</Text>
-
-                  <FieldLabel>我的回覆</FieldLabel>
-                  <TextInput
-                    value={draft.userEditedReply}
-                    onChangeText={(userEditedReply) => onChange({ ...draft, userEditedReply })}
-                    placeholder="你可以直接編輯 AI 回覆..."
-                    placeholderTextColor="#9ca3af"
-                    style={[styles.input, styles.replyInput]}
-                    multiline
-                    textAlignVertical="top"
-                  />
-                  <TouchableOpacity
-                    onPress={async () => {
-                      await Clipboard.setStringAsync(draft.userEditedReply || draft.aiReply);
-                      Alert.alert('已複製', '回覆已複製到剪貼板');
-                    }}
-                    style={styles.copyButton}
-                  >
-                    <Feather name="copy" size={15} color={colors.primary} />
-                    <Text style={styles.copyButtonText}>複製回覆</Text>
-                  </TouchableOpacity>
-
-                  <FieldLabel>更新狀態</FieldLabel>
-                  <View style={styles.chipWrap}>
-                    {STATUS_OPTIONS.map((option) => (
-                      <Chip key={option.value} label={option.label} active={draft.status === option.value} onPress={() => onChange({ ...draft, status: option.value })} />
-                    ))}
-                  </View>
-                </>
-              ) : null}
-
-              <FieldLabel>標籤</FieldLabel>
-              <TextInput
-                value={draft.tagsText}
-                onChangeText={(tagsText) => onChange({ ...draft, tagsText })}
-                placeholder="合作, 報價, 急件"
-                placeholderTextColor="#9ca3af"
-                style={styles.input}
-              />
-
-              <FieldLabel>備註</FieldLabel>
-              <TextInput
-                value={draft.notes}
-                onChangeText={(notes) => onChange({ ...draft, notes })}
-                placeholder="內部備註、跟進方向..."
-                placeholderTextColor="#9ca3af"
-                style={[styles.input, styles.notesInput]}
-                multiline
-                textAlignVertical="top"
-              />
-
-              <FieldLabel>跟進日期</FieldLabel>
-              <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateButton}>
-                <Text style={styles.dateButtonText}>{formatDate(draft.followUpDate)}</Text>
-                {draft.followUpDate ? (
-                  <TouchableOpacity onPress={() => onChange({ ...draft, followUpDate: null })} hitSlop={8}>
-                    <Text style={styles.clearDate}>清除</Text>
-                  </TouchableOpacity>
-                ) : <Feather name="calendar" size={16} color={colors.textMuted} />}
-              </TouchableOpacity>
-
-              {showDatePicker ? (
-                <DateTimePicker
-                  value={draft.followUpDate ?? new Date()}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                  onChange={(_, selected) => {
-                    if (Platform.OS !== 'ios') setShowDatePicker(false);
-                    if (selected) onChange({ ...draft, followUpDate: selected });
-                  }}
-                />
-              ) : null}
-
-              <TouchableOpacity onPress={onSave} disabled={saving} style={[styles.saveButton, saving && styles.disabledButton]}>
-                {saving ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.saveButtonText}>{mode === 'add' ? '新增訊息' : '儲存'}</Text>}
-              </TouchableOpacity>
-
-              {mode === 'detail' && onDelete ? (
-                <TouchableOpacity onPress={onDelete} disabled={deleting} style={styles.deleteButton}>
-                  {deleting ? <ActivityIndicator color={colors.error} /> : <Text style={styles.deleteText}>刪除</Text>}
-                </TouchableOpacity>
-              ) : null}
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
+    <View style={[styles.listBox, warning && styles.warningBox]}>
+      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.body}>
+        {items?.length
+          ? items.map((item) => `• ${item}`).join("\n")
+          : "暫未發現"}
+      </Text>
+    </View>
   );
 }
-
-export default function ReplyCentreToolScreen() {
-  const { user } = useAuth();
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
-  const [threads, setThreads] = useState<ReplyThread[]>([]);
-  const [activeInbox, setActiveInbox] = useState<InboxFilter>('全部');
-  const [activeStatus, setActiveStatus] = useState<StatusFilter>('全部');
-  const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [creditBalance, setCreditBalance] = useState<number | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedThread, setSelectedThread] = useState<ReplyThread | null>(null);
-  const [draft, setDraft] = useState<MessageDraft>(emptyDraft);
-
-  const counts = useMemo(() => {
-    return INBOX_TABS.reduce<Record<InboxFilter, number>>((acc, tab) => {
-      const inbox = filterToInbox(tab);
-      acc[tab] = inbox ? threads.filter((thread) => normalizeInboxType(thread.inbox_type) === inbox).length : threads.length;
-      return acc;
-    }, { 全部: 0, 電郵: 0, 訊息: 0, 粉絲: 0 });
-  }, [threads]);
-
-  const filteredThreads = useMemo(() => {
-    const inbox = filterToInbox(activeInbox);
-    const status = filterToStatus(activeStatus);
-    const needle = query.trim().toLowerCase();
-
-    return threads.filter((thread) => {
-      if (inbox && normalizeInboxType(thread.inbox_type) !== inbox) return false;
-      if (status && normalizeStatus(thread.status) !== status) return false;
-      if (!needle) return true;
-      return [
-        thread.sender_name,
-        thread.sender_handle,
-        thread.original_message
-      ].some((value) => (value ?? '').toLowerCase().includes(needle));
-    });
-  }, [activeInbox, activeStatus, query, threads]);
-
-  const loadThreads = useCallback(async (showLoader = true) => {
-    if (!user) return;
-    if (showLoader) setLoading(true);
-
-    try {
-      const id = workspaceId ?? await resolveWorkspaceId(user.id, user.email);
-      setWorkspaceId(id);
-
-      const queryBuilder = supabase
-        .from('reply_threads')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      const { data, error } = id
-        ? await queryBuilder.eq('workspace_id', id)
-        : await queryBuilder.eq('created_by', user.id);
-
-      if (error) throw error;
-      setThreads((data ?? []) as ReplyThread[]);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '載入失敗';
-      Alert.alert('回覆中心載入失敗', message);
-      setThreads([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, workspaceId]);
-
-  useEffect(() => {
-    loadThreads();
-  }, [loadThreads]);
-
-  useEffect(() => {
-    const email = user?.email?.trim().toLowerCase();
-    if (!email) {
-      setCreditBalance(null);
-      return;
-    }
-
-    getCredits(email)
-      .then(setCreditBalance)
-      .catch(() => setCreditBalance(null));
-  }, [user?.email]);
-
-  const refreshCreditBalance = useCallback(async () => {
-    const email = user?.email?.trim().toLowerCase();
-    if (!email) return;
-    try {
-      setCreditBalance(await getCredits(email));
-    } catch {
-      // Credit display should not block reply generation.
-    }
-  }, [user?.email]);
-
-  async function onRefresh() {
-    setRefreshing(true);
-    try {
-      await loadThreads(false);
-    } finally {
-      setRefreshing(false);
-    }
-  }
-
-  function openAddModal() {
-    setDraft(emptyDraft);
-    setShowAddModal(true);
-  }
-
-  function openDetail(thread: ReplyThread) {
-    setSelectedThread(thread);
-    setDraft(draftFromThread(thread));
-  }
-
-  function payloadFromDraft() {
-    return {
-      inbox_type: draft.inboxType,
-      sender_name: draft.senderName.trim() || '未命名',
-      sender_handle: draft.senderHandle.trim() || null,
-      original_message: draft.originalMessage.trim(),
-      ai_reply: draft.aiReply.trim() || null,
-      user_edited_reply: draft.userEditedReply.trim() || null,
-      status: draft.status,
-      tags: textToTags(draft.tagsText),
-      notes: draft.notes.trim() || null,
-      follow_up_date: dateKey(draft.followUpDate)
-    };
-  }
-
-  async function saveNewMessage() {
-    if (!user) return;
-    if (!draft.originalMessage.trim()) {
-      Alert.alert('請輸入訊息內容');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const { error } = await supabase.from('reply_threads').insert({
-        ...payloadFromDraft(),
-        workspace_id: workspaceId,
-        created_by: user.id
-      });
-      if (error) throw error;
-      setShowAddModal(false);
-      await loadThreads(false);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '請稍後再試';
-      Alert.alert('新增失敗', message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function updateMessage() {
-    if (!selectedThread) return;
-    if (!draft.originalMessage.trim()) {
-      Alert.alert('訊息內容不能留空');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('reply_threads')
-        .update({
-          ...payloadFromDraft(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', selectedThread.id);
-      if (error) throw error;
-      setSelectedThread(null);
-      await loadThreads(false);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '請稍後再試';
-      Alert.alert('儲存失敗', message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function generateReply() {
-    if (!selectedThread) return;
-
-    setGenerating(true);
-    try {
-      const email = user?.email?.trim().toLowerCase();
-      if (email) {
-        const creditResult = await deductCredits(email, 'ai_generate');
-        setCreditBalance(creditResult.balance);
-
-        if (!creditResult.success && creditResult.error === 'insufficient_credits') {
-          Alert.alert('Credits 不足', `需要 10 Credits 生成回覆\n現有：${creditResult.balance} Credits`, [{ text: '了解' }]);
-          return;
-        }
-      }
-
-      const prompt = `你係一個專業香港創作者助手。以下係一條來自${inboxLabel(draft.inboxType)}嘅訊息，請用廣東話口語幫我生成一個友善、專業嘅回覆。訊息：${draft.originalMessage}`;
-      const reply = await generateAiText({
-        prompt,
-        model: 'claude-haiku-4-5-20251001',
-        maxTokens: 1024
-      });
-
-      setDraft((current) => ({
-        ...current,
-        aiReply: reply,
-        userEditedReply: current.userEditedReply || reply,
-        status: current.status === 'pending' ? 'in_progress' : current.status
-      }));
-      await refreshCreditBalance();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '請稍後再試';
-      Alert.alert('AI 生成失敗', message);
-    } finally {
-      setGenerating(false);
-    }
-  }
-
-  function confirmDeleteMessage() {
-    if (!selectedThread) return;
-    Alert.alert('刪除訊息', '確定要刪除這條訊息？', [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '刪除',
-        style: 'destructive',
-        onPress: async () => {
-          setDeleting(true);
-          try {
-            const { error } = await supabase.from('reply_threads').delete().eq('id', selectedThread.id);
-            if (error) throw error;
-            setSelectedThread(null);
-            await loadThreads(false);
-          } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : '請稍後再試';
-            Alert.alert('刪除失敗', message);
-          } finally {
-            setDeleting(false);
-          }
-        }
-      }
-    ]);
-  }
-
+function Empty({ title, text }: { title: string; text: string }) {
   return (
-    <View style={styles.screen}>
-      <BackHeader
-        title="回覆中心"
-        backTo="/(app)/tools"
-        rightElement={
-          <TouchableOpacity onPress={openAddModal} style={styles.addButton}>
-            <Text style={styles.addButtonText}>+ 新增訊息</Text>
-          </TouchableOpacity>
-        }
-      />
-
-      <View style={styles.headerText}>
-        <View>
-          <Text style={styles.title}>回覆中心</Text>
-          <Text style={styles.subtitle}>AI 幫你覆 fans 同客</Text>
-        </View>
-        <Text style={[styles.creditText, (creditBalance ?? 10) < 10 && styles.creditWarning]}>
-          🪙 {creditBalance ?? '...'} Credits
-        </Text>
-      </View>
-
-      <View style={styles.inboxTabs}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.inboxTabsContent}>
-          {INBOX_TABS.map((tab) => (
-            <TouchableOpacity key={tab} onPress={() => setActiveInbox(tab)} style={styles.inboxTabButton}>
-              <View style={styles.tabLabelRow}>
-                <Text style={[styles.inboxTabText, activeInbox === tab && styles.inboxTabTextActive]}>{tab}</Text>
-                <View style={[styles.countBadge, activeInbox === tab && styles.countBadgeActive]}>
-                  <Text style={[styles.countBadgeText, activeInbox === tab && styles.countBadgeTextActive]}>{counts[tab]}</Text>
-                </View>
-              </View>
-              {activeInbox === tab ? <View style={styles.tabUnderline} /> : null}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statusChips}>
-        {STATUS_FILTERS.map((status) => (
-          <TouchableOpacity key={status} onPress={() => setActiveStatus(status)} style={[styles.statusFilterChip, activeStatus === status && styles.statusFilterChipActive]}>
-            <Text style={[styles.statusFilterText, activeStatus === status && styles.statusFilterTextActive]}>{status}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      <View style={styles.searchBox}>
-        <Feather name="search" size={16} color={colors.textMuted} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="搜尋發送者、帳號或訊息內容"
-          placeholderTextColor="#9ca3af"
-          style={styles.searchInput}
-        />
-      </View>
-
-      {loading ? (
-        <View style={styles.loading}><ActivityIndicator color={colors.primary} /></View>
-      ) : (
-        <FlatList
-          data={filteredThreads}
-          keyExtractor={(item) => item.id}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-          contentContainerStyle={filteredThreads.length === 0 ? styles.emptyList : styles.list}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Feather name="message-circle" size={40} color="#d1d5db" />
-              <Text style={styles.emptyTitle}>未有訊息</Text>
-              <Text style={styles.emptyBody}>點擊 + 新增訊息</Text>
-            </View>
-          }
-          renderItem={({ item }) => <MessageCard thread={item} onPress={() => openDetail(item)} />}
-        />
-      )}
-
-      <MessageSheet
-        visible={showAddModal}
-        mode="add"
-        draft={draft}
-        saving={saving}
-        onChange={setDraft}
-        onClose={() => setShowAddModal(false)}
-        onSave={saveNewMessage}
-      />
-
-      <MessageSheet
-        visible={!!selectedThread}
-        mode="detail"
-        draft={draft}
-        saving={saving}
-        deleting={deleting}
-        generating={generating}
-        onChange={setDraft}
-        onClose={() => setSelectedThread(null)}
-        onSave={updateMessage}
-        onDelete={confirmDeleteMessage}
-        onGenerate={generateReply}
-      />
+    <View style={styles.empty}>
+      <Feather name="message-circle" size={32} color="#c7b6ae" />
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.muted}>{text}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  screen: { flex: 1, backgroundColor: "#f8f5f1" },
+  flex: { flex: 1 },
+  content: { flex: 1 },
+  contentPad: { padding: 20, gap: 12 },
+  segment: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginVertical: 10,
+    padding: 4,
+    borderRadius: 14,
+    backgroundColor: "#eee8e3",
+  },
+  segmentButton: {
     flex: 1,
-    backgroundColor: '#F8F3EA'
+    paddingVertical: 9,
+    alignItems: "center",
+    borderRadius: 11,
   },
-  headerText: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12
-  },
-  title: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 28,
-    fontWeight: '800'
-  },
-  subtitle: {
-    marginTop: 4,
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 13
-  },
-  creditText: {
-    color: colors.primary,
-    fontFamily: fonts.bodyBold,
-    fontSize: 13,
-    paddingBottom: 1
-  },
-  creditWarning: {
-    color: '#b45309'
-  },
-  addButton: {
-    borderRadius: 999,
-    backgroundColor: colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 7
-  },
-  addButtonText: {
-    color: '#ffffff',
-    fontFamily: fonts.bodyBold,
-    fontSize: 12
-  },
-  inboxTabs: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#eadfd4'
-  },
-  inboxTabsContent: {
-    paddingHorizontal: 16,
-    gap: 20
-  },
-  inboxTabButton: {
-    paddingTop: 8,
-    paddingBottom: 10,
-    alignItems: 'center'
-  },
-  tabLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6
-  },
-  inboxTabText: {
-    color: colors.textMuted,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 15
-  },
-  inboxTabTextActive: {
-    color: colors.primary,
-    fontFamily: fonts.bodyBold
-  },
-  countBadge: {
-    minWidth: 18,
-    height: 18,
-    borderRadius: 999,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: colors.bodyBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4
-  },
-  countBadgeActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary
-  },
-  countBadgeText: {
-    color: colors.textMuted,
-    fontFamily: fonts.bodyBold,
-    fontSize: 10
-  },
-  countBadgeTextActive: {
-    color: '#ffffff'
-  },
-  tabUnderline: {
-    position: 'absolute',
-    bottom: 0,
-    height: 2,
-    width: '100%',
-    borderRadius: 999,
-    backgroundColor: colors.primary
-  },
-  statusChips: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8
-  },
-  statusFilterChip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.bodyBorder,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 13,
-    paddingVertical: 7
-  },
-  statusFilterChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary
-  },
-  statusFilterText: {
-    color: colors.textMuted,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 13
-  },
-  statusFilterTextActive: {
-    color: '#ffffff',
-    fontFamily: fonts.bodyBold
-  },
-  searchBox: {
+  segmentActive: { backgroundColor: "#181311" },
+  segmentText: { color: "#6b7280", fontWeight: "600" },
+  segmentTextActive: { color: "white" },
+  errorBox: {
     marginHorizontal: 16,
     marginBottom: 8,
-    minHeight: 44,
+    padding: 12,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.bodyBorder,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8
+    backgroundColor: "#fff0ef",
+    flexDirection: "row",
+    gap: 10,
   },
-  searchInput: {
-    flex: 1,
-    color: colors.text,
-    fontFamily: fonts.body,
-    fontSize: 14
+  errorText: { flex: 1, color: "#a51d16" },
+  retry: { color: "#8b1e14", fontWeight: "700" },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
+  muted: { color: "#7b7f88", fontSize: 13, lineHeight: 19 },
+  heading: { color: "#181311", fontSize: 20, fontWeight: "800" },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 5,
   },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  list: {
-    padding: 16,
-    paddingBottom: 110
-  },
-  emptyList: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 24,
-    paddingBottom: 120
-  },
-  emptyState: {
-    alignItems: 'center'
-  },
-  emptyTitle: {
-    marginTop: 12,
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 17
-  },
-  emptyBody: {
-    marginTop: 4,
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 14
-  },
-  card: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.bodyBorder,
-    backgroundColor: '#ffffff',
-    padding: 14,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 999,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  avatarText: {
-    color: '#ffffff',
-    fontFamily: fonts.bodyBold,
-    fontSize: 16
-  },
-  senderBlock: {
-    flex: 1
-  },
-  senderName: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 15
-  },
-  senderHandle: {
-    marginTop: 2,
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 12
-  },
-  timeText: {
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 12
-  },
-  messagePreview: {
-    marginTop: 12,
-    color: '#3A3A3A',
-    fontFamily: fonts.body,
-    fontSize: 14,
-    lineHeight: 20
-  },
-  cardFooter: {
-    marginTop: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8
-  },
-  badge: {
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 4
-  },
-  badgeText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 11
-  },
-  aiBadge: {
-    borderRadius: 999,
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3
-  },
-  aiBadgeText: {
-    color: colors.primary,
-    fontFamily: fonts.bodyBold,
-    fontSize: 11
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end'
-  },
-  sheetKeyboard: {
-    flex: 1,
-    justifyContent: 'flex-end'
-  },
-  sheet: {
-    maxHeight: '94%',
-    minHeight: '88%',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingTop: 10
-  },
-  sheetHandle: {
-    alignSelf: 'center',
-    width: 48,
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: '#d1d5db',
-    marginBottom: 12
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12
-  },
-  sheetTitle: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 22,
-    fontWeight: '800'
-  },
-  sheetSubtitle: {
-    marginTop: 4,
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 13
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  fieldLabel: {
-    marginTop: 14,
-    marginBottom: 7,
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 14
-  },
-  input: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.bodyBorder,
-    backgroundColor: '#f9fafb',
+  primaryButton: {
+    backgroundColor: "#6b2218",
+    borderRadius: 11,
     paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  primaryText: { color: "white", fontWeight: "700" },
+  projectCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "#e8e0da",
+    borderRadius: 16,
+    padding: 14,
+  },
+  projectActive: { borderColor: "#8b3b2f", backgroundColor: "#fff9f5" },
+  projectIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f5e9e2",
+  },
+  projectName: { fontWeight: "700", color: "#181311", marginBottom: 3 },
+  briefCard: {
+    marginTop: 16,
+    borderRadius: 18,
+    padding: 18,
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "#e8e0da",
+  },
+  briefField: { marginBottom: 16 },
+  label: { color: "#6b7280", fontSize: 12, fontWeight: "700", marginBottom: 5 },
+  body: { color: "#24201e", lineHeight: 21 },
+  listBox: {
+    padding: 13,
+    borderRadius: 12,
+    backgroundColor: "#f7f5f3",
+    marginBottom: 12,
+  },
+  warningBox: { backgroundColor: "#fff6df" },
+  chatHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 18,
     paddingVertical: 12,
-    color: colors.text,
-    fontFamily: fonts.body,
-    fontSize: 15
+    backgroundColor: "white",
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#e8e0da",
+  },
+  messages: { flexGrow: 1, padding: 16, gap: 12 },
+  bubbleRow: { flexDirection: "row", justifyContent: "flex-start" },
+  bubbleRowUser: { justifyContent: "flex-end" },
+  bubble: { maxWidth: "88%", borderRadius: 18, padding: 13 },
+  userBubble: { backgroundColor: "#181311", borderBottomRightRadius: 5 },
+  aiBubble: {
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "#e8e0da",
+    borderBottomLeftRadius: 5,
+  },
+  bubbleText: { color: "#24201e", lineHeight: 21 },
+  userBubbleText: { color: "white" },
+  copyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 10,
+  },
+  copyText: { color: "#6b7280", fontSize: 12 },
+  generating: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    padding: 10,
+  },
+  composer: {
+    padding: 12,
+    backgroundColor: "white",
+    borderTopWidth: 1,
+    borderColor: "#e8e0da",
+  },
+  composerRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f3ece7",
   },
   messageInput: {
-    minHeight: 118,
-    lineHeight: 21
-  },
-  replyInput: {
-    minHeight: 140,
-    lineHeight: 21
-  },
-  notesInput: {
-    minHeight: 90,
-    lineHeight: 21
-  },
-  chipWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8
-  },
-  chip: {
-    borderRadius: 999,
+    flex: 1,
+    minHeight: 44,
+    maxHeight: 110,
     borderWidth: 1,
-    borderColor: colors.bodyBorder,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 13,
-    paddingVertical: 8
-  },
-  chipActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary
-  },
-  chipText: {
-    color: colors.textMuted,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 13
-  },
-  chipTextActive: {
-    color: '#ffffff',
-    fontFamily: fonts.bodyBold
-  },
-  sectionDivider: {
-    height: 1,
-    backgroundColor: colors.bodyBorder,
-    marginTop: 18,
-    marginBottom: 14
-  },
-  sectionTitle: {
-    color: colors.text,
-    fontFamily: fonts.bodyBold,
-    fontSize: 17,
-    marginBottom: 10
-  },
-  aiReplyText: {
-    borderRadius: 12,
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: colors.bodyBorder,
-    padding: 12,
-    color: '#3A3A3A',
-    fontFamily: fonts.body,
-    fontSize: 14,
-    lineHeight: 21
-  },
-  emptyHint: {
-    color: colors.textMuted,
-    fontFamily: fonts.body,
-    fontSize: 14
-  },
-  generateButton: {
-    marginTop: 10,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 7
-  },
-  generateButtonText: {
-    color: '#ffffff',
-    fontFamily: fonts.bodyBold,
-    fontSize: 14
-  },
-  creditHint: {
-    color: '#888888',
-    fontFamily: fonts.body,
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 6
-  },
-  copyButton: {
-    marginTop: 10,
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    backgroundColor: colors.primaryLight,
+    borderColor: "#ddd4ce",
+    borderRadius: 13,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6
+    paddingVertical: 11,
+    color: "#181311",
   },
-  copyButtonText: {
-    color: colors.primary,
-    fontFamily: fonts.bodyBold,
-    fontSize: 13
-  },
-  dateButton: {
-    minHeight: 46,
+  sendButton: {
+    width: 44,
+    height: 44,
     borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#6b2218",
+  },
+  disabled: { opacity: 0.35 },
+  attachment: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 9,
+    backgroundColor: "#f8f5f1",
+    borderRadius: 10,
+    padding: 9,
+  },
+  attachmentName: { flex: 1, color: "#403a37", fontSize: 13 },
+  empty: {
+    minHeight: 260,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: 25,
+  },
+  emptyTitle: { fontWeight: "700", color: "#302a27", marginTop: 4 },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 24,
+    backgroundColor: "rgba(0,0,0,0.42)",
+  },
+  modalCard: { borderRadius: 20, padding: 20, backgroundColor: "white" },
+  modalTitle: { fontSize: 20, fontWeight: "800", marginBottom: 14 },
+  input: {
     borderWidth: 1,
-    borderColor: colors.bodyBorder,
-    backgroundColor: '#f9fafb',
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between'
+    borderColor: "#ddd4ce",
+    borderRadius: 12,
+    padding: 13,
+    fontSize: 16,
   },
-  dateButtonText: {
-    color: colors.text,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 15
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 18,
+    marginTop: 16,
   },
-  clearDate: {
-    color: colors.primary,
-    fontFamily: fonts.bodyBold,
-    fontSize: 13
-  },
-  saveButton: {
-    marginTop: 22,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
-    paddingVertical: 15,
-    alignItems: 'center'
-  },
-  disabledButton: {
-    opacity: 0.65
-  },
-  saveButtonText: {
-    color: '#ffffff',
-    fontFamily: fonts.bodyBold,
-    fontSize: 16
-  },
-  deleteButton: {
-    marginTop: 12,
-    alignItems: 'center',
-    paddingVertical: 13
-  },
-  deleteText: {
-    color: colors.error,
-    fontFamily: fonts.bodyBold,
-    fontSize: 15
-  }
+  cancel: { color: "#6b7280", fontWeight: "600" },
 });

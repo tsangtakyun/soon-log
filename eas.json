@@ -10,7 +10,57 @@
         "simulator": false
       }
     },
+    "egg-preview": {
+      "distribution": "internal",
+      "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_APP_NAME": "SOON-EGG",
+        "EXPO_PUBLIC_APP_SCHEME": "soonegg",
+        "EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.egg",
+        "EXPO_PUBLIC_IOS_SHARE_EXTENSION_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.egg.share",
+        "EXPO_PUBLIC_IOS_BUILD_NUMBER": "7",
+        "EXPO_PUBLIC_EGG_CREATOR_BUILD": "true",
+        "EXPO_PUBLIC_EGG_API_URL": "https://egg.sooncreator.network",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ycqribpphvywibamtjew.supabase.co"
+      },
+      "ios": {
+        "simulator": false
+      }
+    },
+    "egg-simulator": {
+      "distribution": "internal",
+      "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_APP_NAME": "SOON-EGG",
+        "EXPO_PUBLIC_APP_SCHEME": "soonegg",
+        "EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.egg",
+        "EXPO_PUBLIC_IOS_SHARE_EXTENSION_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.egg.share",
+        "EXPO_PUBLIC_IOS_BUILD_NUMBER": "7",
+        "EXPO_PUBLIC_EGG_CREATOR_BUILD": "true",
+        "EXPO_PUBLIC_EGG_API_URL": "https://egg.sooncreator.network",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ycqribpphvywibamtjew.supabase.co"
+      },
+      "ios": {
+        "simulator": true
+      }
+    },
     "production": {
+      "ios": {
+        "simulator": false
+      }
+    },
+    "egg-production": {
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_APP_NAME": "SOON-EGG",
+        "EXPO_PUBLIC_APP_SCHEME": "soonegg",
+        "EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.egg",
+        "EXPO_PUBLIC_IOS_SHARE_EXTENSION_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.egg.share",
+        "EXPO_PUBLIC_IOS_BUILD_NUMBER": "7",
+        "EXPO_PUBLIC_EGG_CREATOR_BUILD": "true",
+        "EXPO_PUBLIC_EGG_API_URL": "https://egg.sooncreator.network",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ycqribpphvywibamtjew.supabase.co"
+      },
       "ios": {
         "simulator": false
       }

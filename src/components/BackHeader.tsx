@@ -18,7 +18,9 @@ export function BackHeader({ title, rightElement, backTo }: BackHeaderProps) {
       <TouchableOpacity onPress={() => backTo ? router.replace(backTo as never) : router.back()} style={styles.back}>
         <Text style={styles.backText}>← 返回</Text>
       </TouchableOpacity>
-      <Text style={styles.title} numberOfLines={1}>{title}</Text>
+      <View pointerEvents="none" style={[styles.titleWrap, { top: insets.top + 8 }]}>
+        <Text style={styles.title} numberOfLines={1}>{title}</Text>
+      </View>
       <View style={styles.right}>
         {rightElement || null}
       </View>
@@ -35,6 +37,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
     backgroundColor: '#ffffff',
+    justifyContent: 'space-between',
+    position: 'relative',
   },
   back: {
     minWidth: 80,
@@ -43,15 +47,22 @@ const styles = StyleSheet.create({
     color: '#5C2A22',
     fontSize: 15,
   },
+  titleWrap: {
+    position: 'absolute',
+    left: 96,
+    right: 96,
+    bottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
-    flex: 1,
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '600',
     color: '#0a0a0a',
   },
   right: {
-    minWidth: 80,
+    minWidth: 148,
     alignItems: 'flex-end',
   },
 });

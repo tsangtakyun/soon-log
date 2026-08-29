@@ -24,6 +24,8 @@ import { deductCredits, getCredits } from '@/lib/credits';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
+import { isEggCreatorBuild } from '@/lib/appMode';
+import { generateEggScript } from '@/lib/eggApi';
 
 type HookKey = 'H1' | 'H2' | 'H3' | 'H4' | 'H5' | 'H6' | 'H7' | 'H8';
 type TransitionKey = 'T1' | 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'T8';
@@ -342,6 +344,10 @@ export default function ScriptGeneratorScreen() {
   }, [params.background, params.brand, params.industry, params.topic]);
 
   useEffect(() => {
+    if (isEggCreatorBuild) {
+      setCreditBalance(0);
+      return;
+    }
     const email = user?.email?.trim().toLowerCase();
     if (!email) {
       setCreditBalance(null);
@@ -444,23 +450,36 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
     setGenerating(true);
     try {
       const email = user?.email?.trim().toLowerCase();
-      if (email) {
-        const creditResult = await deductCredits(email, 'ai_generate');
-        setCreditBalance(creditResult.balance);
+      if (!isEggCreatorBuild && email) {
+        const balance = await getCredits(email);
+        setCreditBalance(balance);
 
-        if (!creditResult.success && creditResult.error === 'insufficient_credits') {
-          Alert.alert('Credits 不足', `需要 10 Credits 生成劇本\n現有：${creditResult.balance} Credits`, [{ text: '了解' }]);
+        if (balance < 10) {
+          Alert.alert('Credits 不足', `需要 10 Credits 生成劇本\n現有：${balance} Credits`, [{ text: '了解' }]);
           return;
         }
       }
 
-      const text = await generateAiText({
-        prompt,
-        model: 'claude-sonnet-4-20250514',
-        maxTokens: 2600
-      });
+      const text = isEggCreatorBuild
+        ? (await generateEggScript({
+            brandName: draft.brand,
+            industry: [draft.industry],
+            topic: draft.topic,
+            background: draft.background,
+            hookStyle: draft.hookStyle,
+            transitionStyle: draft.transitionStyle,
+            endingStyle: draft.endingStyle,
+          })).script
+        : await generateAiText({ prompt, model: 'claude-sonnet-4-6', maxTokens: 2600 });
 
       setGeneratedScript(text.trim());
+      if (!isEggCreatorBuild && email) {
+        const creditResult = await deductCredits(email, 'ai_generate');
+        setCreditBalance(creditResult.balance);
+        if (!creditResult.success) {
+          Alert.alert('Credits 未扣除', '劇本已生成，但今次未能扣 Credits。');
+        }
+      }
       await refreshCreditBalance();
     } catch (err: unknown) {
       Alert.alert('生成失敗', formatUnknownError(err));
@@ -510,7 +529,7 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
         ai_draft: scriptText,
         qc_final: scriptText,
         content: scriptText,
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         generated_at: now
       };
 
@@ -632,9 +651,9 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
     <View style={styles.screen}>
       <BackHeader
         title="劇本創作"
-        backTo="/(app)/tools"
+        backTo={isEggCreatorBuild ? "/creator/home" : "/(app)/tools"}
         rightElement={
-          <TouchableOpacity onPress={() => router.push('/(app)/tools/script-history' as never)} style={styles.historyButton}>
+          <TouchableOpacity onPress={() => router.push((isEggCreatorBuild ? '/creator/script-history' : '/(app)/tools/script-history') as never)} style={styles.historyButton}>
             <Text style={styles.historyText}>歷史記錄</Text>
           </TouchableOpacity>
         }
@@ -647,9 +666,7 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
         >
           <Text style={styles.subtitle}>IG Reel 劇本工作台</Text>
-          <Text style={[styles.creditText, (creditBalance ?? 10) < 10 && styles.creditWarning]}>
-            🪙 {creditBalance ?? '...'} Credits
-          </Text>
+          {isEggCreatorBuild ? null : <Text style={[styles.creditText, (creditBalance ?? 10) < 10 && styles.creditWarning]}>🪙 {creditBalance ?? '...'} Credits</Text>}
 
           <View style={styles.formCard}>
             <FieldLabel>01 品牌 / 個人名稱</FieldLabel>
@@ -703,7 +720,7 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
             <OptionSelectButton option={ending} onPress={() => setOptionPicker('ending')} />
           </View>
 
-          <Text style={styles.creditHint}>每次生成扣 10 Credits</Text>
+          {isEggCreatorBuild ? <Text style={styles.creditHint}>目前免費使用 · 生成後自動儲存</Text> : <Text style={styles.creditHint}>每次生成扣 10 Credits</Text>}
           <TouchableOpacity onPress={generateScript} disabled={generating} style={[styles.generateButton, generating && styles.disabledButton]}>
             {generating ? (
               <View style={styles.generateLoading}>
@@ -731,16 +748,16 @@ Hook：${hook.key} ${hook.title}｜轉場：${transition.key} ${transition.title
               </View>
               <Text style={styles.scriptText}>{generatedScript}</Text>
               <View style={styles.actionRow}>
-                <TouchableOpacity
+                {!isEggCreatorBuild ? <TouchableOpacity
                   onPress={scheduleScript}
                   disabled={scheduling}
                   style={styles.secondaryButton}
                 >
                   {scheduling ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.secondaryButtonText}>排程</Text>}
-                </TouchableOpacity>
-                <TouchableOpacity onPress={saveScript} disabled={saving} style={styles.secondaryButton}>
+                </TouchableOpacity> : null}
+                {!isEggCreatorBuild ? <TouchableOpacity onPress={saveScript} disabled={saving} style={styles.secondaryButton}>
                   {saving ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.secondaryButtonText}>儲存</Text>}
-                </TouchableOpacity>
+                </TouchableOpacity> : <Text style={styles.autoSavedText}>✓ 已自動儲存到歷史記錄</Text>}
               </View>
               <TouchableOpacity onPress={generateScript} disabled={generating} style={[styles.regenerateButton, generating && styles.disabledButton]}>
                 <Text style={styles.regenerateButtonText}>重新生成</Text>
@@ -786,6 +803,12 @@ const styles = StyleSheet.create({
   },
   creditWarning: {
     color: '#b45309'
+  },
+  autoSavedText: {
+    color: '#15803d',
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    paddingVertical: 12
   },
   historyButton: {
     paddingVertical: 6,

@@ -26,6 +26,8 @@ import { colors } from '@/theme/colors';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
+const appScheme = process.env.EXPO_PUBLIC_APP_SCHEME || 'soonlog';
+
 function RootNavigator() {
   const { hasShareIntent } = useShareIntentContext();
   const { session, loading } = useAuth();
@@ -149,7 +151,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ShareIntentProvider options={{ scheme: 'soonlog', resetOnBackground: false }}>
+      <ShareIntentProvider options={{ scheme: appScheme, resetOnBackground: false }}>
         <AuthProvider>
           <RootNavigator />
         </AuthProvider>

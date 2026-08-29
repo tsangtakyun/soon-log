@@ -187,6 +187,16 @@ export default function AppTabs() {
         tabBarLabelStyle: {
           fontFamily: fonts.bodyMedium,
           fontSize: 11
+        },
+        tabBarItemStyle: {
+          height: 58,
+          paddingTop: 2
+        },
+        tabBarIconStyle: {
+          width: 30,
+          height: 30,
+          alignItems: 'center',
+          justifyContent: 'center'
         }
       }}
     >

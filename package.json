@@ -5,6 +5,8 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
+    "start:egg": "EXPO_PUBLIC_APP_NAME=SOON-EGG EXPO_PUBLIC_APP_SCHEME=soonegg EXPO_PUBLIC_EGG_CREATOR_BUILD=true EXPO_PUBLIC_EGG_API_URL=https://egg.sooncreator.network EXPO_PUBLIC_SUPABASE_URL=https://ycqribpphvywibamtjew.supabase.co expo start",
+    "open:ios": "open ios/SOONLOG.xcworkspace",
     "ios": "expo run:ios",
     "android": "expo run:android",
     "web": "expo start --web",

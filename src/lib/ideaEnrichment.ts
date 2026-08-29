@@ -189,54 +189,89 @@ async function updateIdeaWithFallback(ideaId: string, update: IdeaUpdate) {
   throw lastError;
 }
 
+function errorSummary(error: unknown) {
+  if (error instanceof Error && error.message) return error.message.slice(0, 140);
+  return String(error ?? 'unknown error').slice(0, 140);
+}
+
+async function markIdeaEnrichmentFailed(ideaId: string, targetUrl: string, boardCategories: string[], sharedText: string, error: unknown) {
+  const cleanSharedText = firstString(sharedText);
+  const tags = Array.from(new Set(['instagram', 'AI未能整理']));
+  const categories = Array.from(new Set(boardCategories.filter(Boolean)));
+  const reason = errorSummary(error);
+  const fallbackDescription = cleanSharedText || `AI 暫時未能整理呢條題材。原始連結已保留，可以稍後再試。(${reason})`;
+
+  await updateIdeaWithFallback(ideaId, {
+    title: cleanSharedText ? 'Instagram Reel 已儲存' : 'AI 未能整理題材',
+    topic: cleanSharedText || 'AI 未能整理題材',
+    summary: fallbackDescription,
+    description: fallbackDescription,
+    hook: '',
+    script_hook: '',
+    country: 'HK',
+    region: 'HK',
+    platform: 'instagram',
+    tags,
+    categories,
+    source_url: targetUrl,
+    viral_potential: 'medium'
+  });
+}
+
 export async function enrichIdeaFromUrl(ideaId: string, targetUrl: string, boardCategories: string[] = [], sharedText = '') {
-  const result = await analyzeUrl(targetUrl, sharedText);
-  const needsResolver =
-    !firstString(result.video_url, result.videoUrl) ||
-    !result.image ||
-    !firstString(result.description, result.desc) ||
-    !result.placeName;
-  const resolved = needsResolver ? await resolveVideoFromUrl(targetUrl) : null;
-  const resolvedVideoUrl = firstString(result.video_url, result.videoUrl, resolved?.videoUrl) || null;
-  const resolvedImage = firstString(result.image, resolved?.image);
-  const resolvedDescription = firstString(result.description, result.desc, sharedText, resolved?.description);
-  const blockedTitle = result.title === 'Instagram' || result.title === 'TikTok' || !result.title;
-  const title = blockedTitle ? (resolved?.title || 'Instagram Reel 靈感') : result.title;
-  const country = firstString(result.country, result.region, resolved?.country) || 'HK';
-  const placeName = firstString(result.placeName, resolved?.placeName);
-  const placeAddress = firstString(result.placeAddress, resolved?.placeAddress);
-  const shopHighlights = firstString(result.shopHighlights, resolved?.shopHighlights);
-  const placeQuery = placeName || placeAddress || '';
-  const coords = placeQuery ? await geocodePlace(placeQuery, country) : null;
-  const mergedCategories = Array.from(new Set([...(result.categories ?? []), ...boardCategories].filter(Boolean)));
-  const description = resolvedDescription;
-  const update: IdeaUpdate = {
-    title,
-    topic: result.topic || title,
-    summary: description,
-    script_hook: result.script_hook ?? result.hook ?? '',
-    country,
-    platform: result.platform ?? 'instagram',
-    tags: result.tags?.length ? result.tags : ['instagram'],
-    categories: mergedCategories,
-    place_name: placeName,
-    place_address: placeAddress,
-    shop_highlights: shopHighlights,
-    lat: coords?.lat ?? null,
-    lng: coords?.lng ?? null,
-    description,
-    hook: result.hook ?? '',
-    region: country,
-    viral_potential: result.viral_potential ?? 'medium',
-    source_url: targetUrl
-  };
+  try {
+    const result = await analyzeUrl(targetUrl, sharedText);
+    const needsResolver =
+      !firstString(result.video_url, result.videoUrl) ||
+      !result.image ||
+      !firstString(result.description, result.desc) ||
+      !result.placeName;
+    const resolved = needsResolver ? await resolveVideoFromUrl(targetUrl) : null;
+    const resolvedVideoUrl = firstString(result.video_url, result.videoUrl, resolved?.videoUrl) || null;
+    const resolvedImage = firstString(result.image, resolved?.image);
+    const resolvedDescription = firstString(result.description, result.desc, sharedText, resolved?.description);
+    const blockedTitle = result.title === 'Instagram' || result.title === 'TikTok' || !result.title;
+    const title = blockedTitle ? (resolved?.title || 'Instagram Reel 靈感') : result.title;
+    const country = firstString(result.country, result.region, resolved?.country) || 'HK';
+    const placeName = firstString(result.placeName, resolved?.placeName);
+    const placeAddress = firstString(result.placeAddress, resolved?.placeAddress);
+    const shopHighlights = firstString(result.shopHighlights, resolved?.shopHighlights);
+    const placeQuery = placeName || placeAddress || '';
+    const coords = placeQuery ? await geocodePlace(placeQuery, country) : null;
+    const mergedCategories = Array.from(new Set([...(result.categories ?? []), ...boardCategories].filter(Boolean)));
+    const description = resolvedDescription;
+    const update: IdeaUpdate = {
+      title,
+      topic: result.topic || title,
+      summary: description,
+      script_hook: result.script_hook ?? result.hook ?? '',
+      country,
+      platform: result.platform ?? 'instagram',
+      tags: result.tags?.length ? result.tags.filter((tag) => tag !== '待分析') : ['instagram'],
+      categories: mergedCategories,
+      place_name: placeName,
+      place_address: placeAddress,
+      shop_highlights: shopHighlights,
+      lat: coords?.lat ?? null,
+      lng: coords?.lng ?? null,
+      description,
+      hook: result.hook ?? '',
+      region: country,
+      viral_potential: result.viral_potential ?? 'medium',
+      source_url: targetUrl
+    };
 
-  if (resolvedImage) {
-    update.thumb = resolvedImage;
-  }
-  if (resolvedVideoUrl) {
-    update.video_url = resolvedVideoUrl;
-  }
+    if (resolvedImage) {
+      update.thumb = resolvedImage;
+    }
+    if (resolvedVideoUrl) {
+      update.video_url = resolvedVideoUrl;
+    }
 
-  await updateIdeaWithFallback(ideaId, update);
+    await updateIdeaWithFallback(ideaId, update);
+  } catch (error) {
+    console.log('[idea-enrich] autofill failed', error);
+    await markIdeaEnrichmentFailed(ideaId, targetUrl, boardCategories, sharedText, error);
+    throw error;
+  }
 }

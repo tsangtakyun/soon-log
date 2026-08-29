@@ -2,7 +2,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, FlatList, Image, Modal, Pressable, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
@@ -362,6 +362,110 @@ function ShareMenu({
   );
 }
 
+function CreateTopicModal({
+  visible,
+  creating,
+  topic,
+  category,
+  angleA,
+  angleB,
+  onTopicChange,
+  onCategoryChange,
+  onAngleAChange,
+  onAngleBChange,
+  onClose,
+  onSubmit
+}: {
+  visible: boolean;
+  creating: boolean;
+  topic: string;
+  category: FilterMode;
+  angleA: string;
+  angleB: string;
+  onTopicChange: (value: string) => void;
+  onCategoryChange: (value: FilterMode) => void;
+  onAngleAChange: (value: string) => void;
+  onAngleBChange: (value: string) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  const categoryOptions = filterOptions.filter((option) => option.category);
+  const canSubmit = topic.trim().length >= 4 && angleA.trim().length > 0 && angleB.trim().length > 0 && !creating;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.createKeyboardWrap}>
+        <Pressable style={styles.createOverlay} onPress={onClose}>
+          <Pressable style={styles.createSheet}>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.createSheetContent}>
+              <View style={styles.sheetHandle} />
+              <Text style={styles.createTitle}>開新 Topic</Text>
+              <Text style={styles.createSubtitle}>建立一個俾大家投票同討論嘅話題。</Text>
+
+              <Text style={styles.fieldLabel}>Topic</Text>
+              <TextInput
+                value={topic}
+                onChangeText={onTopicChange}
+                placeholder="例如：香港夜市會唔會再熱返？"
+                placeholderTextColor={colors.textMuted}
+                selectionColor={colors.primary}
+                style={styles.createInput}
+                maxLength={80}
+                returnKeyType="next"
+              />
+
+              <Text style={styles.fieldLabel}>分類</Text>
+              <View style={styles.categoryGrid}>
+                {categoryOptions.map((option) => (
+                  <Pressable
+                    key={option.key}
+                    onPress={() => onCategoryChange(option.key)}
+                    style={({ pressed }) => [
+                      styles.categoryChip,
+                      category === option.key && styles.categoryChipActive,
+                      pressed && styles.pressed
+                    ]}
+                  >
+                    <Text style={[styles.categoryChipText, category === option.key && styles.categoryChipTextActive]}>{option.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Text style={styles.fieldLabel}>投票角度</Text>
+              <View style={styles.angleInputs}>
+                <TextInput
+                  value={angleA}
+                  onChangeText={onAngleAChange}
+                  placeholder="例如：會爆"
+                  placeholderTextColor={colors.textMuted}
+                  selectionColor={colors.primary}
+                  style={styles.createInput}
+                  maxLength={28}
+                  returnKeyType="next"
+                />
+                <TextInput
+                  value={angleB}
+                  onChangeText={onAngleBChange}
+                  placeholder="例如：未必"
+                  placeholderTextColor={colors.textMuted}
+                  selectionColor={colors.primary}
+                  style={styles.createInput}
+                  maxLength={28}
+                  returnKeyType="done"
+                />
+              </View>
+
+              <Pressable onPress={onSubmit} disabled={!canSubmit} style={({ pressed }) => [styles.createSubmit, (!canSubmit || pressed) && styles.createSubmitDisabled]}>
+                {creating ? <ActivityIndicator color={colors.textOnDark} /> : <Text style={styles.createSubmitText}>開 Topic</Text>}
+              </Pressable>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 export default function PrediktScreen() {
   const params = useLocalSearchParams<{ focus?: string }>();
   const focusId = Array.isArray(params.focus) ? params.focus[0] : params.focus;
@@ -374,6 +478,12 @@ export default function PrediktScreen() {
   const [shareTrend, setShareTrend] = useState<Trend | null>(null);
   const [filterMode, setFilterMode] = useState<FilterMode>('hot');
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [showCreateTopic, setShowCreateTopic] = useState(false);
+  const [creatingTopic, setCreatingTopic] = useState(false);
+  const [newTopic, setNewTopic] = useState('');
+  const [newTopicCategory, setNewTopicCategory] = useState<FilterMode>('life');
+  const [newAngleA, setNewAngleA] = useState('會爆');
+  const [newAngleB, setNewAngleB] = useState('未必');
   const [refreshing, setRefreshing] = useState(false);
 
   const loadInteractions = useCallback(async (trendIds: string[]) => {
@@ -580,6 +690,48 @@ export default function PrediktScreen() {
     }
   }
 
+  async function createTopic() {
+    if (!user) {
+      Alert.alert('請先登入', '登入後就可以開 Topic');
+      return;
+    }
+
+    setCreatingTopic(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('請重新登入後再試');
+
+      const response = await fetch('https://idea-brainstorm.vercel.app/api/trends', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          topic: newTopic,
+          category: newTopicCategory,
+          angles: [newAngleA, newAngleB]
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || '開 Topic 失敗');
+
+      setShowCreateTopic(false);
+      setNewTopic('');
+      setNewTopicCategory('life');
+      setNewAngleA('會爆');
+      setNewAngleB('未必');
+      await loadTrends();
+      if (payload.trend?.id) openTrendDetail(payload.trend.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '請稍後再試';
+      Alert.alert('開 Topic 失敗', message);
+    } finally {
+      setCreatingTopic(false);
+    }
+  }
+
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
@@ -595,6 +747,13 @@ export default function PrediktScreen() {
             <Feather name="sliders" size={16} color={colors.primary} />
             <Text style={styles.sortButtonText}>{filterOptions.find((option) => option.key === filterMode)?.label}</Text>
             <Feather name="chevron-down" size={14} color={colors.textMuted} />
+          </Pressable>
+          <Pressable
+            onPress={() => setShowCreateTopic(true)}
+            style={({ pressed }) => [styles.createTopButton, pressed && styles.pressed]}
+          >
+            <Feather name="plus" size={16} color={colors.textOnDark} />
+            <Text style={styles.createTopButtonText}>開 Topic</Text>
           </Pressable>
         </View>
       </View>
@@ -651,6 +810,20 @@ export default function PrediktScreen() {
         visible={Boolean(shareTrend)}
         onClose={() => setShareTrend(null)}
       />
+      <CreateTopicModal
+        visible={showCreateTopic}
+        creating={creatingTopic}
+        topic={newTopic}
+        category={newTopicCategory}
+        angleA={newAngleA}
+        angleB={newAngleB}
+        onTopicChange={setNewTopic}
+        onCategoryChange={setNewTopicCategory}
+        onAngleAChange={setNewAngleA}
+        onAngleBChange={setNewAngleB}
+        onClose={() => setShowCreateTopic(false)}
+        onSubmit={createTopic}
+      />
     </View>
   );
 }
@@ -696,6 +869,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgBodyCard,
     paddingHorizontal: 12,
     paddingVertical: 8
+  },
+  createTopButton: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 9
+  },
+  createTopButtonText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13
   },
   sortButtonText: {
     color: colors.primary,
@@ -748,6 +936,100 @@ const styles = StyleSheet.create({
   sortMenuTextActive: {
     color: colors.primary,
     fontFamily: fonts.bodyBold
+  },
+  createOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.38)'
+  },
+  createKeyboardWrap: {
+    flex: 1
+  },
+  createSheet: {
+    maxHeight: '82%',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    backgroundColor: colors.bgBody,
+    paddingHorizontal: 20
+  },
+  createSheetContent: {
+    paddingTop: 20,
+    paddingBottom: 34
+  },
+  createTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 22
+  },
+  createSubtitle: {
+    marginTop: 5,
+    marginBottom: 18,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20
+  },
+  fieldLabel: {
+    marginTop: 12,
+    marginBottom: 8,
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13
+  },
+  createInput: {
+    minHeight: 50,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    borderRadius: 14,
+    backgroundColor: colors.bgBodyCard,
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    paddingHorizontal: 13
+  },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  categoryChip: {
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    borderRadius: 999,
+    backgroundColor: colors.bgBodyCard,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  categoryChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: '#FBF4EE'
+  },
+  categoryChipText: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyBold,
+    fontSize: 13
+  },
+  categoryChipTextActive: {
+    color: colors.primary
+  },
+  angleInputs: {
+    gap: 8
+  },
+  createSubmit: {
+    marginTop: 18,
+    minHeight: 52,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  createSubmitDisabled: {
+    opacity: 0.5
+  },
+  createSubmitText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16
   },
   sortBar: {
     flexDirection: 'row',

@@ -1,8 +1,16 @@
+const appName = process.env.EXPO_PUBLIC_APP_NAME || 'SOON-EGG';
+const appScheme = process.env.EXPO_PUBLIC_APP_SCHEME || 'soonlog';
+const iosBundleIdentifier =
+  process.env.EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER || 'com.theirstudio.sooncreatorlog';
+const iosShareExtensionBundleIdentifier =
+  process.env.EXPO_PUBLIC_IOS_SHARE_EXTENSION_BUNDLE_IDENTIFIER || `${iosBundleIdentifier}.share`;
+const iosBuildNumber = process.env.EXPO_PUBLIC_IOS_BUILD_NUMBER || '7';
+
 module.exports = {
   expo: {
-    name: 'EGG',
+    name: appName,
     slug: 'soon-log',
-    scheme: 'soonlog',
+    scheme: appScheme,
     version: '1.0.0',
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
@@ -15,14 +23,15 @@ module.exports = {
     },
     ios: {
       supportsTablet: true,
-      bundleIdentifier: 'com.theirstudio.sooncreatorlog',
+      bundleIdentifier: iosBundleIdentifier,
+      buildNumber: iosBuildNumber,
       appleTeamId: 'K47W3XX3CK',
       icon: './assets/icon.png',
       config: {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       },
       infoPlist: {
-        CFBundleDisplayName: 'EGG',
+        CFBundleDisplayName: appName,
         LSApplicationQueriesSchemes: [
           'googlechrome',
           'comgooglemaps'
@@ -40,6 +49,7 @@ module.exports = {
       }
     },
     extra: {
+      eggCreatorBuild: process.env.EXPO_PUBLIC_EGG_CREATOR_BUILD === 'true',
       eas: {
         projectId: 'd84b00bf-0152-4bd5-b572-0ea1021ff58e'
       }
@@ -59,7 +69,7 @@ module.exports = {
             NSExtensionActivationSupportsWebURLWithMaxCount: 1,
             NSExtensionActivationSupportsWebPageWithMaxCount: 1
           },
-          iosShareExtensionBundleIdentifier: 'com.theirstudio.sooncreatorlog.share'
+          iosShareExtensionBundleIdentifier
         }
       ],
       [

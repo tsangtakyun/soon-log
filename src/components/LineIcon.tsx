@@ -237,8 +237,9 @@ function renderIcon(name: LineIconName, color: string, strokeWidth: number) {
     case 'tool':
       return (
         <>
-          <Path {...stroke} d="M15.4 4.2a4.8 4.8 0 0 0 5.1 6.2l-9.7 9.7a2.7 2.7 0 0 1-3.8-3.8l9.7-9.7a4.8 4.8 0 0 0-6.2-5.1" />
-          <Line {...stroke} x1={7.6} y1={17.4} x2={8.6} y2={18.4} />
+          <Path {...stroke} d="M5.5 4.5h9l2 2-2 2h-9l-2-2 2-2Z" />
+          <Path {...stroke} d="M10 8.5v10.2a2.3 2.3 0 0 0 4.6 0V8.5" />
+          <Line {...stroke} x1={10} y1={15} x2={14.6} y2={15} />
         </>
       );
     case 'trash-2':

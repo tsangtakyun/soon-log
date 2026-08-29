@@ -6,6 +6,7 @@ import { RegionFilter } from '@/components/RegionFilter';
 import { EmptyState, Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import { deriveIdeaTitle } from '@/lib/textSanitizer';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 import { Idea, ViralPotential } from '@/types';
@@ -90,6 +91,7 @@ function IdeaCard({ item }: { item: Idea }) {
   const country = item.country || item.region || 'HK';
   const timestamp = formatTime(item.date || item.created_at);
   const placeName = item.place_name || item.shop_name || '';
+  const displayTitle = deriveIdeaTitle(item.title, item.topic, placeName, summary) || '未命名題材';
 
   async function openSource() {
     if (!sourceUrl) return;
@@ -123,7 +125,7 @@ function IdeaCard({ item }: { item: Idea }) {
           <Text style={styles.countryBadge}>{country}</Text>
         </View>
       </View>
-      <Text numberOfLines={2} style={styles.cardTitle}>{item.title || '未命名題材'}</Text>
+      <Text numberOfLines={2} style={styles.cardTitle}>{displayTitle}</Text>
       {summary ? <Text numberOfLines={2} style={styles.description}>{summary}</Text> : null}
       {hook ? (
         <View style={styles.hookPreview}>
@@ -266,7 +268,9 @@ export default function IdeasLibraryScreen() {
               >
                 <Callout onPress={() => router.push(`/idea/${idea.id}`)}>
                   <View style={styles.callout}>
-                    <Text style={styles.calloutTitle}>{idea.title || '未命名題材'}</Text>
+                    <Text style={styles.calloutTitle}>
+                      {deriveIdeaTitle(idea.title, idea.topic, idea.place_name || idea.shop_name, idea.summary || idea.description) || '未命名題材'}
+                    </Text>
                     <Text style={styles.calloutSummary} numberOfLines={2}>{idea.summary || idea.description || ''}</Text>
                     <Text style={styles.calloutLink}>點擊睇詳情 →</Text>
                   </View>

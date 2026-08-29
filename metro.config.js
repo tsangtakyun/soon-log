@@ -25,7 +25,9 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
 
 config.resolver.blockList = exclusionList([
   new RegExp(`${escapedRoot}/node_modules\\.(broken|bad)\\.[^/]+/.*`),
+  new RegExp(`${escapedRoot}/node_modules/.*\\s\\d+/.*`),
   new RegExp(`${escapedRoot}/ios/build/.*`),
+  new RegExp(`${escapedRoot}/ios/Pods\\s\\d+/.*`),
   new RegExp(`${escapedRoot}/\\.tmp-[^/]+/.*`),
   new RegExp(`${escapedRoot}/\\.env(?:\\s.*|\\..*)?$`)
 ]);

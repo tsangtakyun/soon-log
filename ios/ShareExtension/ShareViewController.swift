@@ -9,6 +9,7 @@ import LinkPresentation
 import Photos
 import Social
 import UIKit
+import Vision
 
 class ShareViewController: UIViewController {
   let hostAppGroupIdentifier = "group.com.theirstudio.sooncreatorlog.shared"
@@ -20,6 +21,12 @@ class ShareViewController: UIViewController {
   let imageContentType: String = UTType.image.identifier
   let videoContentType: String = UTType.movie.identifier
   let textContentType: String = UTType.text.identifier
+  let plainTextContentTypes: [String] = [
+    UTType.text.identifier,
+    "public.plain-text",
+    "public.utf8-plain-text",
+    "public.text"
+  ]
   let urlContentType: String = UTType.url.identifier
   let propertyListType: String = UTType.propertyList.identifier
   let fileURLType: String = UTType.fileURL.identifier
@@ -118,15 +125,51 @@ class ShareViewController: UIViewController {
     return String(cleaned.prefix(limit)) + "..."
   }
 
+  private func loadTextPayload(from attachment: NSItemProvider) async -> String? {
+    for typeIdentifier in plainTextContentTypes where attachment.hasItemConformingToTypeIdentifier(typeIdentifier) {
+      do {
+        let item = try await attachment.loadItem(forTypeIdentifier: typeIdentifier)
+        if let string = item as? String, let normalized = normalizedSharedText(string) {
+          return normalized
+        }
+        if let string = item as? NSString, let normalized = normalizedSharedText(string as String) {
+          return normalized
+        }
+        if let attributed = item as? NSAttributedString, let normalized = normalizedSharedText(attributed.string) {
+          return normalized
+        }
+      } catch {
+        NSLog("[ShareExtension] cannot load text payload for \(typeIdentifier): \(error.localizedDescription)")
+      }
+    }
+
+    return nil
+  }
+
+  private func normalizedSharedText(_ value: String?) -> String? {
+    guard let value else { return nil }
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty { return nil }
+    if trimmed.range(of: #"^https?://\S+$"#, options: .regularExpression) != nil { return nil }
+    if trimmed.caseInsensitiveCompare("Instagram") == .orderedSame { return nil }
+    return trimmed
+  }
+
+  @MainActor
+  private func appendSharedText(_ value: String) {
+    guard let normalized = normalizedSharedText(value) else { return }
+    if !sharedText.contains(normalized) {
+      sharedText.append(normalized)
+    }
+  }
+
   private func handleText(content: NSExtensionItem, attachment: NSItemProvider, index: Int) async {
     Task.detached {
-      if let item = try! await attachment.loadItem(forTypeIdentifier: self.textContentType)
-        as? String
-      {
+      if let item = await self.loadTextPayload(from: attachment) {
         Task { @MainActor in
 
           NSLog("[ShareExtension] loaded text=\(self.debugSnippet(item))")
-          self.sharedText.append(item)
+          self.appendSharedText(item)
           self.markAttachmentProcessed(index: index)
 
         }
@@ -144,8 +187,12 @@ class ShareViewController: UIViewController {
       if let item = try! await attachment.loadItem(forTypeIdentifier: self.urlContentType) as? URL {
         NSLog("[ShareExtension] loaded url=\(item.absoluteString)")
         let previewImage = await self.fetchLinkPreviewImage(for: item)
+        let payloadText = await self.loadTextPayload(from: attachment)
         Task { @MainActor in
 
+          if let payloadText {
+            self.appendSharedText(payloadText)
+          }
           self.sharedWebUrl.append(WebUrl(url: item.absoluteString, meta: self.metaWithSelectedBoard(previewImage: previewImage)))
           self.linkPreviewLabel.text = item.absoluteString
           self.markAttachmentProcessed(index: index)
@@ -716,7 +763,11 @@ class ShareViewController: UIViewController {
     meta["soonBoard"] = selectedBoard == "Recents" ? "" : selectedBoard
     meta["soonBoards"] = storedBoards()
 
-    if let sharedPayloadText = firstNonEmpty(extensionContentText, sharedText.first) {
+    let sharedPayloadText = firstNonEmpty(
+      normalizedSharedText(extensionContentText),
+      sharedText.compactMap { normalizedSharedText($0) }.first
+    )
+    if let sharedPayloadText {
       meta["soonSharedText"] = sharedPayloadText
       meta["soonSharedTextSource"] = extensionContentText == nil ? "attachment-text" : "extension-item"
     }
@@ -1049,7 +1100,14 @@ class ShareViewController: UIViewController {
             let previewURL = container.appendingPathComponent("link-preview-\(UUID().uuidString).jpg")
             do {
               try data.write(to: previewURL)
-              continuation.resume(returning: previewURL.absoluteString)
+              Task {
+                if let recognizedText = await self.recognizePreviewText(in: image) {
+                  await MainActor.run {
+                    self.appendSharedText(recognizedText)
+                  }
+                }
+                continuation.resume(returning: previewURL.absoluteString)
+              }
             } catch {
               continuation.resume(returning: nil)
             }
@@ -1059,6 +1117,37 @@ class ShareViewController: UIViewController {
     }
 
     return nil
+  }
+
+  private func recognizePreviewText(in image: UIImage) async -> String? {
+    guard let cgImage = image.cgImage else { return nil }
+
+    return await withCheckedContinuation { continuation in
+      let request = VNRecognizeTextRequest { request, _ in
+        let observations = (request.results as? [VNRecognizedTextObservation]) ?? []
+        let lines = observations
+          .compactMap { $0.topCandidates(1).first?.string.trimmingCharacters(in: .whitespacesAndNewlines) }
+          .filter { !$0.isEmpty }
+
+        let text = lines.joined(separator: "\n")
+        continuation.resume(returning: self.normalizedSharedText(text))
+      }
+
+      request.recognitionLevel = .accurate
+      request.usesLanguageCorrection = true
+      if #available(iOS 16.0, *) {
+        request.revision = VNRecognizeTextRequestRevision3
+        request.recognitionLanguages = ["zh-Hant", "zh-Hans", "en-US"]
+      }
+
+      DispatchQueue.global(qos: .userInitiated).async {
+        do {
+          try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
+        } catch {
+          continuation.resume(returning: nil)
+        }
+      }
+    }
   }
 
   class WebUrl: Codable {

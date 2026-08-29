@@ -15,7 +15,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Switch,
   Text,
@@ -25,6 +24,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ClipPlayer from '@/components/ClipPlayer';
 import { useAuth } from '@/hooks/useAuth';
+import { FriendProfile, loadCollaboratorProfiles } from '@/lib/friends';
 import { sendPushNotification } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
@@ -108,6 +108,101 @@ type PushMember = {
     username: string | null;
   }> | null;
 };
+
+function FriendPickerModal({
+  visible,
+  friends,
+  members,
+  inviting,
+  onInvite,
+  onOpenFriends,
+  onClose
+}: {
+  visible: boolean;
+  friends: FriendProfile[];
+  members: Member[];
+  inviting: boolean;
+  onInvite: (friend: FriendProfile) => void;
+  onOpenFriends: () => void;
+  onClose: () => void;
+}) {
+  const memberIds = new Set(members.map((member) => member.user_id));
+  const availableFriends = friends.filter((friend) => !memberIds.has(friend.id));
+  const hasFriends = friends.length > 0;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.friendModalOverlay}>
+        <View style={styles.friendModalSheet}>
+          <View style={styles.friendModalHeader}>
+            <View>
+              <Text style={styles.friendModalTitle}>加入好友到 Room</Text>
+              <Text style={styles.friendModalSubtitle}>先喺好友頁加人，再喺呢度揀入房。</Text>
+            </View>
+            <Pressable onPress={onClose} hitSlop={10} style={styles.friendModalClose}>
+              <Feather name="x" size={18} color={colors.text} />
+            </Pressable>
+          </View>
+
+          {availableFriends.length === 0 ? (
+            <View style={styles.friendEmpty}>
+              <Feather name="user-plus" size={34} color="#d1d5db" />
+              <Text style={styles.friendEmptyTitle}>{hasFriends ? '好友已經加入晒呢個 Room' : '未有可加入嘅好友'}</Text>
+              {hasFriends ? (
+                <View style={styles.friendJoinedList}>
+                  {friends.map((friend) => {
+                    const name = friend.display_name || friend.username || '好友';
+                    return (
+                      <View key={friend.id} style={styles.friendRow}>
+                        {friend.avatar_url ? (
+                          <Image source={{ uri: friend.avatar_url }} style={styles.friendAvatar} />
+                        ) : (
+                          <View style={styles.friendAvatarFallback}>
+                            <Text style={styles.friendAvatarText}>{name.slice(0, 1).toUpperCase()}</Text>
+                          </View>
+                        )}
+                        <View style={styles.friendTextWrap}>
+                          <Text numberOfLines={1} style={styles.friendName}>{name}</Text>
+                          <Text numberOfLines={1} style={styles.friendUsername}>@{friend.username || 'soon'} · 已在 Room</Text>
+                        </View>
+                        <Feather name="check" size={20} color={colors.success} />
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : null}
+              <Pressable onPress={hasFriends ? onClose : onOpenFriends} style={({ pressed }) => [styles.friendPrimaryButton, pressed && styles.pressed]}>
+                <Text style={styles.friendPrimaryButtonText}>{hasFriends ? '返回' : '去好友加人'}</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <ScrollView contentContainerStyle={styles.friendList}>
+              {availableFriends.map((friend) => {
+                const name = friend.display_name || friend.username || '好友';
+                return (
+                  <Pressable key={friend.id} disabled={inviting} onPress={() => onInvite(friend)} style={({ pressed }) => [styles.friendRow, pressed && styles.pressed]}>
+                    {friend.avatar_url ? (
+                      <Image source={{ uri: friend.avatar_url }} style={styles.friendAvatar} />
+                    ) : (
+                      <View style={styles.friendAvatarFallback}>
+                        <Text style={styles.friendAvatarText}>{name.slice(0, 1).toUpperCase()}</Text>
+                      </View>
+                    )}
+                    <View style={styles.friendTextWrap}>
+                      <Text numberOfLines={1} style={styles.friendName}>{name}</Text>
+                      <Text numberOfLines={1} style={styles.friendUsername}>@{friend.username || 'soon'}</Text>
+                    </View>
+                    {inviting ? <ActivityIndicator size="small" color={colors.primary} /> : <Feather name="plus" size={20} color={colors.primary} />}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 function timeAgo(value: string) {
   const diff = Date.now() - new Date(value).getTime();
@@ -246,6 +341,9 @@ export default function TopicRoomScreen() {
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [friendSheetOpen, setFriendSheetOpen] = useState(false);
+  const [roomFriends, setRoomFriends] = useState<FriendProfile[]>([]);
+  const [invitingFriend, setInvitingFriend] = useState(false);
   const memberAngles = useMemo(() => new Map(members.map((member) => [member.user_id, member.angle])), [members]);
   const isMember = Boolean(membershipRole);
   const isOwner = membershipRole === 'owner';
@@ -351,17 +449,6 @@ export default function TopicRoomScreen() {
     };
   }, [id, loadRoom]);
 
-  const copyInviteCode = () => {
-    Alert.alert('邀請碼', room?.invite_code ?? '');
-  };
-
-  const shareInviteCode = () => {
-    if (!room?.invite_code) return;
-    Share.share({
-      message: '加入我嘅 Topic Room！\n邀請碼：' + room.invite_code + '\n\n喺 SOON-LOG app 入面，去 EGGS → 輸入邀請碼，輸入：' + room.invite_code
-    });
-  };
-
   const joinStudio = async () => {
     if (!user || !room) return;
     setMembershipRole('member');
@@ -377,6 +464,42 @@ export default function TopicRoomScreen() {
 
     Alert.alert('已加入 Studio！');
     loadRoom();
+  };
+
+  const openFriendPicker = async () => {
+    if (!user) return;
+    try {
+      setRoomFriends(await loadCollaboratorProfiles(user.id));
+    } catch {
+      setRoomFriends([]);
+    }
+    setFriendSheetOpen(true);
+  };
+
+  const inviteFriendToRoom = async (friend: FriendProfile) => {
+    if (!user || !room || invitingFriend) return;
+    setInvitingFriend(true);
+    try {
+      const response = await fetch('https://idea-brainstorm.vercel.app/api/topic-room/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId: room.id,
+          invitedBy: user.id,
+          userId: friend.id
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || '邀請失敗');
+
+      await loadRoom();
+      Alert.alert(payload.alreadyMember ? '已在 Room' : '已加入 Room', `@${friend.username || '好友'} 可以一齊上載片段。`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '請稍後再試';
+      Alert.alert('邀請失敗', message);
+    } finally {
+      setInvitingFriend(false);
+    }
   };
 
   if (loading) {
@@ -433,29 +556,16 @@ export default function TopicRoomScreen() {
                       <Text style={styles.memberInitial}>{(member.display_name || member.username || 'S').slice(0, 1).toUpperCase()}</Text>
                     </View>
                   )}
-                  <Text numberOfLines={2} style={styles.memberAngle}>{member.angle || '未設定角度'}</Text>
+                  <Text numberOfLines={2} style={styles.memberAngle}>{member.display_name || member.username || '成員'}</Text>
                 </View>
               ))}
               {isMember ? (
-                <Pressable onPress={() => Alert.alert('邀請隊友', `邀請碼：${room.invite_code ?? ''}`)} style={styles.addMember}>
-                  <Text style={styles.addMemberText}>＋</Text>
+                <Pressable onPress={openFriendPicker} style={styles.addMember}>
+                  <Feather name="user-plus" size={18} color={colors.textOnDark} />
+                  <Text style={styles.addMemberText}>加入成員</Text>
                 </Pressable>
               ) : null}
             </ScrollView>
-
-            {isOwner ? (
-              <View style={styles.invitePill}>
-                <Text numberOfLines={1} style={styles.inviteText}>邀請碼：{room.invite_code}</Text>
-                <View style={styles.inviteActions}>
-                  <Pressable onPress={copyInviteCode} hitSlop={8} style={styles.inviteActionButton}>
-                    <Text style={styles.copyText}>Copy</Text>
-                  </Pressable>
-                  <Pressable onPress={shareInviteCode} hitSlop={8} style={styles.inviteActionButton}>
-                    <Feather name="share-2" size={15} color={colors.textOnDark} />
-                  </Pressable>
-                </View>
-              </View>
-            ) : null}
 
             {!isMember && room.privacy === 'open' ? (
               <Pressable onPress={joinStudio} style={({ pressed }) => [styles.joinButton, pressed && styles.pressed]}>
@@ -478,6 +588,19 @@ export default function TopicRoomScreen() {
           ))}
         </View>
       </ScrollView>
+
+      <FriendPickerModal
+        visible={friendSheetOpen}
+        friends={roomFriends}
+        members={members}
+        inviting={invitingFriend}
+        onInvite={inviteFriendToRoom}
+        onOpenFriends={() => {
+          setFriendSheetOpen(false);
+          router.push('/(app)/friends');
+        }}
+        onClose={() => setFriendSheetOpen(false)}
+      />
 
       {isMember ? (
         <>
@@ -1114,52 +1237,22 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   },
   addMember: {
-    width: 48,
+    width: 92,
     height: 48,
     borderRadius: 24,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: 'rgba(255,255,255,0.4)',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 5,
+    paddingHorizontal: 10
   },
   addMemberText: {
     color: colors.textOnDark,
     fontFamily: fonts.bodyBold,
-    fontSize: 24
-  },
-  invitePill: {
-    marginTop: 16,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12
-  },
-  inviteText: {
-    flex: 1,
-    color: colors.textOnDark,
-    fontFamily: fonts.bodyMedium,
-    fontSize: 14
-  },
-  inviteActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10
-  },
-  inviteActionButton: {
-    minWidth: 28,
-    minHeight: 28,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  copyText: {
-    color: colors.textOnDark,
-    fontFamily: fonts.bodyBold,
-    fontSize: 13
+    fontSize: 12
   },
   joinButton: {
     alignSelf: 'flex-start',
@@ -1561,6 +1654,122 @@ const styles = StyleSheet.create({
     color: colors.error,
     fontFamily: fonts.bodyBold,
     fontSize: 15
+  },
+  friendModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.45)'
+  },
+  friendModalSheet: {
+    maxHeight: '72%',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    backgroundColor: colors.bgBody,
+    padding: 18
+  },
+  friendModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 14
+  },
+  friendModalTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 20
+  },
+  friendModalSubtitle: {
+    marginTop: 4,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13
+  },
+  friendModalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgBodyMuted
+  },
+  friendEmpty: {
+    minHeight: 180,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12
+  },
+  friendEmptyTitle: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15
+  },
+  friendPrimaryButton: {
+    minHeight: 44,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18
+  },
+  friendPrimaryButtonText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14
+  },
+  friendList: {
+    gap: 10,
+    paddingBottom: 12
+  },
+  friendJoinedList: {
+    alignSelf: 'stretch',
+    gap: 10,
+    width: '100%'
+  },
+  friendRow: {
+    minHeight: 64,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    backgroundColor: colors.bgBodyCard,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  friendAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.bgBodyMuted
+  },
+  friendAvatarFallback: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  friendAvatarText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 16
+  },
+  friendTextWrap: {
+    flex: 1
+  },
+  friendName: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15
+  },
+  friendUsername: {
+    marginTop: 2,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13
   },
   pressed: {
     opacity: 0.72

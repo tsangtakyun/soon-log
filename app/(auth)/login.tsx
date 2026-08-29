@@ -5,6 +5,7 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, Vie
 import { Button, Field, Screen, Title } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import { isEggCreatorBuild } from '@/lib/appMode';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 
@@ -35,7 +36,8 @@ export default function LoginScreen() {
   const signInWithGoogle = async () => {
     try {
       setGoogleLoading(true);
-      const redirectUrl = 'soonlog://auth/callback';
+      const appScheme = process.env.EXPO_PUBLIC_APP_SCHEME || 'soonlog';
+      const redirectUrl = `${appScheme}://auth/callback`;
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -99,9 +101,13 @@ export default function LoginScreen() {
     <Screen>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.wrap}>
         <View style={styles.hero}>
-          <Text style={styles.brand}>SOON LOG</Text>
-          <Title>記低創作背後的每一步</Title>
-          <Text style={styles.copy}>登入後即可追蹤靈感、製作筆記、影像和創作者動態。</Text>
+          <Text style={styles.brand}>{isEggCreatorBuild ? 'SOON-EGG' : 'SOON LOG'}</Text>
+          <Title>{isEggCreatorBuild ? '你的創作者工作空間' : '記低創作背後的每一步'}</Title>
+          <Text style={styles.copy}>
+            {isEggCreatorBuild
+              ? '登入後管理創作者檔案、社交數據與品牌合作。'
+              : '登入後即可追蹤靈感、製作筆記、影像和創作者動態。'}
+          </Text>
         </View>
 
         <View style={styles.authCard}>
@@ -127,7 +133,11 @@ export default function LoginScreen() {
           ) : null}
         </View>
 
-        <Link href="/register" style={styles.link}>未有帳戶？建立創作者帳戶</Link>
+        {isEggCreatorBuild ? (
+          <Text style={styles.inviteOnly}>目前只開放予受邀創作者；未有帳戶請聯絡 SOON 團隊。</Text>
+        ) : (
+          <Link href="/register" style={styles.link}>未有帳戶？建立創作者帳戶</Link>
+        )}
       </KeyboardAvoidingView>
     </Screen>
   );
@@ -201,5 +211,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     textAlign: 'center',
     fontSize: 15
+  },
+  inviteOnly: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    textAlign: 'center',
+    fontSize: 13,
+    lineHeight: 19
   }
 });

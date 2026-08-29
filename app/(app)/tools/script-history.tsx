@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { BackHeader } from '@/components/BackHeader';
 import { EmptyState } from '@/components/ui';
@@ -9,6 +10,8 @@ import { resolveLinkedScriptOwnerIds } from '@/lib/scriptIdentity';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
+import { isEggCreatorBuild } from '@/lib/appMode';
+import { deleteEggScript, loadEggScripts } from '@/lib/eggApi';
 
 type ScriptRecord = {
   id: string;
@@ -44,6 +47,10 @@ export default function ScriptHistoryScreen() {
     if (showLoader) setLoading(true);
 
     try {
+      if (isEggCreatorBuild) {
+        setScripts((await loadEggScripts()) as ScriptRecord[]);
+        return;
+      }
       const ownerIds = await resolveLinkedScriptOwnerIds(user.id, user.email);
       let query = supabase
         .from('scripts')
@@ -65,9 +72,11 @@ export default function ScriptHistoryScreen() {
     }
   }, [user]);
 
-  useEffect(() => {
-    loadScripts();
-  }, [loadScripts]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadScripts();
+    }, [loadScripts])
+  );
 
   async function copyScript(script: ScriptRecord) {
     const content = script.content || script.qc_final || script.ai_draft || '';
@@ -97,6 +106,11 @@ export default function ScriptHistoryScreen() {
     if (!user) return;
     setDeletingId(script.id);
     try {
+      if (isEggCreatorBuild) {
+        await deleteEggScript(script.id);
+        setScripts((current) => current.filter((item) => item.id !== script.id));
+        return;
+      }
       const ownerIds = await resolveLinkedScriptOwnerIds(user.id, user.email);
       let query = supabase
         .from('scripts')
@@ -128,7 +142,7 @@ export default function ScriptHistoryScreen() {
 
   return (
     <View style={styles.screen}>
-      <BackHeader title="劇本歷史" backTo="/(app)/tools/script-generator" />
+      <BackHeader title="劇本歷史" backTo={isEggCreatorBuild ? "/creator/script" : "/(app)/tools/script-generator"} />
       {loading ? (
         <View style={styles.loading}>
           <ActivityIndicator color={colors.primary} />

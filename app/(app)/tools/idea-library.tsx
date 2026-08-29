@@ -28,6 +28,7 @@ import { BackHeader } from '@/components/BackHeader';
 import ClipPlayer from '@/components/ClipPlayer';
 import { LineIcon as Feather } from '@/components/LineIcon';
 import { useAuth } from '@/hooks/useAuth';
+import { FriendProfile, loadCollaboratorProfiles } from '@/lib/friends';
 import { loadLocalIdeaBoards, mergeLocalIdeaBoards, saveLocalIdeaBoards } from '@/lib/ideaBoards';
 import { enrichIdeaFromUrl } from '@/lib/ideaEnrichment';
 import { supabase } from '@/lib/supabase';
@@ -77,6 +78,18 @@ type IdeaDraft = {
   placeName: string;
   placeAddress: string;
   shopHighlights: string;
+};
+
+type WorkspaceMember = {
+  id?: string;
+  user_id: string;
+  email?: string | null;
+  display_name?: string | null;
+  profile_display_name?: string | null;
+  username?: string | null;
+  avatar_url?: string | null;
+  role?: string | null;
+  status?: string | null;
 };
 
 const TYPE_FILTERS: Array<{ key: IdeaType; label: string }> = [
@@ -257,14 +270,13 @@ function ideaHasPendingEnrichment(idea: IdeaRecord) {
     (!idea.title || idea.title === 'IG Reel 靈感' || idea.title === 'Instagram Reel 靈感') &&
     (!idea.thumb && !idea.summary && !idea.description);
   const missingUsefulPreview = !idea.thumb && !idea.summary && !idea.description;
-  const missingMediaPreview = !idea.thumb && !idea.video_url;
   const isInstagramSource = /instagram\.com/i.test(sourceUrl);
   const missingInstagramDetails =
     isInstagramSource &&
     hasPendingTag &&
     (!idea.video_url || !idea.place_name || (!idea.summary && !idea.description));
 
-  return hasPendingTag || hasGenericTitle || missingUsefulPreview || missingMediaPreview || missingInstagramDetails;
+  return hasPendingTag || hasGenericTitle || missingUsefulPreview || missingInstagramDetails;
 }
 
 function ideaNeedsEnrichment(idea: IdeaRecord) {
@@ -1064,8 +1076,165 @@ function IdeaDetailSheet({
   );
 }
 
+function IdeaPreviewImage({
+  uri,
+  icon = 'instagram',
+  label = '預覽已過期，正在刷新',
+  imageStyle,
+  emptyStyle,
+  emptyTextStyle,
+  onImageError
+}: {
+  uri: string;
+  icon?: 'instagram' | 'bookmark';
+  label?: string;
+  imageStyle: any;
+  emptyStyle: any;
+  emptyTextStyle: any;
+  onImageError?: () => void;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (!uri || failed) {
+    return (
+      <View style={emptyStyle}>
+        <Feather name={icon} size={22} color="#c7b8ad" />
+        <Text style={emptyTextStyle}>{label}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={imageStyle}
+      resizeMode="cover"
+      onError={() => {
+        setFailed(true);
+        onImageError?.();
+      }}
+    />
+  );
+}
+
+function TeamSheet({
+  visible,
+  members,
+  friends,
+  inviting,
+  onInviteFriend,
+  onOpenFriends,
+  onClose
+}: {
+  visible: boolean;
+  members: WorkspaceMember[];
+  friends: FriendProfile[];
+  inviting: boolean;
+  onInviteFriend: (friend: FriendProfile) => void;
+  onOpenFriends: () => void;
+  onClose: () => void;
+}) {
+  const memberIds = new Set(members.map((member) => member.user_id));
+  const availableFriends = friends.filter((friend) => !memberIds.has(friend.id));
+  const hasFriends = friends.length > 0;
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={styles.sheetScreen}>
+        <View style={styles.sheetHeader}>
+          <View>
+            <Text style={styles.sheetEyebrow}>WORKSPACE</Text>
+            <Text style={styles.sheetTitle}>題材庫成員</Text>
+          </View>
+          <TouchableOpacity onPress={onClose} style={styles.sheetClose}>
+            <Feather name="x" size={18} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.teamInviteBox}>
+          <Text style={styles.teamLabel}>由好友加入題材庫</Text>
+          <Text style={styles.teamHint}>要加新同事，先去「好友」用 username 加人；之後返嚟呢度揀好友。</Text>
+          {availableFriends.length === 0 ? (
+            <View style={styles.teamEmptyPanel}>
+              <Text style={styles.teamEmptyText}>{hasFriends ? '所有好友已經喺題材庫入面。' : '未有可加入嘅好友。'}</Text>
+              {hasFriends ? (
+                <View style={styles.teamFriendList}>
+                  {friends.map((friend) => {
+                    const name = friend.display_name || friend.username || '好友';
+                    return (
+                      <View key={friend.id} style={styles.teamFriendRow}>
+                        {friend.avatar_url ? <Image source={{ uri: friend.avatar_url }} style={styles.teamAvatar} /> : (
+                          <View style={styles.teamAvatar}>
+                            <Text style={styles.teamAvatarText}>{name.slice(0, 1).toUpperCase()}</Text>
+                          </View>
+                        )}
+                        <View style={styles.teamMemberTextWrap}>
+                          <Text numberOfLines={1} style={styles.teamMemberName}>{name}</Text>
+                          <Text numberOfLines={1} style={styles.teamMemberMeta}>@{friend.username || 'soon'} · 已在題材庫</Text>
+                        </View>
+                        <Feather name="check" size={18} color={colors.success} />
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : (
+                <TouchableOpacity onPress={onOpenFriends} style={styles.teamEmptyAction}>
+                  <Feather name="plus" size={16} color={colors.primary} />
+                  <Text style={styles.teamEmptyActionText}>去好友加人</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <View style={styles.teamFriendList}>
+              {availableFriends.map((friend) => {
+                const name = friend.display_name || friend.username || '好友';
+                return (
+                  <TouchableOpacity key={friend.id} disabled={inviting} onPress={() => onInviteFriend(friend)} style={styles.teamFriendRow}>
+                    {friend.avatar_url ? <Image source={{ uri: friend.avatar_url }} style={styles.teamAvatar} /> : (
+                      <View style={styles.teamAvatar}>
+                        <Text style={styles.teamAvatarText}>{name.slice(0, 1).toUpperCase()}</Text>
+                      </View>
+                    )}
+                    <View style={styles.teamMemberTextWrap}>
+                      <Text style={styles.teamMemberName}>{name}</Text>
+                      <Text style={styles.teamMemberMeta}>@{friend.username || 'soon'}</Text>
+                    </View>
+                    {inviting ? <ActivityIndicator size="small" color={colors.primary} /> : <Feather name="plus" size={18} color={colors.primary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        <ScrollView contentContainerStyle={styles.teamMemberList}>
+          {members.map((member) => {
+            const name = member.display_name || member.profile_display_name || member.username || member.email || member.user_id.slice(0, 8);
+            const role = member.role === 'owner' ? 'Owner' : 'Member';
+            const meta = member.username ? `@${member.username} · ${role}` : `${role} · ${member.status || 'active'}`;
+            return (
+              <View key={member.user_id} style={styles.teamMemberRow}>
+                {member.avatar_url ? <Image source={{ uri: member.avatar_url }} style={styles.teamAvatar} /> : (
+                  <View style={styles.teamAvatar}>
+                    <Text style={styles.teamAvatarText}>{name.slice(0, 1).toUpperCase()}</Text>
+                  </View>
+                )}
+                <View style={styles.teamMemberTextWrap}>
+                  <Text numberOfLines={1} style={styles.teamMemberName}>{name}</Text>
+                  <Text numberOfLines={1} style={styles.teamMemberMeta}>{meta}</Text>
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
 export default function ToolsIdeaLibraryScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<IdeaRecord[]>([]);
@@ -1086,7 +1255,12 @@ export default function ToolsIdeaLibraryScreen() {
   const [draft, setDraft] = useState<IdeaDraft>(emptyDraft);
   const [translatingIdeaId, setTranslatingIdeaId] = useState<string | null>(null);
   const [pendingEnrichmentCount, setPendingEnrichmentCount] = useState(0);
+  const [showTeamSheet, setShowTeamSheet] = useState(false);
+  const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
+  const [workspaceFriends, setWorkspaceFriends] = useState<FriendProfile[]>([]);
+  const [invitingMember, setInvitingMember] = useState(false);
   const enrichmentPollingStartedAt = useRef<number | null>(null);
+  const imageRefreshIds = useRef<Set<string>>(new Set());
 
   const resolveWorkspace = useCallback(async () => {
     if (!user) return null;
@@ -1176,6 +1350,130 @@ export default function ToolsIdeaLibraryScreen() {
 
   useEffect(() => {
     loadIdeas();
+  }, [loadIdeas]);
+
+  const loadWorkspaceMembers = useCallback(async (id = workspaceId) => {
+    if (!id) {
+      setWorkspaceMembers([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('workspace_members')
+      .select('id,user_id,email,display_name,role,status')
+      .eq('workspace_id', id)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.log('[idea-library] load workspace members failed', error);
+      setWorkspaceMembers([]);
+      return;
+    }
+
+    const rows = (data ?? []) as WorkspaceMember[];
+    const profileIds = rows.map((member) => member.user_id).filter(Boolean);
+
+    if (profileIds.length === 0) {
+      setWorkspaceMembers(rows);
+      return;
+    }
+
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id,username,display_name,avatar_url')
+      .in('id', profileIds);
+
+    if (profileError) {
+      console.log('[idea-library] load workspace member profiles failed', profileError);
+      setWorkspaceMembers(rows);
+      return;
+    }
+
+    const profileMap = new Map(
+      ((profiles ?? []) as Array<{ id: string; username?: string | null; display_name?: string | null; avatar_url?: string | null }>)
+        .map((profile) => [profile.id, profile])
+    );
+
+    setWorkspaceMembers(rows.map((member) => {
+      const profile = profileMap.get(member.user_id);
+      return {
+        ...member,
+        username: profile?.username ?? null,
+        profile_display_name: profile?.display_name ?? null,
+        avatar_url: profile?.avatar_url ?? null
+      };
+    }));
+  }, [workspaceId]);
+
+  async function openTeamSheet() {
+    const id = workspaceId ?? await resolveWorkspace();
+    if (id) {
+      setWorkspaceId(id);
+      await Promise.all([
+        loadWorkspaceMembers(id),
+        user?.id ? loadCollaboratorProfiles(user.id).then(setWorkspaceFriends).catch(() => setWorkspaceFriends([])) : Promise.resolve()
+      ]);
+    }
+    setShowTeamSheet(true);
+  }
+
+  async function inviteWorkspaceMember(friend: FriendProfile) {
+    if (!user) return;
+    const id = workspaceId ?? await resolveWorkspace();
+    if (!id) {
+      Alert.alert('未能建立題材庫 workspace');
+      return;
+    }
+
+    const username = friend.username?.trim().toLowerCase();
+    if (!username) {
+      Alert.alert('邀請失敗', '呢位好友未有 username');
+      return;
+    }
+
+    setInvitingMember(true);
+    try {
+      const response = await fetch('https://idea-brainstorm.vercel.app/api/workspace/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId: id,
+          invitedBy: user.id,
+          username
+        })
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || '邀請失敗');
+      }
+
+      await Promise.all([
+        loadWorkspaceMembers(id),
+        loadCollaboratorProfiles(user.id).then(setWorkspaceFriends).catch(() => setWorkspaceFriends([]))
+      ]);
+      Alert.alert(payload.alreadyMember ? '已在題材庫' : '邀請完成', `@${username} 可以一齊 save 題材。`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '請稍後再試';
+      Alert.alert('邀請失敗', message);
+    } finally {
+      setInvitingMember(false);
+    }
+  }
+
+  const refreshExpiredPreview = useCallback((idea: IdeaRecord) => {
+    const sourceUrl = ideaSourceUrl(idea);
+    if (!sourceUrl || imageRefreshIds.current.has(idea.id)) return;
+
+    imageRefreshIds.current.add(idea.id);
+    enrichIdeaFromUrl(idea.id, sourceUrl, Array.isArray(idea.categories) ? idea.categories : [])
+      .then(() => loadIdeas(false, false))
+      .catch((error) => {
+        console.log('[idea-library] preview refresh skipped', error);
+      })
+      .finally(() => {
+        imageRefreshIds.current.delete(idea.id);
+      });
   }, [loadIdeas]);
 
   useEffect(() => {
@@ -1419,7 +1717,7 @@ export default function ToolsIdeaLibraryScreen() {
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-6',
           max_tokens: 900,
           messages: [{
             role: 'user',
@@ -1594,7 +1892,14 @@ ${JSON.stringify(source, null, 2)}`
               thumbnail
             />
           ) : previewImage ? (
-            <Image source={{ uri: previewImage }} style={styles.cardImage} resizeMode="cover" />
+            <IdeaPreviewImage
+              uri={previewImage}
+              icon={sourceUrl ? 'instagram' : 'bookmark'}
+              imageStyle={styles.cardImage}
+              emptyStyle={styles.cardImageEmpty}
+              emptyTextStyle={styles.cardImageEmptyText}
+              onImageError={() => refreshExpiredPreview(item)}
+            />
           ) : (
             <View style={styles.cardImageEmpty}>
               <Feather name={sourceUrl ? 'instagram' : 'bookmark'} size={22} color="#c7b8ad" />
@@ -1647,7 +1952,14 @@ ${JSON.stringify(source, null, 2)}`
             thumbnail
           />
         ) : previewImage ? (
-          <Image source={{ uri: previewImage }} style={styles.mapIdeaImage} resizeMode="cover" />
+          <IdeaPreviewImage
+            uri={previewImage}
+            icon={sourceUrl ? 'instagram' : 'bookmark'}
+            imageStyle={styles.mapIdeaImage}
+            emptyStyle={styles.mapIdeaImageEmpty}
+            emptyTextStyle={styles.mapIdeaImageEmptyText}
+            onImageError={() => refreshExpiredPreview(item)}
+          />
         ) : (
           <View style={styles.mapIdeaImageEmpty}>
             <Feather name={sourceUrl ? 'instagram' : 'bookmark'} size={20} color="#c7b8ad" />
@@ -1718,9 +2030,11 @@ ${JSON.stringify(source, null, 2)}`
         title="題材庫"
         backTo="/(app)/tools"
         rightElement={
-          <TouchableOpacity onPress={openAddModal} style={styles.addButton}>
-            <Text style={styles.addButtonText}>+ 新增</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity onPress={openAddModal} style={styles.addButton}>
+              <Text style={styles.addButtonText}>+ 新增</Text>
+            </TouchableOpacity>
+          </View>
         }
       />
 
@@ -1747,6 +2061,9 @@ ${JSON.stringify(source, null, 2)}`
           ) : null}
         </View>
         <View style={styles.controlRow}>
+          <TouchableOpacity onPress={openTeamSheet} style={[styles.controlButton, styles.memberControlButton]}>
+            <Text style={styles.controlButtonText}>成員</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => setShowFilterSheet(true)} style={styles.controlButton}>
             <Feather name="sliders" size={15} color={colors.primary} />
             <Text style={styles.controlButtonText}>
@@ -1848,6 +2165,19 @@ ${JSON.stringify(source, null, 2)}`
         onDeleteBoard={deleteBoard}
         onClose={() => setShowFilterSheet(false)}
       />
+
+      <TeamSheet
+        visible={showTeamSheet}
+        members={workspaceMembers}
+        friends={workspaceFriends}
+        inviting={invitingMember}
+        onInviteFriend={inviteWorkspaceMember}
+        onOpenFriends={() => {
+          setShowTeamSheet(false);
+          router.push('/(app)/friends');
+        }}
+        onClose={() => setShowTeamSheet(false)}
+      />
     </View>
   );
 }
@@ -1892,6 +2222,29 @@ const styles = StyleSheet.create({
   sourceWebView: {
     flex: 1,
     backgroundColor: '#000000'
+  },
+  sheetScreen: {
+    flex: 1,
+    backgroundColor: '#F7F3EE',
+    paddingHorizontal: 20,
+    paddingTop: 18
+  },
+  sheetEyebrow: {
+    color: colors.textMuted,
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0
+  },
+  sheetClose: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#E8DED6'
   },
   detailContent: {
     backgroundColor: '#F7F3EE'
@@ -2318,11 +2671,21 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 11
   },
+  memberControlButton: {
+    borderColor: colors.primary,
+    backgroundColor: '#fffaf7',
+    paddingHorizontal: 14
+  },
   controlButtonText: {
     color: colors.primary,
     fontFamily: fonts.bodyBold,
     fontSize: 13,
     fontWeight: '700'
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
   },
   boardFilterContent: {
     gap: 8,
@@ -2369,6 +2732,151 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 13,
     fontWeight: '700'
+  },
+  teamInviteBox: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+    backgroundColor: '#ffffff',
+    padding: 14,
+    marginBottom: 14
+  },
+  teamLabel: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 10
+  },
+  teamInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  teamInput: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+    backgroundColor: '#F7F3EE',
+    paddingHorizontal: 12,
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: 14
+  },
+  teamInviteButton: {
+    minHeight: 44,
+    minWidth: 70,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14
+  },
+  teamInviteButtonDisabled: {
+    opacity: 0.45
+  },
+  teamInviteButtonText: {
+    color: '#ffffff',
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    fontWeight: '800'
+  },
+  teamHint: {
+    marginTop: 9,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 12,
+    lineHeight: 17
+  },
+  teamEmptyPanel: {
+    marginTop: 12,
+    gap: 10
+  },
+  teamEmptyText: {
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 19
+  },
+  teamEmptyAction: {
+    marginTop: 12,
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8
+  },
+  teamEmptyActionText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    fontWeight: '800'
+  },
+  teamFriendList: {
+    marginTop: 12,
+    gap: 10
+  },
+  teamFriendRow: {
+    minHeight: 62,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+    backgroundColor: '#F7F3EE',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  teamMemberList: {
+    gap: 10,
+    paddingBottom: 28
+  },
+  teamMemberRow: {
+    minHeight: 64,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E8DED6',
+    backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  teamAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  teamAvatarText: {
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
+    fontSize: 15,
+    fontWeight: '800'
+  },
+  teamMemberTextWrap: {
+    flex: 1
+  },
+  teamMemberName: {
+    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    fontWeight: '800'
+  },
+  teamMemberMeta: {
+    marginTop: 3,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 12
   },
   filterWrap: {
     gap: 8,

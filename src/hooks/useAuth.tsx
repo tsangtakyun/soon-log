@@ -2,6 +2,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { router, useSegments } from 'expo-router';
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { isEggCreatorBuild } from '@/lib/appMode';
 import { Profile, Region } from '@/types';
 
 type AuthContextValue = {
@@ -39,11 +40,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .maybeSingle();
+    const query = supabase
+      .from(isEggCreatorBuild ? 'egg_creator_profiles' : 'profiles')
+      .select('*');
+    const { data, error } = isEggCreatorBuild
+      ? await query.eq('user_id', session.user.id).limit(1).maybeSingle()
+      : await query.eq('id', session.user.id).maybeSingle();
 
     if (error) throw error;
     setProfile(data);
@@ -97,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (session && inAuthGroup) {
-      router.replace('/home');
+      router.replace(isEggCreatorBuild ? '/creator/home' as never : '/home');
     }
   }, [loading, session, segments]);
 

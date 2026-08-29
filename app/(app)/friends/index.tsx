@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -9,21 +10,15 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   View
 } from 'react-native';
 import { BackHeader } from '@/components/BackHeader';
 import { useAuth } from '@/hooks/useAuth';
+import { addFriendByUsername, FriendProfile, loadFriendProfiles } from '@/lib/friends';
 import { supabase } from '@/lib/supabase';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
-
-type Friend = {
-  id: string;
-  username: string | null;
-  display_name: string | null;
-  avatar_url: string | null;
-  region: string | null;
-};
 
 const REGION_FLAG: Record<string, string> = {
   HK: '🇭🇰',
@@ -34,40 +29,19 @@ const REGION_FLAG: Record<string, string> = {
 
 export default function FriendsScreen() {
   const { user } = useAuth();
-  const [friends, setFriends] = useState<Friend[]>([]);
+  const [friends, setFriends] = useState<FriendProfile[]>([]);
+  const [username, setUsername] = useState('');
+  const [adding, setAdding] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadFriends = useCallback(async () => {
     if (!user?.id) return;
-    const { data: rows, error: followError } = await supabase
-      .from('follows')
-      .select('following_id, created_at')
-      .eq('follower_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (followError) {
-      Alert.alert('載入失敗', followError.message);
-      return;
+    try {
+      setFriends(await loadFriendProfiles(user.id));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '請稍後再試';
+      Alert.alert('載入失敗', message);
     }
-
-    const ids = (rows ?? []).map((row) => row.following_id).filter(Boolean);
-    if (ids.length === 0) {
-      setFriends([]);
-      return;
-    }
-
-    const { data: profiles, error } = await supabase
-      .from('profiles')
-      .select('id, username, display_name, avatar_url, region')
-      .in('id', ids);
-
-    if (error) {
-      Alert.alert('載入失敗', error.message);
-      return;
-    }
-
-    const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile as Friend]));
-    setFriends(ids.flatMap((id) => profileMap.get(id) ? [profileMap.get(id) as Friend] : []));
   }, [user?.id]);
 
   useEffect(() => {
@@ -97,10 +71,46 @@ export default function FriendsScreen() {
     }
   };
 
+  const addFriend = async () => {
+    if (!user?.id || adding) return;
+    setAdding(true);
+    try {
+      const result = await addFriendByUsername(user.id, username);
+      setUsername('');
+      await loadFriends();
+      Alert.alert(result.alreadyFriend ? '已經係好友' : '已加入好友', `@${result.profile.username} 之後可以喺 Room / 題材庫揀佢。`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '請稍後再試';
+      Alert.alert('加好友失敗', message);
+    } finally {
+      setAdding(false);
+    }
+  };
+
   return (
     <View style={styles.screen}>
       <BackHeader title="好友" />
-      <Text style={styles.subtitle}>你追蹤緊嘅創作者</Text>
+      <View style={styles.addBox}>
+        <Text style={styles.subtitle}>用 username 加好友，之後可以喺 Room 同題材庫揀佢合作。</Text>
+        <View style={styles.inputRow}>
+          <TextInput
+            value={username}
+            onChangeText={setUsername}
+            placeholder="@username，例如 renee"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.input}
+          />
+          <Pressable
+            onPress={addFriend}
+            disabled={!username.trim() || adding}
+            style={({ pressed }) => [styles.addButton, (!username.trim() || adding || pressed) && styles.addButtonDimmed]}
+          >
+            {adding ? <ActivityIndicator size="small" color={colors.textOnDark} /> : <Text style={styles.addButtonText}>加入</Text>}
+          </Pressable>
+        </View>
+      </View>
       <FlatList
         data={friends}
         keyExtractor={(item) => item.id}
@@ -109,7 +119,7 @@ export default function FriendsScreen() {
         ListEmptyComponent={(
           <View style={styles.empty}>
             <Feather name="user-plus" size={40} color="#d1d5db" />
-            <Text style={styles.emptyTitle}>仲未追蹤任何創作者</Text>
+            <Text style={styles.emptyTitle}>仲未有好友</Text>
             <Pressable onPress={() => router.push('/(app)/home/discover')} hitSlop={10}>
               <Text style={styles.emptyLink}>去發掘 →</Text>
             </Pressable>
@@ -135,7 +145,7 @@ export default function FriendsScreen() {
   );
 }
 
-function Avatar({ item }: { item: Friend }) {
+function Avatar({ item }: { item: FriendProfile }) {
   const name = item.display_name || item.username || 'S';
 
   if (item.avatar_url) {
@@ -155,12 +165,53 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgBody
   },
   subtitle: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 8,
     color: colors.textMuted,
     fontFamily: fonts.body,
-    fontSize: 13
+    fontSize: 13,
+    lineHeight: 19
+  },
+  addBox: {
+    margin: 16,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    borderRadius: 16,
+    backgroundColor: colors.bgBodyCard,
+    padding: 14,
+    gap: 12
+  },
+  inputRow: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10
+  },
+  input: {
+    flex: 1,
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: colors.bodyBorder,
+    borderRadius: 12,
+    backgroundColor: colors.bgBody,
+    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    paddingHorizontal: 12
+  },
+  addButton: {
+    width: 72,
+    minHeight: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary
+  },
+  addButtonDimmed: {
+    opacity: 0.55
+  },
+  addButtonText: {
+    color: colors.textOnDark,
+    fontFamily: fonts.bodyBold,
+    fontSize: 14
   },
   list: {
     paddingBottom: 110

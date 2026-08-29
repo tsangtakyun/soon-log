@@ -5,7 +5,7 @@ import { BackHeader } from '@/components/BackHeader';
 import { Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
-import { stripCitationMarkup } from '@/lib/textSanitizer';
+import { deriveIdeaTitle, stripCitationMarkup } from '@/lib/textSanitizer';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
 import { Idea } from '@/types';
@@ -49,13 +49,14 @@ export default function IdeaDetailScreen() {
   }, [loadIdea]);
 
   const sourceUrl = idea?.url || idea?.source_url;
-  const cleanTitle = stripCitationMarkup(idea?.title);
   const cleanSummary = stripCitationMarkup(idea?.summary || idea?.description);
   const cleanHook = stripCitationMarkup(idea?.script_hook || idea?.hook);
   const cleanPlaceName = stripCitationMarkup(idea?.place_name || idea?.shop_name);
   const cleanPlaceAddress = stripCitationMarkup(idea?.place_address);
   const cleanShopHighlights = stripCitationMarkup(idea?.shop_highlights);
   const cleanNotes = stripCitationMarkup(idea?.notes);
+  const cleanTopic = deriveIdeaTitle(idea?.topic);
+  const cleanTitle = deriveIdeaTitle(idea?.title, cleanTopic, cleanPlaceName, cleanSummary);
 
   function openScriptGenerator() {
     if (!idea) return;
@@ -73,7 +74,7 @@ export default function IdeaDetailScreen() {
       params: {
         brand: cleanPlaceName || cleanTitle || '',
         industry: '飲食',
-        topic: cleanTitle || cleanPlaceName || stripCitationMarkup(idea.topic) || 'IG Reel 題材',
+        topic: cleanTitle || cleanPlaceName || cleanTopic || 'IG Reel 題材',
         background
       }
     });
@@ -113,7 +114,7 @@ export default function IdeaDetailScreen() {
 }`,
           messages: [{
             role: 'user',
-            content: `題材：${cleanTitle}
+	            content: `題材：${cleanTitle || cleanPlaceName || cleanTopic || 'IG Reel 題材'}
 	${cleanSummary ? '描述：' + cleanSummary : ''}
 	${cleanHook ? 'Hook 參考：' + cleanHook : ''}
 	${cleanPlaceName ? '地點：' + cleanPlaceName : ''}
@@ -135,7 +136,7 @@ export default function IdeaDetailScreen() {
           background: parsed.background,
           test: parsed.test,
           ending: parsed.ending,
-          title: cleanTitle || '題材劇本',
+	          title: cleanTitle || cleanPlaceName || cleanTopic || '題材劇本',
         }
       });
     } catch (err: unknown) {

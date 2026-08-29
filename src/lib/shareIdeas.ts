@@ -118,28 +118,27 @@ function missingColumnName(error: unknown) {
   return message.match(/'([^']+)' column/)?.[1] ?? '';
 }
 
-async function findExistingIdea(userId: string, url: string): Promise<ExistingIdea | null> {
-  const { data: bySource } = await supabase
-    .from('ideas')
-    .select('id, categories, thumb')
-    .eq('user_id', userId)
-    .eq('source_url', url)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+async function findExistingIdea(userId: string, workspaceId: string | null, url: string): Promise<ExistingIdea | null> {
+  async function findBy(column: 'source_url' | 'url') {
+    let query = supabase
+      .from('ideas')
+      .select('id, categories, thumb')
+      .eq(column, url)
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-  if (bySource?.id) return bySource as ExistingIdea;
+    query = workspaceId
+      ? query.or(`workspace_id.eq.${workspaceId},user_id.eq.${userId}`)
+      : query.eq('user_id', userId);
 
-  const { data: byUrl } = await supabase
-    .from('ideas')
-    .select('id, categories, thumb')
-    .eq('user_id', userId)
-    .eq('url', url)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    const { data } = await query.maybeSingle();
+    return data?.id ? data as ExistingIdea : null;
+  }
 
-  return byUrl?.id ? byUrl as ExistingIdea : null;
+  const bySource = await findBy('source_url');
+  if (bySource?.id) return bySource;
+
+  return findBy('url');
 }
 
 async function updateExistingSharedIdea(existing: ExistingIdea, boardCategories: string[], previewImage: string, videoUrl: string) {
@@ -194,7 +193,8 @@ export async function saveSharedIdea(params: {
     await mergeLocalIdeaBoards(allBoards);
   }
 
-  const existingIdea = await findExistingIdea(user.id, url);
+  const workspaceId = await resolveWorkspaceId(user);
+  const existingIdea = await findExistingIdea(user.id, workspaceId, url);
   if (existingIdea) {
     const nextCategories = await updateExistingSharedIdea(existingIdea, boardCategories, previewImage, videoUrl);
     enrichIdeaFromUrl(existingIdea.id, url, nextCategories, sharedText).catch((error) => {
@@ -203,7 +203,6 @@ export async function saveSharedIdea(params: {
     return { id: existingIdea.id, existing: true };
   }
 
-  const workspaceId = await resolveWorkspaceId(user);
   const insertPayload: Record<string, unknown> = {
     workspace_id: workspaceId,
     user_id: user.id,
