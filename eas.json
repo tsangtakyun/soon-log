@@ -16,8 +16,8 @@
       "env": {
         "EXPO_PUBLIC_APP_NAME": "SOON-EGG",
         "EXPO_PUBLIC_APP_SCHEME": "soonegg",
-        "EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.egg",
-        "EXPO_PUBLIC_IOS_SHARE_EXTENSION_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.egg.share",
+        "EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog",
+        "EXPO_PUBLIC_IOS_SHARE_EXTENSION_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.share",
         "EXPO_PUBLIC_IOS_BUILD_NUMBER": "7",
         "EXPO_PUBLIC_EGG_CREATOR_BUILD": "true",
         "EXPO_PUBLIC_EGG_API_URL": "https://egg.sooncreator.network",
@@ -33,8 +33,8 @@
       "env": {
         "EXPO_PUBLIC_APP_NAME": "SOON-EGG",
         "EXPO_PUBLIC_APP_SCHEME": "soonegg",
-        "EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.egg",
-        "EXPO_PUBLIC_IOS_SHARE_EXTENSION_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.egg.share",
+        "EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog",
+        "EXPO_PUBLIC_IOS_SHARE_EXTENSION_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.share",
         "EXPO_PUBLIC_IOS_BUILD_NUMBER": "7",
         "EXPO_PUBLIC_EGG_CREATOR_BUILD": "true",
         "EXPO_PUBLIC_EGG_API_URL": "https://egg.sooncreator.network",
@@ -54,8 +54,8 @@
       "env": {
         "EXPO_PUBLIC_APP_NAME": "SOON-EGG",
         "EXPO_PUBLIC_APP_SCHEME": "soonegg",
-        "EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.egg",
-        "EXPO_PUBLIC_IOS_SHARE_EXTENSION_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.egg.share",
+        "EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog",
+        "EXPO_PUBLIC_IOS_SHARE_EXTENSION_BUNDLE_IDENTIFIER": "com.theirstudio.sooncreatorlog.share",
         "EXPO_PUBLIC_IOS_BUILD_NUMBER": "7",
         "EXPO_PUBLIC_EGG_CREATOR_BUILD": "true",
         "EXPO_PUBLIC_EGG_API_URL": "https://egg.sooncreator.network",
