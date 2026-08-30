@@ -91,11 +91,13 @@ export async function rememberEggWorkspace(workspaceId: string) {
 
 export type EggTopicIdea = {
   id: string;
+  workspace_id: string | null;
   title: string;
   summary: string | null;
   source_name: string | null;
   source_url: string | null;
   image_url: string | null;
+  media_urls?: string[];
   platform: string;
   category: string;
   tags: string[];
@@ -116,7 +118,7 @@ export async function loadEggTopics() {
   const response = await fetch(`${apiBase}/api/mobile/topics`, { headers: await eggAuthHeaders() });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || "未能載入題材靈感");
-  return (result.ideas ?? []) as EggTopicIdea[];
+  return { ideas: (result.ideas ?? []) as EggTopicIdea[], role: (result.role ?? "member") as EggWorkspace["role"] };
 }
 
 export async function updateEggTopic(ideaId: string, action: "save" | "create" | "dismiss") {
@@ -143,6 +145,44 @@ export async function importEggSharedTopic(payload: {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || "未能儲存分享題材");
   return result as { success: true; ideaId: string; existing: boolean };
+}
+
+export async function uploadEggTopicImage(uri: string, mimeType = "image/jpeg", index = 0) {
+  const form = new FormData();
+  form.append("file", { uri, type: mimeType || "image/jpeg", name: `shared-topic-${Date.now()}-${index}.${mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : mimeType.includes("hei") ? "heic" : "jpg"}` } as never);
+  const response = await fetch(`${apiBase}/api/mobile/topics`, { method: "PUT", headers: await eggAuthHeaders(), body: form });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "未能上載圖片");
+  return result.imageUrl as string;
+}
+
+export async function importEggSharedPhotos(media: Array<{ uri: string; mimeType?: string }>, context = "") {
+  const mediaUrls: string[] = [];
+  for (let index = 0; index < media.length; index += 1) mediaUrls.push(await uploadEggTopicImage(media[index].uri, media[index].mimeType, index));
+  const response = await fetch(`${apiBase}/api/mobile/topics`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await eggAuthHeaders()) },
+    body: JSON.stringify({ mode: "import-media", mediaUrls, context }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "未能儲存相簿題材");
+  return result;
+}
+
+export async function deleteEggTopic(ideaId: string) {
+  const response = await fetch(`${apiBase}/api/mobile/topics?ideaId=${encodeURIComponent(ideaId)}`, { method: "DELETE", headers: await eggAuthHeaders() });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "未能刪除題材");
+}
+
+export async function changeEggTopicCover(ideaId: string, imageUrl: string) {
+  const response = await fetch(`${apiBase}/api/mobile/topics`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...(await eggAuthHeaders()) },
+    body: JSON.stringify({ ideaId, imageUrl }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "未能更換封面");
 }
 
 export type EggTeamMember = {

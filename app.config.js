@@ -67,7 +67,8 @@ module.exports = {
         {
           iosActivationRules: {
             NSExtensionActivationSupportsWebURLWithMaxCount: 1,
-            NSExtensionActivationSupportsWebPageWithMaxCount: 1
+            NSExtensionActivationSupportsWebPageWithMaxCount: 1,
+            NSExtensionActivationSupportsImageWithMaxCount: 20
           },
           iosShareExtensionBundleIdentifier
         }

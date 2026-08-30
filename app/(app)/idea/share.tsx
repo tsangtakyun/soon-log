@@ -9,7 +9,7 @@ import { mergeLocalIdeaBoards } from '@/lib/ideaBoards';
 import { boardsFromShareMeta, extractSharedUrl, saveSharedIdea } from '@/lib/shareIdeas';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
-import { importEggSharedTopic } from '@/lib/eggApi';
+import { importEggSharedPhotos, importEggSharedTopic } from '@/lib/eggApi';
 
 type Status = 'idle' | 'ready' | 'saving' | 'saved' | 'error';
 
@@ -21,6 +21,7 @@ type SharedIdeaItem = {
   previewImage: string;
   videoUrl: string;
   sharedText: string;
+  media: Array<{ uri: string; mimeType: string }>;
 };
 
 function formatSaveError(err: unknown) {
@@ -128,7 +129,8 @@ function buildSharedItems(shareIntent: Record<string, any>): SharedIdeaItem[] {
         sharedBoards: boardsFromShareMeta((meta as Record<string, unknown>)?.soonBoards).concat(fallbackBoards),
         previewImage,
         videoUrl: mediaType === 'video' ? mediaPath : fallbackVideoUrl,
-        sharedText: normalizeSharedPayloadText(payloadText, entry.url)
+        sharedText: normalizeSharedPayloadText(payloadText, entry.url),
+        media: []
       };
     })
     : [{
@@ -138,7 +140,12 @@ function buildSharedItems(shareIntent: Record<string, any>): SharedIdeaItem[] {
       sharedBoards: fallbackBoards,
       previewImage: fallbackThumbnail,
       videoUrl: fallbackVideoUrl,
-      sharedText: ''
+      sharedText: '',
+      media: files.flatMap((file: Record<string, unknown>) => {
+        const uri = typeof file.path === 'string' ? file.path.trim() : '';
+        const mimeType = typeof file.mimeType === 'string' ? file.mimeType : 'image/jpeg';
+        return uri && mimeType.startsWith('image/') ? [{ uri, mimeType }] : [];
+      })
     }];
 
   const seen = new Set<string>();
@@ -210,11 +217,8 @@ export default function IdeaShareScreen() {
 
       for (const item of sharedItems) {
         if (process.env.EXPO_PUBLIC_EGG_CREATOR_BUILD === 'true') {
-          await importEggSharedTopic({
-            sourceUrl: item.url,
-            context: item.sharedText,
-            imageUrl: item.previewImage.startsWith('https://') ? item.previewImage : undefined
-          });
+          if (item.media.length > 0) await importEggSharedPhotos(item.media, item.sharedText);
+          else await importEggSharedTopic({ sourceUrl: item.url, context: item.sharedText, imageUrl: item.previewImage.startsWith('https://') ? item.previewImage : undefined });
         } else {
           await saveSharedIdea({
             user,
@@ -283,7 +287,7 @@ export default function IdeaShareScreen() {
         {status === 'saved' ? (
           <View style={styles.centerState}>
             <Text style={styles.savedIcon}>◈</Text>
-            <Text style={styles.savedText}>{sharedItems.length > 1 ? `已儲存 ${sharedItems.length} 條入題材靈感庫` : '已儲存入題材靈感庫'}</Text>
+            <Text style={styles.savedText}>{sharedItems[0]?.media.length > 1 ? `已將 ${sharedItems[0].media.length} 張圖片儲存成一個 carousel 題材` : sharedItems.length > 1 ? `已儲存 ${sharedItems.length} 條入題材靈感庫` : '已儲存入題材靈感庫'}</Text>
             <Text style={styles.savedSubtext}>AI 正在背景補充標題、封面、店舖同推薦資料，通常約 10–30 秒完成。</Text>
           </View>
         ) : null}
@@ -298,7 +302,9 @@ export default function IdeaShareScreen() {
               <Text style={styles.quickDescription}>
                 {sharedItems[0]?.destination === 'reply-center'
                   ? '會保留連結或截圖，帶入 AI 回覆草稿；不會儲存到題材庫。'
-                  : sharedItems.length > 1
+                  : sharedItems[0]?.media.length > 1
+                    ? `準備將 ${sharedItems[0].media.length} 張圖片儲存成一個 carousel；AI 會自動整理分類。`
+                    : sharedItems.length > 1
                     ? `準備儲存 ${sharedItems.length} 條題材；AI 會自動整理分類。`
                     : 'AI 會自動補充標題、封面、地區及內容分類。'}
               </Text>

@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -6,7 +7,7 @@ import { ActivityIndicator, Alert, Image, Pressable, RefreshControl, ScrollView,
 import { BackHeader } from "@/components/BackHeader";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/lib/theme";
-import { EggTopicIdea, loadEggTopics, updateEggTopic } from "@/lib/eggApi";
+import { changeEggTopicCover, deleteEggTopic, EggTopicIdea, loadEggTopics, updateEggTopic, uploadEggTopicImage } from "@/lib/eggApi";
 
 export default function EggTopicsScreen() {
   const [ideas, setIdeas] = useState<EggTopicIdea[]>([]);
@@ -15,8 +16,9 @@ export default function EggTopicsScreen() {
   const [location, setLocation] = useState("全部地區");
   const [loading, setLoading] = useState(true);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [role, setRole] = useState<"owner" | "admin" | "member">("member");
   const refresh = useCallback(async () => {
-    try { setIdeas(await loadEggTopics()); } catch (error) { Alert.alert("未能載入", error instanceof Error ? error.message : "請稍後再試"); } finally { setLoading(false); }
+    try { const result = await loadEggTopics(); setIdeas(result.ideas); setRole(result.role); } catch (error) { Alert.alert("未能載入", error instanceof Error ? error.message : "請稍後再試"); } finally { setLoading(false); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
   const categories = useMemo(() => ["全部", ...Array.from(new Set(ideas.map((idea) => idea.category)))], [ideas]);
@@ -33,6 +35,26 @@ export default function EggTopicsScreen() {
     } catch (error) { Alert.alert("操作失敗", error instanceof Error ? error.message : "請稍後再試"); } finally { setPendingId(null); }
   }
 
+  function manage(idea: EggTopicIdea) {
+    const media = idea.media_urls?.length ? idea.media_urls : idea.image_url ? [idea.image_url] : [];
+    Alert.alert("管理題材", idea.title, [
+      { text: "上載新封面", onPress: async () => {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) return Alert.alert("需要相簿權限", "請允許 EGG 讀取你選擇嘅圖片。");
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: false, quality: 0.9 });
+        const asset = result.assets?.[0];
+        if (!asset) return;
+        setPendingId(idea.id);
+        try { const imageUrl = await uploadEggTopicImage(asset.uri, asset.mimeType || "image/jpeg"); await changeEggTopicCover(idea.id, imageUrl); setIdeas((current) => current.map((item) => item.id === idea.id ? { ...item, image_url: imageUrl, media_urls: [imageUrl, ...(item.media_urls ?? [])] } : item)); }
+        catch (error) { Alert.alert("更換失敗", error instanceof Error ? error.message : "請稍後再試"); }
+        finally { setPendingId(null); }
+      } },
+      ...(media.length > 1 ? [{ text: "選擇 carousel 封面", onPress: () => Alert.alert("選擇封面", "請選擇想用作封面嘅圖片", media.map((imageUrl, index) => ({ text: `第 ${index + 1} 張`, onPress: async () => { setPendingId(idea.id); try { await changeEggTopicCover(idea.id, imageUrl); setIdeas((current) => current.map((item) => item.id === idea.id ? { ...item, image_url: imageUrl } : item)); } catch (error) { Alert.alert("更換失敗", error instanceof Error ? error.message : "請稍後再試"); } finally { setPendingId(null); } } }))) }] : []),
+      { text: "刪除題材", style: "destructive", onPress: () => Alert.alert("確定刪除？", "刪除後無法復原。", [{ text: "取消", style: "cancel" }, { text: "刪除", style: "destructive", onPress: async () => { setPendingId(idea.id); try { await deleteEggTopic(idea.id); setIdeas((current) => current.filter((item) => item.id !== idea.id)); } catch (error) { Alert.alert("刪除失敗", error instanceof Error ? error.message : "請稍後再試"); } finally { setPendingId(null); } } }]) },
+      { text: "取消", style: "cancel" },
+    ]);
+  }
+
   return <View style={styles.screen}>
     <BackHeader title="題材靈感庫" backTo="/creator/home" />
     <ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void refresh()} />} contentContainerStyle={styles.content}>
@@ -43,7 +65,7 @@ export default function EggTopicsScreen() {
       {loading && !ideas.length ? <ActivityIndicator color={colors.primary} /> : null}
       {filtered.map((idea) => <View key={idea.id} style={styles.card}>
         {idea.image_url ? <Image source={{ uri: idea.image_url }} resizeMode="cover" style={styles.cover} /> : null}
-        <View style={styles.cardTop}><Text style={styles.meta}>{idea.platform} · {idea.category}</Text><Feather name="zap" size={17} color="#b45309" /></View>
+        <View style={styles.cardTop}><Text style={styles.meta}>{idea.platform} · {idea.category}</Text><View style={styles.cardTools}>{idea.media_urls && idea.media_urls.length > 1 ? <Text style={styles.mediaCount}>1/{idea.media_urls.length}</Text> : null}{role === "owner" && idea.workspace_id ? <Pressable onPress={() => manage(idea)} hitSlop={10}><Feather name="more-horizontal" size={20} color={colors.textMuted} /></Pressable> : <Feather name="zap" size={17} color="#b45309" />}</View></View>
         {idea.recommended ? <View style={styles.recommended}><Text style={styles.recommendedText}>為你推薦</Text></View> : null}
         <Text style={styles.title}>{idea.title}</Text>{idea.summary ? <Text style={styles.summary}>{idea.summary}</Text> : null}
         {idea.why_now ? <View style={styles.whyNow}><Text style={styles.whyNowText}><Text style={styles.whyNowStrong}>點解值得留意：</Text>{idea.why_now}</Text></View> : null}
@@ -62,5 +84,5 @@ function Action({ icon, label, onPress, active, primary, disabled }: { icon: key
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg }, content: { padding: 18, paddingBottom: 110, gap: 14 }, lead: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 14, lineHeight: 21 }, searchRow: { flexDirection: "row", alignItems: "center", gap: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.bgCard, paddingHorizontal: 13 }, searchInput: { flex: 1, color: colors.text, fontFamily: fonts.body, fontSize: 14, paddingVertical: 13 }, categories: { gap: 8 }, category: { borderRadius: 999, backgroundColor: "#f3f4f6", paddingHorizontal: 14, paddingVertical: 8 }, categoryActive: { backgroundColor: colors.text }, categoryText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 12 }, categoryTextActive: { color: "#fff" }, locations: { gap: 7 }, location: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 11, paddingVertical: 7, flexDirection: "row", alignItems: "center", gap: 4 }, locationActive: { borderColor: "#f59e0b", backgroundColor: "#fffbeb" }, locationText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 11 }, locationTextActive: { color: "#92400e" }, card: { overflow: "hidden", borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgCard, padding: 17, gap: 12 }, cover: { alignSelf: "stretch", aspectRatio: 4 / 5, marginHorizontal: -17, marginTop: -17, marginBottom: 2, backgroundColor: "#f3f4f6" }, cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, meta: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 12 }, recommended: { alignSelf: "flex-start", borderRadius: 999, backgroundColor: "#fbbf24", paddingHorizontal: 9, paddingVertical: 5 }, recommendedText: { color: "#18181b", fontFamily: fonts.bodyBold, fontSize: 11 }, title: { color: colors.text, fontFamily: fonts.bodyBold, fontSize: 21, lineHeight: 28 }, summary: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 14, lineHeight: 21 }, whyNow: { borderRadius: 12, backgroundColor: "#fffbeb", padding: 10 }, whyNowText: { color: "#78350f", fontFamily: fonts.body, fontSize: 13, lineHeight: 19 }, whyNowStrong: { fontFamily: fonts.bodyBold }, hook: { color: colors.text, fontFamily: fonts.body, fontSize: 13, lineHeight: 19 }, hookStrong: { fontFamily: fonts.bodyBold }, tags: { flexDirection: "row", flexWrap: "wrap", gap: 6 }, tag: { borderRadius: 999, backgroundColor: "#f3f4f6", paddingHorizontal: 9, paddingVertical: 5 }, tagText: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 11 }, source: { flexDirection: "row", alignItems: "center", gap: 5 }, sourceText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 12, textDecorationLine: "underline" }, actions: { flexDirection: "row", gap: 7, paddingTop: 4 }, action: { flex: 1, minHeight: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }, actionActive: { backgroundColor: "#fffbeb", borderColor: "#fcd34d" }, actionPrimary: { backgroundColor: colors.text, borderColor: colors.text }, actionText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 11 }, actionTextActive: { color: "#92400e" }, actionTextPrimary: { color: "#fff" }, empty: { color: colors.textMuted, fontFamily: fonts.body, textAlign: "center", paddingVertical: 48 },
+  screen: { flex: 1, backgroundColor: colors.bg }, content: { padding: 18, paddingBottom: 110, gap: 14 }, lead: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 14, lineHeight: 21 }, searchRow: { flexDirection: "row", alignItems: "center", gap: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.bgCard, paddingHorizontal: 13 }, searchInput: { flex: 1, color: colors.text, fontFamily: fonts.body, fontSize: 14, paddingVertical: 13 }, categories: { gap: 8 }, category: { borderRadius: 999, backgroundColor: "#f3f4f6", paddingHorizontal: 14, paddingVertical: 8 }, categoryActive: { backgroundColor: colors.text }, categoryText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 12 }, categoryTextActive: { color: "#fff" }, locations: { gap: 7 }, location: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 11, paddingVertical: 7, flexDirection: "row", alignItems: "center", gap: 4 }, locationActive: { borderColor: "#f59e0b", backgroundColor: "#fffbeb" }, locationText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 11 }, locationTextActive: { color: "#92400e" }, card: { overflow: "hidden", borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgCard, padding: 17, gap: 12 }, cover: { alignSelf: "stretch", aspectRatio: 4 / 5, marginHorizontal: -17, marginTop: -17, marginBottom: 2, backgroundColor: "#f3f4f6" }, cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, cardTools: { flexDirection: "row", alignItems: "center", gap: 8 }, mediaCount: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 11 }, meta: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 12 }, recommended: { alignSelf: "flex-start", borderRadius: 999, backgroundColor: "#fbbf24", paddingHorizontal: 9, paddingVertical: 5 }, recommendedText: { color: "#18181b", fontFamily: fonts.bodyBold, fontSize: 11 }, title: { color: colors.text, fontFamily: fonts.bodyBold, fontSize: 21, lineHeight: 28 }, summary: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 14, lineHeight: 21 }, whyNow: { borderRadius: 12, backgroundColor: "#fffbeb", padding: 10 }, whyNowText: { color: "#78350f", fontFamily: fonts.body, fontSize: 13, lineHeight: 19 }, whyNowStrong: { fontFamily: fonts.bodyBold }, hook: { color: colors.text, fontFamily: fonts.body, fontSize: 13, lineHeight: 19 }, hookStrong: { fontFamily: fonts.bodyBold }, tags: { flexDirection: "row", flexWrap: "wrap", gap: 6 }, tag: { borderRadius: 999, backgroundColor: "#f3f4f6", paddingHorizontal: 9, paddingVertical: 5 }, tagText: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 11 }, source: { flexDirection: "row", alignItems: "center", gap: 5 }, sourceText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 12, textDecorationLine: "underline" }, actions: { flexDirection: "row", gap: 7, paddingTop: 4 }, action: { flex: 1, minHeight: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }, actionActive: { backgroundColor: "#fffbeb", borderColor: "#fcd34d" }, actionPrimary: { backgroundColor: colors.text, borderColor: colors.text }, actionText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 11 }, actionTextActive: { color: "#92400e" }, actionTextPrimary: { color: "#fff" }, empty: { color: colors.textMuted, fontFamily: fonts.body, textAlign: "center", paddingVertical: 48 },
 });
