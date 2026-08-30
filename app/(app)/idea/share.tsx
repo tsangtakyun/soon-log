@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Easing, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useShareIntentContext } from 'expo-share-intent';
 import { Feather } from '@expo/vector-icons';
 import { Screen } from '@/components/ui';
@@ -167,10 +167,30 @@ export default function IdeaShareScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const autoSaveStarted = useRef(false);
+  const eggRotation = useRef(new Animated.Value(0)).current;
   const [status, setStatus] = useState<Status>('idle');
   const [sharedItems, setSharedItems] = useState<SharedIdeaItem[]>([]);
   const [url, setUrl] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    if (status !== 'saving') {
+      eggRotation.stopAnimation();
+      eggRotation.setValue(0);
+      return;
+    }
+
+    const animation = Animated.loop(
+      Animated.timing(eggRotation, {
+        toValue: 1,
+        duration: 1450,
+        easing: Easing.linear,
+        useNativeDriver: true
+      })
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [eggRotation, status]);
 
   useEffect(() => {
     if (!hasShareIntent || !shareIntent || status !== 'idle') return;
@@ -255,12 +275,28 @@ export default function IdeaShareScreen() {
     router.replace('/(app)/tools/idea-library');
   }
 
+  const photoCount = sharedItems.reduce((count, item) => count + item.media.length, 0);
+  const sourceLabel = photoCount > 0
+    ? `已讀取 ${photoCount} 張圖片`
+    : sharedItems.length > 1
+      ? `已讀取 ${sharedItems.length} 條題材`
+      : url.startsWith('file://')
+        ? '已讀取分享內容'
+        : url;
+  const eggSpin = eggRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg']
+  });
+
   return (
     <Screen>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.kicker}>SHARE TO SOON</Text>
-          <Text style={styles.title}>Save Idea</Text>
+        <View style={styles.brandLockup}>
+          <Image source={require('../../../assets/soon-egg.png')} style={styles.brandLogo} />
+          <View>
+            <Text style={styles.kicker}>SOON–EGG</Text>
+            <Text style={styles.title}>儲存靈感</Text>
+          </View>
         </View>
         <Pressable onPress={dismiss} style={styles.closeButton}>
           <Text style={styles.closeText}>✕</Text>
@@ -269,9 +305,10 @@ export default function IdeaShareScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         {url ? (
-          <Text numberOfLines={2} style={styles.urlPill}>
-            {sharedItems.length > 1 ? `${sharedItems.length} 條題材待儲存` : url}
-          </Text>
+          <View style={styles.sourcePill}>
+            <Feather name={photoCount > 0 ? 'image' : 'link-2'} size={15} color={colors.primary} />
+            <Text numberOfLines={1} style={styles.sourcePillText}>{sourceLabel}</Text>
+          </View>
         ) : null}
 
         {status === 'error' ? (
@@ -292,7 +329,28 @@ export default function IdeaShareScreen() {
           </View>
         ) : null}
 
-        {status === 'ready' || status === 'saving' ? (
+        {status === 'saving' ? (
+          <View style={styles.loadingCard}>
+            <View style={styles.loadingLogoHalo}>
+              <Animated.Image
+                source={require('../../../assets/soon-egg.png')}
+                style={[styles.loadingLogo, { transform: [{ rotate: eggSpin }] }]}
+              />
+            </View>
+            <Text style={styles.loadingTitle}>正在整理題材</Text>
+            <Text style={styles.loadingDescription}>
+              {photoCount > 1
+                ? `正在上載 ${photoCount} 張圖片，並準備建立 carousel 題材…`
+                : '正在安全上載內容，AI 會自動補充標題、封面及分類…'}
+            </Text>
+            <View style={styles.loadingTrack}>
+              <View style={styles.loadingTrackFill} />
+            </View>
+            <Text style={styles.loadingHint}>請保持 EGG 開啟，通常只需數秒</Text>
+          </View>
+        ) : null}
+
+        {status === 'ready' ? (
           <View style={styles.quickCard}>
             <View style={styles.quickIcon}>
               <Feather name="bookmark" size={24} color={colors.primary} />
@@ -309,15 +367,11 @@ export default function IdeaShareScreen() {
                     : 'AI 會自動補充標題、封面、地區及內容分類。'}
               </Text>
             </View>
-            <Pressable disabled={status === 'saving'} onPress={saveIdea} style={({ pressed }) => [styles.saveButton, (pressed || status === 'saving') && styles.pressed]}>
-              {status === 'saving' ? (
-                <ActivityIndicator color={colors.textOnDark} />
-              ) : (
-                <View style={styles.saveButtonContent}>
-                  <Feather name={sharedItems[0]?.destination === 'reply-center' ? 'message-circle' : 'bookmark'} size={18} color={colors.textOnDark} />
-                  <Text style={styles.saveButtonText}>{sharedItems[0]?.destination === 'reply-center' ? '開啟回覆中心' : '儲存入題材靈感庫'}</Text>
-                </View>
-              )}
+            <Pressable onPress={saveIdea} style={({ pressed }) => [styles.saveButton, pressed && styles.pressed]}>
+              <View style={styles.saveButtonContent}>
+                <Feather name={sharedItems[0]?.destination === 'reply-center' ? 'message-circle' : 'bookmark'} size={18} color={colors.textOnDark} />
+                <Text style={styles.saveButtonText}>{sharedItems[0]?.destination === 'reply-center' ? '開啟回覆中心' : '儲存入題材靈感庫'}</Text>
+              </View>
             </Pressable>
 
             <Pressable onPress={dismiss} style={styles.dismissLink}>
@@ -338,6 +392,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between'
+  },
+  brandLockup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11
+  },
+  brandLogo: {
+    width: 48,
+    height: 48
   },
   kicker: {
     color: colors.gold,
@@ -368,14 +431,20 @@ const styles = StyleSheet.create({
     paddingBottom: 44,
     gap: 16
   },
-  urlPill: {
+  sourcePill: {
     alignSelf: 'flex-start',
     maxWidth: '100%',
-    color: colors.textMuted,
-    backgroundColor: colors.bgMuted,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: colors.primaryLight,
     borderRadius: 999,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 9
+  },
+  sourcePillText: {
+    flexShrink: 1,
+    color: colors.primary,
     fontFamily: fonts.bodyMedium,
     fontSize: 12
   },
@@ -430,6 +499,70 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 3,
     gap: 16
+  },
+  loadingCard: {
+    minHeight: 420,
+    borderRadius: 30,
+    paddingHorizontal: 26,
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: '#EAD8CC',
+    gap: 12
+  },
+  loadingLogoHalo: {
+    width: 124,
+    height: 124,
+    borderRadius: 62,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    shadowColor: colors.primary,
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 3,
+    marginBottom: 8
+  },
+  loadingLogo: {
+    width: 94,
+    height: 94
+  },
+  loadingTitle: {
+    color: colors.primaryDeep,
+    fontFamily: fonts.heading,
+    fontSize: 30,
+    textAlign: 'center'
+  },
+  loadingDescription: {
+    maxWidth: 300,
+    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center'
+  },
+  loadingTrack: {
+    width: '82%',
+    height: 6,
+    marginTop: 12,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: '#E7D3C7'
+  },
+  loadingTrackFill: {
+    width: '72%',
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: colors.primary
+  },
+  loadingHint: {
+    color: '#8A6B63',
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    textAlign: 'center'
   },
   quickIcon: {
     width: 54,
