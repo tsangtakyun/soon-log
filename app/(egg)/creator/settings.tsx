@@ -4,7 +4,6 @@ import * as WebBrowser from "expo-web-browser";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Image,
   Pressable,
@@ -15,6 +14,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { EggLoader } from "@/components/egg/EggLoader";
 import { BackHeader } from "@/components/BackHeader";
 import {
   checkEggUsername,
@@ -219,7 +219,7 @@ export default function EggSettingsScreen() {
     <SafeAreaView style={styles.safe}>
       <BackHeader title="設定" backTo="/(egg)/creator/more" />
       <ScrollView contentContainerStyle={styles.content}>
-        {loading ? <ActivityIndicator color={colors.primary} /> : null}
+        {loading ? <EggLoader label="正在載入設定…" /> : null}
         {error ? (
           <View style={styles.error}>
             <Text style={styles.errorText}>{error}</Text>

@@ -3,7 +3,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -16,6 +15,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { EggLoader } from "@/components/egg/EggLoader";
 import { BackHeader } from "@/components/BackHeader";
 import {
   loadEggDeals,
@@ -151,7 +151,7 @@ export default function EggDealsScreen() {
       >
         {loading ? (
           <View style={styles.loading}>
-            <ActivityIndicator color={colors.primary} />
+            <EggLoader label="正在載入合作機會…" />
             <Text style={styles.muted}>載入合作資料中…</Text>
           </View>
         ) : null}

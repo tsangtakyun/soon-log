@@ -3,7 +3,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Image,
   RefreshControl,
   SafeAreaView,
@@ -13,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { EggLoader } from "@/components/egg/EggLoader";
 import Svg, { Circle, Polyline } from "react-native-svg";
 import { BackHeader } from "@/components/BackHeader";
 import {
@@ -127,7 +127,7 @@ export default function EggAnalyticsScreen() {
         </View>
         {loading ? (
           <View style={styles.loading}>
-            <ActivityIndicator color={colors.primary} />
+            <EggLoader label="正在更新社交數據…" />
             <Text style={styles.subtext}>正在讀取 Meta 數據…</Text>
           </View>
         ) : null}

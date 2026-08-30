@@ -3,7 +3,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Image,
   Pressable,
@@ -15,6 +14,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { EggLoader } from "@/components/egg/EggLoader";
 import { BackHeader } from "@/components/BackHeader";
 import {
   loadEggMediaKit,
@@ -163,7 +163,7 @@ export default function EggMediaKitScreen() {
       >
         {loading ? (
           <View style={styles.loading}>
-            <ActivityIndicator color={colors.primary} />
+            <EggLoader label="正在載入 Media Kit…" />
             <Text style={styles.muted}>正在讀取 Media Kit…</Text>
           </View>
         ) : null}

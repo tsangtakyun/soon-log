@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { EggScreen, eggStyles } from '@/components/egg/EggScreen';
+import { EggLoader } from '@/components/egg/EggLoader';
 import { useEggBootstrap } from '@/hooks/useEggBootstrap';
 import { colors } from '@/theme/colors';
 import { fonts } from '@/lib/theme';
@@ -51,7 +52,7 @@ export default function EggHomeScreen() {
           <Text style={styles.subheading}>今日有咩想創作？</Text>
         </View>
       </View>
-      {loading ? <ActivityIndicator /> : null}
+      {loading ? <EggLoader label="正在載入工作空間…" /> : null}
       {error ? <View style={eggStyles.card}><Text style={eggStyles.cardTitle}>未能載入工作空間</Text><Text style={eggStyles.body}>{error}</Text><Pressable onPress={() => void refresh()}><Text style={eggStyles.link}>重新整理</Text></Pressable></View> : null}
       {data && data.workspaces.length > 1 ? (
         <View style={eggStyles.card}>

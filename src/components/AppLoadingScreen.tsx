@@ -1,6 +1,7 @@
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { ImageBackground, StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { EggLoader } from '@/components/egg/EggLoader';
 
 export function AppLoadingScreen() {
   useEffect(() => {
@@ -8,17 +9,15 @@ export function AppLoadingScreen() {
   }, []);
 
   return (
-    <ImageBackground
-      source={require('../../assets/loading-background.png')}
-      style={styles.screen}
-      resizeMode="cover"
-    />
+    <View style={styles.screen}><EggLoader size="large" label="正在準備你的創作者空間…" /></View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#F9E293'
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FBF4EE'
   }
 });

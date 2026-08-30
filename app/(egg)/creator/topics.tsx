@@ -3,8 +3,9 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Image, NativeScrollEvent, NativeSyntheticEvent, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { Alert, Image, NativeScrollEvent, NativeSyntheticEvent, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { BackHeader } from "@/components/BackHeader";
+import { EggLoader } from "@/components/egg/EggLoader";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/lib/theme";
 import { changeEggTopicCover, deleteEggTopic, EggTopicIdea, loadEggTopics, updateEggTopic, uploadEggTopicImage } from "@/lib/eggApi";
@@ -62,7 +63,7 @@ export default function EggTopicsScreen() {
       <View style={styles.searchRow}><Feather name="search" size={18} color={colors.textMuted} /><TextInput value={query} onChangeText={setQuery} placeholder="搜尋題材、來源或標籤" placeholderTextColor={colors.textMuted} style={styles.searchInput} /></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>{categories.map((item) => <Pressable key={item} onPress={() => setCategory(item)} style={[styles.category, category === item && styles.categoryActive]}><Text style={[styles.categoryText, category === item && styles.categoryTextActive]}>{item}</Text></Pressable>)}</ScrollView>
       {locations.length > 1 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.locations}>{locations.map((item) => <Pressable key={item} onPress={() => setLocation(item)} style={[styles.location, location === item && styles.locationActive]}><Feather name="map-pin" size={12} color={location === item ? "#92400e" : colors.textMuted} /><Text style={[styles.locationText, location === item && styles.locationTextActive]}>{item}</Text></Pressable>)}</ScrollView> : null}
-      {loading && !ideas.length ? <ActivityIndicator color={colors.primary} /> : null}
+      {loading && !ideas.length ? <EggLoader label="正在整理題材靈感…" /> : null}
       {filtered.map((idea) => <View key={idea.id} style={styles.card}>
         <TopicMediaCarousel idea={idea} />
         <View style={styles.cardTop}><Text style={styles.meta}>{idea.platform} · {idea.category}</Text><View style={styles.cardTools}>{role === "owner" && idea.workspace_id ? <Pressable onPress={() => manage(idea)} hitSlop={10}><Feather name="more-horizontal" size={20} color={colors.textMuted} /></Pressable> : <Feather name="zap" size={17} color="#b45309" />}</View></View>

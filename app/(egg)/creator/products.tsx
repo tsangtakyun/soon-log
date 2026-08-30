@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -14,6 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { EggLoader } from "@/components/egg/EggLoader";
 import { BackHeader } from "@/components/BackHeader";
 import { loadEggProducts, saveEggProduct, type EggProduct } from "@/lib/eggApi";
 import { fonts } from "@/lib/theme";
@@ -133,7 +133,7 @@ export default function EggProductsScreen() {
             </Pressable>
           ) : null}
         </View>
-        {loading ? <ActivityIndicator color={colors.primary} /> : null}
+        {loading ? <EggLoader label="正在載入數位產品…" /> : null}
         {error ? (
           <Pressable style={styles.error} onPress={() => void load()}>
             <Text style={styles.errorText}>{error} · 重試</Text>

@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -14,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { BackHeader } from "@/components/BackHeader";
+import { EggLoader } from "@/components/egg/EggLoader";
 import {
   loadEggTeam,
   loadEggPrompt,
@@ -173,7 +173,7 @@ export default function EggTeamScreen() {
             </Pressable>
           </View>
         ) : null}
-        {loading ? <ActivityIndicator color={colors.primary} /> : null}
+        {loading ? <EggLoader label="正在載入團隊成員…" /> : null}
         {error ? (
           <View style={styles.error}>
             <Text style={styles.errorText}>{error}</Text>
