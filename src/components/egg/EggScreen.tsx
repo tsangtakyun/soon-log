@@ -4,19 +4,24 @@ import { colors } from '@/theme/colors';
 import { fonts } from '@/lib/theme';
 
 export function EggScreen({ title, eyebrow, children }: { title?: string; eyebrow?: string; children: ReactNode }) {
-  const rotation = useRef(new Animated.Value(0)).current;
+  const motion = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    const animation = Animated.loop(Animated.timing(rotation, { toValue: 1, duration: 12000, easing: Easing.linear, useNativeDriver: true }));
+    const animation = Animated.loop(Animated.sequence([
+      Animated.timing(motion, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(motion, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
     animation.start();
     return () => animation.stop();
-  }, [rotation]);
-  const spin = rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  }, [motion]);
+  const translateX = motion.interpolate({ inputRange: [0, 1], outputRange: [0, 8] });
+  const translateY = motion.interpolate({ inputRange: [0, 1], outputRange: [1, -1] });
+  const rotate = motion.interpolate({ inputRange: [0, 1], outputRange: ['-3deg', '3deg'] });
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.brandRow}>
-          <Animated.Image source={require('../../../assets/soon-egg.png')} style={[styles.logo, { transform: [{ rotate: spin }] }]} resizeMode="contain" />
+          <Animated.Image source={require('../../../assets/soon-egg.png')} style={[styles.logo, { transform: [{ translateX }, { translateY }, { rotate }] }]} resizeMode="contain" />
         </View>
         {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
         {title ? <Text style={styles.title}>{title}</Text> : null}
