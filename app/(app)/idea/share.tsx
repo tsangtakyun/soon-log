@@ -95,6 +95,8 @@ function buildSharedItems(shareIntent: Record<string, any>): SharedIdeaItem[] {
   const firstFile = files[0] as Record<string, unknown> | undefined;
   const filePath = typeof firstFile?.path === 'string' ? firstFile.path.trim() : '';
   const fileMime = typeof firstFile?.mimeType === 'string' ? firstFile.mimeType : '';
+  const fileName = typeof firstFile?.fileName === 'string' ? firstFile.fileName : '';
+  const mediaDestination = fileName.startsWith('soon-destination-reply-center__') ? 'reply-center' : 'topic-library';
   const fileType = fileMime.startsWith('video/') ? 'video' : fileMime.startsWith('image/') ? 'image' : '';
 
   const fallbackMeta = shareIntent.meta ?? {};
@@ -105,7 +107,7 @@ function buildSharedItems(shareIntent: Record<string, any>): SharedIdeaItem[] {
   const fallbackVideoUrl = localMediaType === 'video' ? localMediaPath : '';
   const fallbackText = stringFromMeta(fallbackMeta, 'soonSharedText') || (typeof shareIntent.text === 'string' ? shareIntent.text.trim() : '');
   const fallbackBoard = stringFromMeta(fallbackMeta, 'soonBoard');
-  const fallbackDestination = destinationFromMeta(fallbackMeta);
+  const fallbackDestination = stringFromMeta(fallbackMeta, 'soonDestination') ? destinationFromMeta(fallbackMeta) : mediaDestination;
   const fallbackBoards = boardsFromShareMeta((fallbackMeta as Record<string, unknown>)?.soonBoards);
 
   const entries = sharedWebUrlEntries(shareIntent);

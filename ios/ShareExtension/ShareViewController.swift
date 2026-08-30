@@ -550,11 +550,11 @@ class ShareViewController: UIViewController {
 
     let headerSpacer = UIView()
     headerSpacer.translatesAutoresizingMaskIntoConstraints = false
-    headerSpacer.widthAnchor.constraint(equalTo: cancelButton.widthAnchor).isActive = true
 
     header.addArrangedSubview(cancelButton)
     header.addArrangedSubview(titleLabel)
     header.addArrangedSubview(headerSpacer)
+    headerSpacer.widthAnchor.constraint(equalTo: cancelButton.widthAnchor).isActive = true
 
     let scrollView = UIScrollView()
     scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -790,6 +790,22 @@ class ShareViewController: UIViewController {
   }
 
   private func persistSelectedBoardToSharedPayload() {
+    let userDefaults = UserDefaults(suiteName: hostAppGroupIdentifier)
+    if !sharedMedia.isEmpty {
+      let marker = "soon-destination-\(selectedBoard)__"
+      for media in sharedMedia {
+        let cleanName = media.fileName.replacingOccurrences(
+          of: #"^soon-destination-[a-z-]+__"#,
+          with: "",
+          options: .regularExpression
+        )
+        media.fileName = marker + cleanName
+      }
+      userDefaults?.set(toData(data: sharedMedia), forKey: sharedKey)
+      userDefaults?.synchronize()
+      return
+    }
+
     guard !sharedWebUrl.isEmpty else { return }
     sharedWebUrl = sharedWebUrl.map {
       if currentShareWebUrlSet.contains(normalizedUrl($0.url)) {
@@ -798,7 +814,6 @@ class ShareViewController: UIViewController {
 
       return $0
     }
-    let userDefaults = UserDefaults(suiteName: hostAppGroupIdentifier)
     sharedWebUrl = mergeWithPendingWebUrls(sharedWebUrl, userDefaults: userDefaults)
     userDefaults?.set(toData(data: sharedWebUrl), forKey: sharedKey)
     userDefaults?.synchronize()
