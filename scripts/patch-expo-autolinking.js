@@ -545,6 +545,50 @@ function patchExpoShareIntentWebUrls() {
   console.log('Patched expo-share-intent iOS weburls batch parsing');
 }
 
+function patchExpoShareIntentSafeDecoding() {
+  const moduleFile = path.join(
+    __dirname,
+    '..',
+    'node_modules',
+    'expo-share-intent',
+    'ios',
+    'ExpoShareIntentModule.swift'
+  );
+
+  if (!fs.existsSync(moduleFile)) {
+    return;
+  }
+
+  let source = fs.readFileSync(moduleFile, 'utf8');
+  const replacements = [
+    [
+      `        let encodedData = try? JSONDecoder().decode([SharedMediaFile].self, from: data)\n        return encodedData!`,
+      `        return (try? JSONDecoder().decode([SharedMediaFile].self, from: data)) ?? []`
+    ],
+    [
+      `        let encodedData = try? JSONDecoder().decode([WebUrl].self, from: data)\n        return encodedData!`,
+      `        return (try? JSONDecoder().decode([WebUrl].self, from: data)) ?? []`
+    ],
+    [
+      `        let encodedData = try? JSONEncoder().encode(data)\n        let json = String(data: encodedData!, encoding: .utf8)!\n        return json`,
+      `        guard let encodedData = try? JSONEncoder().encode(data) else { return nil }\n        return String(data: encodedData, encoding: .utf8)`
+    ]
+  ];
+
+  let changed = false;
+  for (const [original, patched] of replacements) {
+    if (source.includes(original)) {
+      source = source.replace(original, patched);
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    fs.writeFileSync(moduleFile, source);
+    console.log('Patched expo-share-intent iOS decoding to avoid malformed-payload crashes');
+  }
+}
+
 function patchReactNativeScreensMissingIosFiles() {
   const screensRoot = path.join(
     __dirname,
@@ -611,4 +655,5 @@ patchExpoImageLoaderReactImport();
 patchExpoRouterRootUrlScheme();
 patchExpoLinkingManifestFallback();
 patchExpoShareIntentWebUrls();
+patchExpoShareIntentSafeDecoding();
 patchReactNativeScreensMissingIosFiles();

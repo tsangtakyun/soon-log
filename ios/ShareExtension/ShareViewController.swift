@@ -531,10 +531,7 @@ class ShareViewController: UIViewController {
   private func setupMinimalSaveUI() {
     view.backgroundColor = UIColor(red: 0.03, green: 0.04, blue: 0.03, alpha: 1.0)
 
-    let header = UIStackView()
-    header.axis = .horizontal
-    header.alignment = .center
-    header.distribution = .equalCentering
+    let header = UIView()
     header.translatesAutoresizingMaskIntoConstraints = false
 
     let cancelButton = UIButton(type: .system)
@@ -548,18 +545,10 @@ class ShareViewController: UIViewController {
     titleLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
     titleLabel.textAlignment = .center
 
-    let headerSpacer = UIView()
-    headerSpacer.translatesAutoresizingMaskIntoConstraints = false
-
-    header.addArrangedSubview(cancelButton)
-    header.addArrangedSubview(titleLabel)
-    header.addArrangedSubview(headerSpacer)
-    headerSpacer.widthAnchor.constraint(equalTo: cancelButton.widthAnchor).isActive = true
-
-    let scrollView = UIScrollView()
-    scrollView.translatesAutoresizingMaskIntoConstraints = false
-    scrollView.alwaysBounceVertical = true
-    scrollView.showsVerticalScrollIndicator = true
+    cancelButton.translatesAutoresizingMaskIntoConstraints = false
+    titleLabel.translatesAutoresizingMaskIntoConstraints = false
+    header.addSubview(cancelButton)
+    header.addSubview(titleLabel)
 
     let contentStack = UIStackView()
     contentStack.axis = .vertical
@@ -602,34 +591,28 @@ class ShareViewController: UIViewController {
     contentStack.addArrangedSubview(replyCenterRow)
     contentStack.addArrangedSubview(linkPreviewLabel)
 
-    view.addSubview(header)
-    view.addSubview(scrollView)
-    scrollView.addSubview(contentStack)
-    view.addSubview(saveButton)
+    let rootStack = UIStackView(arrangedSubviews: [header, contentStack, saveButton])
+    rootStack.axis = .vertical
+    rootStack.spacing = 18
+    rootStack.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(rootStack)
 
     NSLayoutConstraint.activate([
-      header.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 28),
-      header.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -28),
-      header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+      rootStack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 28),
+      rootStack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -28),
+      rootStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+      rootStack.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
+
       header.heightAnchor.constraint(equalToConstant: 44),
+      cancelButton.leadingAnchor.constraint(equalTo: header.leadingAnchor),
+      cancelButton.centerYAnchor.constraint(equalTo: header.centerYAnchor),
+      titleLabel.centerXAnchor.constraint(equalTo: header.centerXAnchor),
+      titleLabel.centerYAnchor.constraint(equalTo: header.centerYAnchor),
+      titleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: cancelButton.trailingAnchor, constant: 12),
+      titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: header.trailingAnchor),
 
       topicLibraryRow.heightAnchor.constraint(equalToConstant: 78),
       replyCenterRow.heightAnchor.constraint(equalToConstant: 78),
-
-      scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-      scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-      scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 44),
-      scrollView.bottomAnchor.constraint(equalTo: saveButton.topAnchor, constant: -18),
-
-      contentStack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 28),
-      contentStack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -28),
-      contentStack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-      contentStack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -18),
-      contentStack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -56),
-
-      saveButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 28),
-      saveButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -28),
-      saveButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
       saveButton.heightAnchor.constraint(equalToConstant: 60)
     ])
   }

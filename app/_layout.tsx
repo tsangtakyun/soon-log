@@ -4,10 +4,9 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts as useExpoFonts } from 'expo-font';
 import { Feather, FontAwesome, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ShareIntentModule, ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
+import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import {
   DMSerifDisplay_400Regular,
   useFonts as useSerifFonts
@@ -21,7 +20,6 @@ import {
 import { AppLoadingScreen } from '@/components/AppLoadingScreen';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { registerPushToken } from '@/lib/notifications';
-import { SHARE_INTENT_URL } from '@/lib/shareIdeas';
 import { colors } from '@/theme/colors';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -34,25 +32,6 @@ function RootNavigator() {
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
   const lastShareRouteAt = useRef(0);
-
-  const checkPendingShare = useCallback(() => {
-    if (loading) return;
-    ShareIntentModule?.getShareIntent(SHARE_INTENT_URL);
-  }, [loading]);
-
-  useEffect(() => {
-    checkPendingShare();
-  }, [checkPendingShare]);
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        checkPendingShare();
-      }
-    });
-
-    return () => subscription.remove();
-  }, [checkPendingShare]);
 
   useEffect(() => {
     if (!hasShareIntent || loading) return;
