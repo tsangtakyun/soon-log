@@ -148,17 +148,35 @@ export async function importEggSharedTopic(payload: {
 }
 
 export async function uploadEggTopicImage(uri: string, mimeType = "image/jpeg", index = 0) {
-  const form = new FormData();
-  form.append("file", { uri, type: mimeType || "image/jpeg", name: `shared-topic-${Date.now()}-${index}.${mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : mimeType.includes("hei") ? "heic" : "jpg"}` } as never);
-  const response = await fetch(`${apiBase}/api/mobile/topics`, { method: "PUT", headers: await eggAuthHeaders(), body: form });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.error || "未能上載圖片");
-  return result.imageUrl as string;
+  let lastMessage = "未能上載圖片";
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const form = new FormData();
+      form.append("file", { uri, type: mimeType || "image/jpeg", name: `shared-topic-${Date.now()}-${index}.${mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : mimeType.includes("hei") ? "heic" : "jpg"}` } as never);
+      const response = await fetch(`${apiBase}/api/mobile/topics`, { method: "PUT", headers: await eggAuthHeaders(), body: form });
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result.imageUrl) return result.imageUrl as string;
+      lastMessage = friendlyUploadMessage(result.error);
+      if (response.status < 500 || attempt === 2) break;
+    } catch (error) {
+      lastMessage = friendlyUploadMessage(error instanceof Error ? error.message : error);
+      if (attempt === 2) break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 600));
+  }
+  throw new Error(lastMessage);
 }
 
 export async function importEggSharedPhotos(media: Array<{ uri: string; mimeType?: string }>, context = "") {
   const mediaUrls: string[] = [];
-  for (let index = 0; index < media.length; index += 1) mediaUrls.push(await uploadEggTopicImage(media[index].uri, media[index].mimeType, index));
+  for (let index = 0; index < media.length; index += 1) {
+    try {
+      mediaUrls.push(await uploadEggTopicImage(media[index].uri, media[index].mimeType, index));
+    } catch (error) {
+      const detail = friendlyUploadMessage(error instanceof Error ? error.message : error);
+      throw new Error(`第 ${index + 1}/${media.length} 張圖片上載失敗。${detail}`);
+    }
+  }
   const response = await fetch(`${apiBase}/api/mobile/topics`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(await eggAuthHeaders()) },
@@ -167,6 +185,14 @@ export async function importEggSharedPhotos(media: Array<{ uri: string; mimeType
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || "未能儲存相簿題材");
   return result;
+}
+
+function friendlyUploadMessage(value: unknown) {
+  const message = typeof value === "string" ? value.trim() : "";
+  if (!message || message === "<none>" || /storageapierror|network request failed/i.test(message)) {
+    return "圖片儲存服務暫時未能回應，請再試一次";
+  }
+  return message;
 }
 
 export async function deleteEggTopic(ideaId: string) {

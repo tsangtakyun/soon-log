@@ -25,7 +25,7 @@ type SharedIdeaItem = {
 };
 
 function formatSaveError(err: unknown) {
-  if (err instanceof Error) return err.message;
+  if (err instanceof Error) return sanitizeSaveError(err.message);
 
   if (err && typeof err === 'object') {
     const record = err as Record<string, unknown>;
@@ -33,10 +33,18 @@ function formatSaveError(err: unknown) {
       .filter(Boolean)
       .map(String);
 
-    if (parts.length > 0) return parts.join('\n');
+    if (parts.length > 0) return sanitizeSaveError(parts.join('\n'));
   }
 
   return '請稍後再試';
+}
+
+function sanitizeSaveError(message: string) {
+  const value = message.trim();
+  if (!value || value === '<none>' || /storageapierror|network request failed/i.test(value)) {
+    return '圖片儲存服務暫時未能回應，請再試一次';
+  }
+  return value;
 }
 
 function normalizeSharedPayloadText(value: string, sharedUrl: string) {
