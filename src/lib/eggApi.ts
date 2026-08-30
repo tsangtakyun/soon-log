@@ -104,6 +104,7 @@ export type EggTopicIdea = {
   content_format: string;
   saved: boolean;
   want_to_create: boolean;
+  manageable?: boolean;
   why_now?: string;
   hook?: string;
   suggested_angles?: string[];

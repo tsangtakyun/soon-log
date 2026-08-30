@@ -66,7 +66,7 @@ export default function EggTopicsScreen() {
       {loading && !ideas.length ? <EggLoader label="正在整理題材靈感…" /> : null}
       {filtered.map((idea) => <View key={idea.id} style={styles.card}>
         <TopicMediaCarousel idea={idea} />
-        <View style={styles.cardTop}><Text style={styles.meta}>{idea.platform} · {idea.category}</Text><View style={styles.cardTools}>{role === "owner" && idea.workspace_id ? <Pressable onPress={() => manage(idea)} hitSlop={10}><Feather name="more-horizontal" size={20} color={colors.textMuted} /></Pressable> : <Feather name="zap" size={17} color="#b45309" />}</View></View>
+        <View style={styles.cardTop}><Text style={styles.meta}>{idea.platform} · {idea.category}</Text><View style={styles.cardTools}>{role === "owner" && idea.manageable ? <Pressable onPress={() => manage(idea)} hitSlop={10}><Feather name="more-horizontal" size={20} color={colors.textMuted} /></Pressable> : <Feather name="zap" size={17} color="#b45309" />}</View></View>
         {idea.recommended ? <View style={styles.recommended}><Text style={styles.recommendedText}>為你推薦</Text></View> : null}
         <Text style={styles.title}>{idea.title}</Text>{idea.summary ? <Text style={styles.summary}>{idea.summary}</Text> : null}
         {idea.why_now ? <View style={styles.whyNow}><Text style={styles.whyNowText}><Text style={styles.whyNowStrong}>點解值得留意：</Text>{idea.why_now}</Text></View> : null}
