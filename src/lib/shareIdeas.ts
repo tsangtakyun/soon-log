@@ -2,7 +2,8 @@ import { enrichIdeaFromUrl } from '@/lib/ideaEnrichment';
 import { mergeLocalIdeaBoards } from '@/lib/ideaBoards';
 import { supabase } from '@/lib/supabase';
 
-export const SHARE_INTENT_URL = 'soonlog://dataUrl=soonlogShareKey#weburl';
+const shareScheme = process.env.EXPO_PUBLIC_APP_SCHEME || 'soonlog';
+export const SHARE_INTENT_URL = `${shareScheme}://dataUrl=soonlogShareKey#weburl`;
 
 type AuthUser = {
   id: string;

@@ -13,7 +13,7 @@ import Vision
 
 class ShareViewController: UIViewController {
   let hostAppGroupIdentifier = "group.com.theirstudio.sooncreatorlog.shared"
-  let shareProtocol = "soonlog"
+  let shareProtocol = "soonegg"
   let sharedKey = "soonlogShareKey"
   var sharedMedia: [SharedMediaFile] = []
   var sharedWebUrl: [WebUrl] = []

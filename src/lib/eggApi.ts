@@ -129,6 +129,22 @@ export async function updateEggTopic(ideaId: string, action: "save" | "create" |
   if (!response.ok) throw new Error(result.error || "未能儲存操作");
 }
 
+export async function importEggSharedTopic(payload: {
+  sourceUrl: string;
+  context?: string;
+  category?: string;
+  imageUrl?: string;
+}) {
+  const response = await fetch(`${apiBase}/api/mobile/topics`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await eggAuthHeaders()) },
+    body: JSON.stringify({ mode: "import", ...payload }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "未能儲存分享題材");
+  return result as { success: true; ideaId: string; existing: boolean };
+}
+
 export type EggTeamMember = {
   user_id: string;
   email: string;

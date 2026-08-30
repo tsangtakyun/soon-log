@@ -9,6 +9,7 @@ import { mergeLocalIdeaBoards } from '@/lib/ideaBoards';
 import { boardsFromShareMeta, extractSharedUrl, saveSharedIdea } from '@/lib/shareIdeas';
 import { fonts } from '@/lib/theme';
 import { colors } from '@/theme/colors';
+import { importEggSharedTopic } from '@/lib/eggApi';
 
 type Status = 'idle' | 'ready' | 'saving' | 'saved' | 'error';
 
@@ -182,20 +183,29 @@ export default function IdeaShareScreen() {
     setStatus('saving');
     try {
       for (const item of sharedItems) {
-        await saveSharedIdea({
-          user,
-          url: item.url,
-          selectedBoard: item.selectedBoard,
-          sharedBoards: item.sharedBoards,
-          previewImage: item.previewImage,
-          videoUrl: item.videoUrl,
-          sharedText: item.sharedText
-        });
+        if (process.env.EXPO_PUBLIC_EGG_CREATOR_BUILD === 'true') {
+          await importEggSharedTopic({
+            sourceUrl: item.url,
+            context: item.sharedText,
+            category: item.selectedBoard && item.selectedBoard !== 'Recents' ? item.selectedBoard : undefined,
+            imageUrl: item.previewImage.startsWith('https://') ? item.previewImage : undefined
+          });
+        } else {
+          await saveSharedIdea({
+            user,
+            url: item.url,
+            selectedBoard: item.selectedBoard,
+            sharedBoards: item.sharedBoards,
+            previewImage: item.previewImage,
+            videoUrl: item.videoUrl,
+            sharedText: item.sharedText
+          });
+        }
       }
 
       setStatus('saved');
       resetShareIntent();
-      setTimeout(() => router.replace('/(app)/tools/idea-library'), 1200);
+      setTimeout(() => router.replace(process.env.EXPO_PUBLIC_EGG_CREATOR_BUILD === 'true' ? '/creator/topics' : '/(app)/tools/idea-library'), 1200);
     } catch (err: unknown) {
       console.warn('[share-idea] save failed', err);
       const message = formatSaveError(err);
