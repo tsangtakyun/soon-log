@@ -41,10 +41,8 @@ class ShareViewController: UIViewController {
   private let statusLabel = UILabel()
   private let saveButton = UIButton(type: .system)
   private let linkPreviewLabel = UILabel()
-  private let boardListStack = UIStackView()
   private var boardCheckmarks: [String: UIImageView] = [:]
-  private var selectedBoard = "Recents"
-  private let boardsKey = "soonlogIdeaBoards"
+  private var selectedBoard = "topic-library"
   private var extensionContentText: String?
   private var currentShareWebUrlSet = Set<String>()
 
@@ -545,20 +543,18 @@ class ShareViewController: UIViewController {
     cancelButton.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .regular)
     cancelButton.addTarget(self, action: #selector(cancelShare), for: .touchUpInside)
 
-    titleLabel.text = "儲存到 EGG"
+    titleLabel.text = "分享到 EGG"
     titleLabel.textColor = .white
     titleLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
     titleLabel.textAlignment = .center
 
-    let newBoardButton = UIButton(type: .system)
-    newBoardButton.setTitle("新增分類", for: .normal)
-    newBoardButton.setTitleColor(UIColor(red: 0.82, green: 0.31, blue: 0.49, alpha: 1), for: .normal)
-    newBoardButton.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .regular)
-    newBoardButton.addTarget(self, action: #selector(showNewBoardPrompt), for: .touchUpInside)
+    let headerSpacer = UIView()
+    headerSpacer.translatesAutoresizingMaskIntoConstraints = false
+    headerSpacer.widthAnchor.constraint(equalTo: cancelButton.widthAnchor).isActive = true
 
     header.addArrangedSubview(cancelButton)
     header.addArrangedSubview(titleLabel)
-    header.addArrangedSubview(newBoardButton)
+    header.addArrangedSubview(headerSpacer)
 
     let scrollView = UIScrollView()
     scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -570,17 +566,18 @@ class ShareViewController: UIViewController {
     contentStack.spacing = 14
     contentStack.translatesAutoresizingMaskIntoConstraints = false
 
-    let recentsRow = makeBoardRow(
-      id: "Recents",
-      title: "儲存到最近項目",
-      subtitle: "快速保存到最近靈感",
-      systemIcon: "bookmark"
+    let topicLibraryRow = makeBoardRow(
+      id: "topic-library",
+      title: "題材靈感庫",
+      subtitle: "儲存靈感，由 AI 自動整理分類",
+      systemIcon: "lightbulb"
     )
-
-    boardListStack.axis = .vertical
-    boardListStack.spacing = 10
-    boardListStack.translatesAutoresizingMaskIntoConstraints = false
-    reloadBoardRows()
+    let replyCenterRow = makeBoardRow(
+      id: "reply-center",
+      title: "回覆中心",
+      subtitle: "將客戶查詢或截圖帶入 AI 回覆",
+      systemIcon: "bubble.left.and.bubble.right"
+    )
 
     linkPreviewLabel.text = ""
     linkPreviewLabel.textColor = UIColor(white: 1, alpha: 0.45)
@@ -588,7 +585,7 @@ class ShareViewController: UIViewController {
     linkPreviewLabel.numberOfLines = 1
 
     saveButton.translatesAutoresizingMaskIntoConstraints = false
-    saveButton.setTitle("儲存", for: .normal)
+    saveButton.setTitle("繼續", for: .normal)
     saveButton.setTitleColor(.white, for: .normal)
     saveButton.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
     saveButton.backgroundColor = UIColor(red: 0.82, green: 0.31, blue: 0.49, alpha: 0.45)
@@ -601,8 +598,8 @@ class ShareViewController: UIViewController {
     statusLabel.font = UIFont.systemFont(ofSize: 14, weight: .regular)
 
     contentStack.addArrangedSubview(statusLabel)
-    contentStack.addArrangedSubview(recentsRow)
-    contentStack.addArrangedSubview(boardListStack)
+    contentStack.addArrangedSubview(topicLibraryRow)
+    contentStack.addArrangedSubview(replyCenterRow)
     contentStack.addArrangedSubview(linkPreviewLabel)
 
     view.addSubview(header)
@@ -616,7 +613,8 @@ class ShareViewController: UIViewController {
       header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
       header.heightAnchor.constraint(equalToConstant: 44),
 
-      recentsRow.heightAnchor.constraint(equalToConstant: 78),
+      topicLibraryRow.heightAnchor.constraint(equalToConstant: 78),
+      replyCenterRow.heightAnchor.constraint(equalToConstant: 78),
 
       scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -712,39 +710,6 @@ class ShareViewController: UIViewController {
     return row
   }
 
-  private func reloadBoardRows() {
-    boardListStack.arrangedSubviews.forEach { view in
-      boardListStack.removeArrangedSubview(view)
-      view.removeFromSuperview()
-    }
-
-    let boards = storedBoards()
-    for board in boards {
-      let row = makeBoardRow(id: board, title: board, subtitle: "儲存到此分類", systemIcon: "folder")
-      boardListStack.addArrangedSubview(row)
-      row.heightAnchor.constraint(equalToConstant: 78).isActive = true
-    }
-    updateBoardSelection()
-  }
-
-  private func storedBoards() -> [String] {
-    let userDefaults = UserDefaults(suiteName: hostAppGroupIdentifier)
-    return userDefaults?.stringArray(forKey: boardsKey) ?? []
-  }
-
-  private func saveBoards(_ boards: [String]) {
-    var cleaned: [String] = []
-    for board in boards.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) }).filter({ !$0.isEmpty }) {
-      if !cleaned.contains(board) {
-        cleaned.append(board)
-      }
-    }
-    let userDefaults = UserDefaults(suiteName: hostAppGroupIdentifier)
-    userDefaults?.set(cleaned, forKey: boardsKey)
-    userDefaults?.synchronize()
-    persistSelectedBoardToSharedPayload()
-  }
-
   private func updateBoardSelection() {
     boardCheckmarks.forEach { key, checkmark in
       checkmark.isHidden = key != selectedBoard
@@ -760,8 +725,8 @@ class ShareViewController: UIViewController {
       meta = json
     }
 
-    meta["soonBoard"] = selectedBoard == "Recents" ? "" : selectedBoard
-    meta["soonBoards"] = storedBoards()
+    meta["soonDestination"] = selectedBoard
+    meta["soonBoard"] = ""
 
     let sharedPayloadText = firstNonEmpty(
       normalizedSharedText(extensionContentText),
@@ -798,8 +763,8 @@ class ShareViewController: UIViewController {
     guard let data = try? JSONSerialization.data(withJSONObject: meta),
       let string = String(data: data, encoding: .utf8)
     else {
-      let escapedBoard = selectedBoard.replacingOccurrences(of: "\"", with: "\\\"")
-      return selectedBoard == "Recents" ? "{}" : "{\"soonBoard\":\"\(escapedBoard)\"}"
+      let escapedDestination = selectedBoard.replacingOccurrences(of: "\"", with: "\\\"")
+      return "{\"soonDestination\":\"\(escapedDestination)\"}"
     }
 
     return string
@@ -877,11 +842,11 @@ class ShareViewController: UIViewController {
   private func finishLoading(type: RedirectType) {
     pendingRedirectType = type
     if type == .weburl && sharedWebUrl.count > 1 {
-      statusLabel.text = "已準備好儲存 \(sharedWebUrl.count) 條題材"
-      saveButton.setTitle("儲存 \(sharedWebUrl.count) 條", for: .normal)
+      statusLabel.text = "已讀取 \(sharedWebUrl.count) 項分享內容"
+      saveButton.setTitle("繼續處理 \(sharedWebUrl.count) 項", for: .normal)
     } else {
-      statusLabel.text = "已準備好儲存"
-      saveButton.setTitle("儲存", for: .normal)
+      statusLabel.text = "已讀取分享內容"
+      saveButton.setTitle("繼續", for: .normal)
     }
     saveButton.isEnabled = true
     saveButton.backgroundColor = UIColor(red: 0.82, green: 0.31, blue: 0.49, alpha: 1)
@@ -899,28 +864,8 @@ class ShareViewController: UIViewController {
   }
 
   @objc private func selectBoard(_ sender: UIControl) {
-    selectedBoard = sender.accessibilityIdentifier ?? "Recents"
+    selectedBoard = sender.accessibilityIdentifier ?? "topic-library"
     updateBoardSelection()
-  }
-
-  @objc private func showNewBoardPrompt() {
-    let alert = UIAlertController(title: "新增分類", message: "為呢個靈感建立一個分類", preferredStyle: .alert)
-    alert.addTextField { textField in
-      textField.placeholder = "分類名稱"
-      textField.autocapitalizationType = .words
-    }
-    alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-    alert.addAction(UIAlertAction(title: "建立", style: .default) { _ in
-      guard let name = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
-        return
-      }
-      var boards = self.storedBoards()
-      boards.append(name)
-      self.saveBoards(boards)
-      self.selectedBoard = name
-      self.reloadBoardRows()
-    })
-    present(alert, animated: true)
   }
 
   @objc private func cancelShare() {

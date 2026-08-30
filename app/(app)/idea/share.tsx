@@ -15,6 +15,7 @@ type Status = 'idle' | 'ready' | 'saving' | 'saved' | 'error';
 
 type SharedIdeaItem = {
   url: string;
+  destination: 'topic-library' | 'reply-center';
   selectedBoard: string;
   sharedBoards: string[];
   previewImage: string;
@@ -59,6 +60,10 @@ function stringFromMeta(meta: unknown, key: string) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function destinationFromMeta(meta: unknown): SharedIdeaItem['destination'] {
+  return stringFromMeta(meta, 'soonDestination') === 'reply-center' ? 'reply-center' : 'topic-library';
+}
+
 function sharedWebUrlEntries(shareIntent: Record<string, any>) {
   const rawWebUrls = parseJson(shareIntent.meta?.soonWebUrls);
   if (Array.isArray(rawWebUrls)) {
@@ -100,6 +105,7 @@ function buildSharedItems(shareIntent: Record<string, any>): SharedIdeaItem[] {
   const fallbackVideoUrl = localMediaType === 'video' ? localMediaPath : '';
   const fallbackText = stringFromMeta(fallbackMeta, 'soonSharedText') || (typeof shareIntent.text === 'string' ? shareIntent.text.trim() : '');
   const fallbackBoard = stringFromMeta(fallbackMeta, 'soonBoard');
+  const fallbackDestination = destinationFromMeta(fallbackMeta);
   const fallbackBoards = boardsFromShareMeta((fallbackMeta as Record<string, unknown>)?.soonBoards);
 
   const entries = sharedWebUrlEntries(shareIntent);
@@ -111,9 +117,11 @@ function buildSharedItems(shareIntent: Record<string, any>): SharedIdeaItem[] {
       const mediaPath = stringFromMeta(meta, 'soonLocalMediaPath') || localMediaPath;
       const payloadText = stringFromMeta(meta, 'soonSharedText') || fallbackText;
       const selectedBoard = stringFromMeta(meta, 'soonBoard') || fallbackBoard;
+      const destination = stringFromMeta(meta, 'soonDestination') ? destinationFromMeta(meta) : fallbackDestination;
 
       return {
         url: entry.url,
+        destination,
         selectedBoard,
         sharedBoards: boardsFromShareMeta((meta as Record<string, unknown>)?.soonBoards).concat(fallbackBoards),
         previewImage,
@@ -123,6 +131,7 @@ function buildSharedItems(shareIntent: Record<string, any>): SharedIdeaItem[] {
     })
     : [{
       url: shareIntent.webUrl || extractSharedUrl(shareIntent.text) || localMediaPath,
+      destination: fallbackDestination,
       selectedBoard: fallbackBoard,
       sharedBoards: fallbackBoards,
       previewImage: fallbackThumbnail,
@@ -182,12 +191,26 @@ export default function IdeaShareScreen() {
 
     setStatus('saving');
     try {
+      const replyItem = sharedItems.find((item) => item.destination === 'reply-center');
+      if (process.env.EXPO_PUBLIC_EGG_CREATOR_BUILD === 'true' && replyItem) {
+        resetShareIntent();
+        router.replace({
+          pathname: '/creator/reply',
+          params: {
+            sharedUrl: replyItem.url,
+            sharedText: replyItem.sharedText,
+            sharedImage: replyItem.previewImage,
+            sharedMime: replyItem.previewImage ? 'image/jpeg' : ''
+          }
+        });
+        return;
+      }
+
       for (const item of sharedItems) {
         if (process.env.EXPO_PUBLIC_EGG_CREATOR_BUILD === 'true') {
           await importEggSharedTopic({
             sourceUrl: item.url,
             context: item.sharedText,
-            category: item.selectedBoard && item.selectedBoard !== 'Recents' ? item.selectedBoard : undefined,
             imageUrl: item.previewImage.startsWith('https://') ? item.previewImage : undefined
           });
         } else {
@@ -258,7 +281,7 @@ export default function IdeaShareScreen() {
         {status === 'saved' ? (
           <View style={styles.centerState}>
             <Text style={styles.savedIcon}>◈</Text>
-            <Text style={styles.savedText}>{sharedItems.length > 1 ? `已儲存 ${sharedItems.length} 條入題材庫` : '已儲存入題材庫'}</Text>
+            <Text style={styles.savedText}>{sharedItems.length > 1 ? `已儲存 ${sharedItems.length} 條入題材靈感庫` : '已儲存入題材靈感庫'}</Text>
             <Text style={styles.savedSubtext}>AI 正在背景補充標題、封面、店舖同推薦資料，通常約 10–30 秒完成。</Text>
           </View>
         ) : null}
@@ -269,24 +292,22 @@ export default function IdeaShareScreen() {
               <Feather name="bookmark" size={24} color={colors.primary} />
             </View>
             <View style={styles.quickCopy}>
-              <Text style={styles.quickTitle}>Save to 題材庫</Text>
+              <Text style={styles.quickTitle}>{sharedItems[0]?.destination === 'reply-center' ? '帶入回覆中心' : '儲存到題材靈感庫'}</Text>
               <Text style={styles.quickDescription}>
-                {sharedItems.length > 1 ? `準備儲存 ${sharedItems.length} 條題材；先入庫，AI 之後約 10–30 秒補資料。` : '先儲存連結；AI 之後約 10–30 秒補標題、封面、店舖同推薦資料。'}
+                {sharedItems[0]?.destination === 'reply-center'
+                  ? '會保留連結或截圖，帶入 AI 回覆草稿；不會儲存到題材庫。'
+                  : sharedItems.length > 1
+                    ? `準備儲存 ${sharedItems.length} 條題材；AI 會自動整理分類。`
+                    : 'AI 會自動補充標題、封面、地區及內容分類。'}
               </Text>
-              {sharedItems[0]?.selectedBoard ? (
-                <View style={styles.boardPill}>
-                  <Feather name="folder" size={13} color={colors.primary} />
-                  <Text style={styles.boardPillText}>{sharedItems[0].selectedBoard}</Text>
-                </View>
-              ) : null}
             </View>
             <Pressable disabled={status === 'saving'} onPress={saveIdea} style={({ pressed }) => [styles.saveButton, (pressed || status === 'saving') && styles.pressed]}>
               {status === 'saving' ? (
                 <ActivityIndicator color={colors.textOnDark} />
               ) : (
                 <View style={styles.saveButtonContent}>
-                  <Feather name="bookmark" size={18} color={colors.textOnDark} />
-                  <Text style={styles.saveButtonText}>儲存入題材庫</Text>
+                  <Feather name={sharedItems[0]?.destination === 'reply-center' ? 'message-circle' : 'bookmark'} size={18} color={colors.textOnDark} />
+                  <Text style={styles.saveButtonText}>{sharedItems[0]?.destination === 'reply-center' ? '開啟回覆中心' : '儲存入題材靈感庫'}</Text>
                 </View>
               )}
             </Pressable>

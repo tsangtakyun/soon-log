@@ -1,8 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
+import { useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -32,6 +34,13 @@ type Panel = "projects" | "brief" | "chat";
 type Attachment = { data: string; mediaType: string; name: string };
 
 export default function ReplyCentreScreen() {
+  const params = useLocalSearchParams<{
+    sharedUrl?: string;
+    sharedText?: string;
+    sharedImage?: string;
+    sharedMime?: string;
+  }>();
+  const didApplySharedContent = useRef(false);
   const [projects, setProjects] = useState<EggReplyProject[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<EggReplyMessage[]>([]);
@@ -51,6 +60,36 @@ export default function ReplyCentreScreen() {
       null,
     [activeId, projects],
   );
+
+  useEffect(() => {
+    if (didApplySharedContent.current) return;
+    const sharedUrl = typeof params.sharedUrl === "string" ? params.sharedUrl.trim() : "";
+    const sharedText = typeof params.sharedText === "string" ? params.sharedText.trim() : "";
+    const sharedImage = typeof params.sharedImage === "string" ? params.sharedImage.trim() : "";
+    if (!sharedUrl && !sharedText && !sharedImage) return;
+
+    didApplySharedContent.current = true;
+    setInput([sharedText, sharedUrl].filter(Boolean).join("\n\n"));
+    setPanel("chat");
+
+    if (sharedImage && !/^https?:\/\//i.test(sharedImage)) {
+      void FileSystem.readAsStringAsync(sharedImage, {
+        encoding: FileSystem.EncodingType.Base64,
+      }).then((data) => {
+        if (data.length > 4_000_000) {
+          setError("分享截圖太大，請在回覆中心重新選擇較細圖片。");
+          return;
+        }
+        setImage({
+          data,
+          mediaType: params.sharedMime || "image/jpeg",
+          name: "分享截圖",
+        });
+      }).catch(() => {
+        setError("未能讀取分享截圖，請在回覆中心重新選擇圖片。");
+      });
+    }
+  }, [params.sharedImage, params.sharedMime, params.sharedText, params.sharedUrl]);
 
   const load = useCallback(async (projectId?: string, quiet = false) => {
     if (!quiet) setLoading(true);
