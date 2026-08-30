@@ -3,7 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Image, NativeScrollEvent, NativeSyntheticEvent, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { BackHeader } from "@/components/BackHeader";
 import { colors } from "@/theme/colors";
 import { fonts } from "@/lib/theme";
@@ -64,8 +64,8 @@ export default function EggTopicsScreen() {
       {locations.length > 1 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.locations}>{locations.map((item) => <Pressable key={item} onPress={() => setLocation(item)} style={[styles.location, location === item && styles.locationActive]}><Feather name="map-pin" size={12} color={location === item ? "#92400e" : colors.textMuted} /><Text style={[styles.locationText, location === item && styles.locationTextActive]}>{item}</Text></Pressable>)}</ScrollView> : null}
       {loading && !ideas.length ? <ActivityIndicator color={colors.primary} /> : null}
       {filtered.map((idea) => <View key={idea.id} style={styles.card}>
-        {idea.image_url ? <Image source={{ uri: idea.image_url }} resizeMode="cover" style={styles.cover} /> : null}
-        <View style={styles.cardTop}><Text style={styles.meta}>{idea.platform} · {idea.category}</Text><View style={styles.cardTools}>{idea.media_urls && idea.media_urls.length > 1 ? <Text style={styles.mediaCount}>1/{idea.media_urls.length}</Text> : null}{role === "owner" && idea.workspace_id ? <Pressable onPress={() => manage(idea)} hitSlop={10}><Feather name="more-horizontal" size={20} color={colors.textMuted} /></Pressable> : <Feather name="zap" size={17} color="#b45309" />}</View></View>
+        <TopicMediaCarousel idea={idea} />
+        <View style={styles.cardTop}><Text style={styles.meta}>{idea.platform} · {idea.category}</Text><View style={styles.cardTools}>{role === "owner" && idea.workspace_id ? <Pressable onPress={() => manage(idea)} hitSlop={10}><Feather name="more-horizontal" size={20} color={colors.textMuted} /></Pressable> : <Feather name="zap" size={17} color="#b45309" />}</View></View>
         {idea.recommended ? <View style={styles.recommended}><Text style={styles.recommendedText}>為你推薦</Text></View> : null}
         <Text style={styles.title}>{idea.title}</Text>{idea.summary ? <Text style={styles.summary}>{idea.summary}</Text> : null}
         {idea.why_now ? <View style={styles.whyNow}><Text style={styles.whyNowText}><Text style={styles.whyNowStrong}>點解值得留意：</Text>{idea.why_now}</Text></View> : null}
@@ -79,10 +79,47 @@ export default function EggTopicsScreen() {
   </View>;
 }
 
+function TopicMediaCarousel({ idea }: { idea: EggTopicIdea }) {
+  const { width: screenWidth } = useWindowDimensions();
+  const [page, setPage] = useState(0);
+  const media = idea.media_urls?.length ? idea.media_urls : idea.image_url ? [idea.image_url] : [];
+  if (!media.length) return null;
+
+  const carouselWidth = Math.max(260, screenWidth - 36);
+  const updatePage = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const nextPage = Math.round(event.nativeEvent.contentOffset.x / carouselWidth);
+    setPage(Math.max(0, Math.min(nextPage, media.length - 1)));
+  };
+
+  return <View style={[styles.carouselWrap, { width: carouselWidth }]}>
+    <ScrollView
+      horizontal
+      pagingEnabled
+      bounces={false}
+      decelerationRate="fast"
+      showsHorizontalScrollIndicator={false}
+      onMomentumScrollEnd={updatePage}
+    >
+      {media.map((uri, index) => <Image
+        key={`${idea.id}-${index}-${uri}`}
+        source={{ uri }}
+        resizeMode="cover"
+        style={[styles.carouselImage, { width: carouselWidth }]}
+      />)}
+    </ScrollView>
+    {media.length > 1 ? <>
+      <View style={styles.carouselCount}><Text style={styles.carouselCountText}>{page + 1}/{media.length}</Text></View>
+      <View style={styles.carouselDots}>
+        {media.map((_, index) => <View key={index} style={[styles.carouselDot, index === page && styles.carouselDotActive]} />)}
+      </View>
+    </> : null}
+  </View>;
+}
+
 function Action({ icon, label, onPress, active, primary, disabled }: { icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void; active?: boolean; primary?: boolean; disabled?: boolean }) {
   return <Pressable onPress={onPress} disabled={disabled} style={[styles.action, active && styles.actionActive, primary && styles.actionPrimary]}><Feather name={icon} size={14} color={primary ? "#fff" : active ? "#92400e" : colors.textMuted} /><Text style={[styles.actionText, active && styles.actionTextActive, primary && styles.actionTextPrimary]}>{label}</Text></Pressable>;
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg }, content: { padding: 18, paddingBottom: 110, gap: 14 }, lead: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 14, lineHeight: 21 }, searchRow: { flexDirection: "row", alignItems: "center", gap: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.bgCard, paddingHorizontal: 13 }, searchInput: { flex: 1, color: colors.text, fontFamily: fonts.body, fontSize: 14, paddingVertical: 13 }, categories: { gap: 8 }, category: { borderRadius: 999, backgroundColor: "#f3f4f6", paddingHorizontal: 14, paddingVertical: 8 }, categoryActive: { backgroundColor: colors.text }, categoryText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 12 }, categoryTextActive: { color: "#fff" }, locations: { gap: 7 }, location: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 11, paddingVertical: 7, flexDirection: "row", alignItems: "center", gap: 4 }, locationActive: { borderColor: "#f59e0b", backgroundColor: "#fffbeb" }, locationText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 11 }, locationTextActive: { color: "#92400e" }, card: { overflow: "hidden", borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgCard, padding: 17, gap: 12 }, cover: { alignSelf: "stretch", aspectRatio: 4 / 5, marginHorizontal: -17, marginTop: -17, marginBottom: 2, backgroundColor: "#f3f4f6" }, cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, cardTools: { flexDirection: "row", alignItems: "center", gap: 8 }, mediaCount: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 11 }, meta: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 12 }, recommended: { alignSelf: "flex-start", borderRadius: 999, backgroundColor: "#fbbf24", paddingHorizontal: 9, paddingVertical: 5 }, recommendedText: { color: "#18181b", fontFamily: fonts.bodyBold, fontSize: 11 }, title: { color: colors.text, fontFamily: fonts.bodyBold, fontSize: 21, lineHeight: 28 }, summary: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 14, lineHeight: 21 }, whyNow: { borderRadius: 12, backgroundColor: "#fffbeb", padding: 10 }, whyNowText: { color: "#78350f", fontFamily: fonts.body, fontSize: 13, lineHeight: 19 }, whyNowStrong: { fontFamily: fonts.bodyBold }, hook: { color: colors.text, fontFamily: fonts.body, fontSize: 13, lineHeight: 19 }, hookStrong: { fontFamily: fonts.bodyBold }, tags: { flexDirection: "row", flexWrap: "wrap", gap: 6 }, tag: { borderRadius: 999, backgroundColor: "#f3f4f6", paddingHorizontal: 9, paddingVertical: 5 }, tagText: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 11 }, source: { flexDirection: "row", alignItems: "center", gap: 5 }, sourceText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 12, textDecorationLine: "underline" }, actions: { flexDirection: "row", gap: 7, paddingTop: 4 }, action: { flex: 1, minHeight: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }, actionActive: { backgroundColor: "#fffbeb", borderColor: "#fcd34d" }, actionPrimary: { backgroundColor: colors.text, borderColor: colors.text }, actionText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 11 }, actionTextActive: { color: "#92400e" }, actionTextPrimary: { color: "#fff" }, empty: { color: colors.textMuted, fontFamily: fonts.body, textAlign: "center", paddingVertical: 48 },
+  screen: { flex: 1, backgroundColor: colors.bg }, content: { padding: 18, paddingBottom: 110, gap: 14 }, lead: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 14, lineHeight: 21 }, searchRow: { flexDirection: "row", alignItems: "center", gap: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.bgCard, paddingHorizontal: 13 }, searchInput: { flex: 1, color: colors.text, fontFamily: fonts.body, fontSize: 14, paddingVertical: 13 }, categories: { gap: 8 }, category: { borderRadius: 999, backgroundColor: "#f3f4f6", paddingHorizontal: 14, paddingVertical: 8 }, categoryActive: { backgroundColor: colors.text }, categoryText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 12 }, categoryTextActive: { color: "#fff" }, locations: { gap: 7 }, location: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 11, paddingVertical: 7, flexDirection: "row", alignItems: "center", gap: 4 }, locationActive: { borderColor: "#f59e0b", backgroundColor: "#fffbeb" }, locationText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 11 }, locationTextActive: { color: "#92400e" }, card: { overflow: "hidden", borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgCard, padding: 17, gap: 12 }, carouselWrap: { position: "relative", aspectRatio: 4 / 5, marginHorizontal: -17, marginTop: -17, marginBottom: 2, backgroundColor: "#f3f4f6" }, carouselImage: { aspectRatio: 4 / 5, backgroundColor: "#f3f4f6" }, carouselCount: { position: "absolute", right: 12, top: 12, borderRadius: 999, backgroundColor: "rgba(10,10,10,0.72)", paddingHorizontal: 9, paddingVertical: 5 }, carouselCountText: { color: "#fff", fontFamily: fonts.bodyBold, fontSize: 11 }, carouselDots: { position: "absolute", left: 12, right: 12, bottom: 12, flexDirection: "row", justifyContent: "center", gap: 5 }, carouselDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.55)" }, carouselDotActive: { width: 16, backgroundColor: "#fff" }, cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, cardTools: { flexDirection: "row", alignItems: "center", gap: 8 }, meta: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 12 }, recommended: { alignSelf: "flex-start", borderRadius: 999, backgroundColor: "#fbbf24", paddingHorizontal: 9, paddingVertical: 5 }, recommendedText: { color: "#18181b", fontFamily: fonts.bodyBold, fontSize: 11 }, title: { color: colors.text, fontFamily: fonts.bodyBold, fontSize: 21, lineHeight: 28 }, summary: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 14, lineHeight: 21 }, whyNow: { borderRadius: 12, backgroundColor: "#fffbeb", padding: 10 }, whyNowText: { color: "#78350f", fontFamily: fonts.body, fontSize: 13, lineHeight: 19 }, whyNowStrong: { fontFamily: fonts.bodyBold }, hook: { color: colors.text, fontFamily: fonts.body, fontSize: 13, lineHeight: 19 }, hookStrong: { fontFamily: fonts.bodyBold }, tags: { flexDirection: "row", flexWrap: "wrap", gap: 6 }, tag: { borderRadius: 999, backgroundColor: "#f3f4f6", paddingHorizontal: 9, paddingVertical: 5 }, tagText: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 11 }, source: { flexDirection: "row", alignItems: "center", gap: 5 }, sourceText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 12, textDecorationLine: "underline" }, actions: { flexDirection: "row", gap: 7, paddingTop: 4 }, action: { flex: 1, minHeight: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }, actionActive: { backgroundColor: "#fffbeb", borderColor: "#fcd34d" }, actionPrimary: { backgroundColor: colors.text, borderColor: colors.text }, actionText: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 11 }, actionTextActive: { color: "#92400e" }, actionTextPrimary: { color: "#fff" }, empty: { color: colors.textMuted, fontFamily: fonts.body, textAlign: "center", paddingVertical: 48 },
 });

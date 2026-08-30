@@ -293,10 +293,7 @@ export default function IdeaShareScreen() {
       <View style={styles.header}>
         <View style={styles.brandLockup}>
           <Image source={require('../../../assets/soon-egg.png')} style={styles.brandLogo} />
-          <View>
-            <Text style={styles.kicker}>SOON–EGG</Text>
-            <Text style={styles.title}>儲存靈感</Text>
-          </View>
+          <Text style={styles.kicker}>SOON–EGG</Text>
         </View>
         <Pressable onPress={dismiss} style={styles.closeButton}>
           <Text style={styles.closeText}>✕</Text>
@@ -403,15 +400,10 @@ const styles = StyleSheet.create({
     height: 48
   },
   kicker: {
-    color: colors.gold,
+    color: colors.primary,
     fontFamily: fonts.bodyBold,
-    fontSize: 12
-  },
-  title: {
-    color: colors.text,
-    fontFamily: fonts.heading,
-    fontSize: 38,
-    lineHeight: 42
+    fontSize: 17,
+    letterSpacing: 0.3
   },
   closeButton: {
     width: 42,
