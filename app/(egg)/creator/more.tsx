@@ -37,6 +37,14 @@ export default function EggMoreScreen() {
   return (
     <EggScreen title="更多">
       <View style={styles.workspaceCard}>
+        <View style={styles.workspaceHeading}>
+          <Text style={styles.workspaceEyebrow}>目前工作空間</Text>
+          {data && data.workspaces.length > 1 ? (
+            <View style={styles.workspaceCountBadge}>
+              <Text style={styles.workspaceCountText}>{data.workspaces.length} 個</Text>
+            </View>
+          ) : null}
+        </View>
         <View style={styles.workspaceMain}>
           {active?.avatar_url ? (
             <Image source={{ uri: active.avatar_url }} style={styles.avatar} />
@@ -69,20 +77,31 @@ export default function EggMoreScreen() {
             {data.workspaces.map((workspace) => (
               <Pressable
                 key={workspace.id}
+                disabled={workspace.id === active?.id || loading}
                 onPress={() => void refresh(workspace.id)}
                 style={[
                   styles.workspaceOption,
                   workspace.id === active?.id && styles.workspaceOptionActive,
                 ]}
               >
-                <Text style={styles.workspaceOptionName}>
-                  {workspace.display_name || workspace.username}
-                </Text>
-                <Text style={styles.workspaceOptionRole}>
-                  {workspace.id === active?.id
-                    ? "目前使用"
-                    : roleLabel(workspace.role)}
-                </Text>
+                <View style={styles.workspaceOptionIdentity}>
+                  {workspace.avatar_url ? (
+                    <Image source={{ uri: workspace.avatar_url }} style={styles.workspaceOptionAvatar} />
+                  ) : (
+                    <View style={[styles.workspaceOptionAvatar, styles.avatarFallback]}>
+                      <Feather name="user" size={15} color={colors.textMuted} />
+                    </View>
+                  )}
+                  <View style={styles.flex}>
+                    <Text style={styles.workspaceOptionName}>{workspace.display_name || workspace.username}</Text>
+                    <Text style={styles.workspaceOptionRole}>{roleLabel(workspace.role)}</Text>
+                  </View>
+                </View>
+                {workspace.id === active?.id ? (
+                  <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>✓ 使用中</Text></View>
+                ) : (
+                  <Feather name="chevron-right" size={17} color="#b8ada7" />
+                )}
               </Pressable>
             ))}
           </View>
@@ -164,14 +183,13 @@ export default function EggMoreScreen() {
       <MenuSection title="工作空間與帳戶">
         <MenuItem
           icon="users"
-          title="團隊成員"
+          title="團隊成員與邀請"
           description={
             canManage
-              ? "邀請及管理工作空間成員"
-              : "只有擁有者或管理員可以管理成員"
+              ? "查看收到的邀請，或管理工作空間成員"
+              : "查看及回應其他工作空間寄俾你嘅邀請"
           }
           onPress={() => router.push("/creator/team" as never)}
-          disabled={!canManage}
         />
         <MenuItem
           icon="settings"
@@ -280,6 +298,10 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
+  workspaceHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  workspaceEyebrow: { color: "#b8ada7", fontFamily: fonts.bodyBold, fontSize: 12 },
+  workspaceCountBadge: { borderRadius: 999, backgroundColor: "#3d322d", paddingHorizontal: 9, paddingVertical: 4 },
+  workspaceCountText: { color: "#e8ded8", fontFamily: fonts.bodyBold, fontSize: 11 },
   workspaceMain: { flexDirection: "row", alignItems: "center", gap: 12 },
   avatar: { width: 48, height: 48, borderRadius: 16, backgroundColor: "#fff" },
   avatarFallback: { alignItems: "center", justifyContent: "center" },
@@ -305,6 +327,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 9,
   },
+  workspaceOptionIdentity: { flex: 1, flexDirection: "row", alignItems: "center", gap: 9 },
+  workspaceOptionAvatar: { width: 34, height: 34, borderRadius: 10, backgroundColor: "#fff" },
   workspaceOptionActive: { backgroundColor: "#3d322d" },
   workspaceOptionName: {
     color: "#fff",
@@ -316,6 +340,8 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 11,
   },
+  activeBadge: { borderRadius: 999, backgroundColor: "#f4e5dc", paddingHorizontal: 9, paddingVertical: 5 },
+  activeBadgeText: { color: colors.primary, fontFamily: fonts.bodyBold, fontSize: 10 },
   section: { gap: 8 },
   sectionTitle: {
     color: colors.textMuted,

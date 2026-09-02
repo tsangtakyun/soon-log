@@ -3,6 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useState } from "react";
 import {
   Alert,
+  Image,
   Modal,
   Pressable,
   SafeAreaView,
@@ -20,6 +21,7 @@ import {
   saveEggPrompt,
   updateEggTeam,
   type EggTeamInvitation,
+  type EggIncomingTeamInvitation,
   type EggTeamMember,
 } from "@/lib/eggApi";
 import { fonts } from "@/lib/theme";
@@ -28,6 +30,7 @@ import { colors } from "@/theme/colors";
 export default function EggTeamScreen() {
   const [members, setMembers] = useState<EggTeamMember[]>([]);
   const [invitations, setInvitations] = useState<EggTeamInvitation[]>([]);
+  const [incoming, setIncoming] = useState<EggIncomingTeamInvitation[]>([]);
   const [role, setRole] = useState<"owner" | "admin" | "member">("member");
   const [email, setEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
@@ -42,6 +45,7 @@ export default function EggTeamScreen() {
       const data = await loadEggTeam();
       setMembers(data.members);
       setInvitations(data.invitations);
+      setIncoming(data.incomingInvitations ?? []);
       setRole(data.currentRole);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "未能載入團隊成員");
@@ -159,7 +163,7 @@ export default function EggTeamScreen() {
               onPress={() =>
                 void run(
                   { action: "invite", email, role: inviteRole },
-                  "邀請已建立；對方登入後會自動加入。",
+                  "邀請已建立；對方接受後先會加入。",
                 )
               }
               style={[
@@ -182,6 +186,14 @@ export default function EggTeamScreen() {
             </Pressable>
           </View>
         ) : null}
+        {!loading ? <View style={styles.card}>
+          <View style={styles.inviteHeader}><View style={styles.inviteHeaderCopy}><Text style={styles.sectionTitle}>收到的邀請</Text><Text style={styles.meta}>只有你接受後先會加入工作空間</Text></View>{incoming.length ? <View style={styles.badge}><Text style={styles.badgeText}>{incoming.length}</Text></View> : null}</View>
+          {incoming.length ? incoming.map((invite) => <View key={invite.id} style={styles.incomingCard}>
+            <View style={styles.workspaceMark}>{invite.workspaceAvatar ? <Image source={{ uri: invite.workspaceAvatar }} style={styles.workspaceAvatar} /> : <Text style={styles.initialText}>{invite.workspaceName.slice(0, 1)}</Text>}</View>
+            <View style={styles.flex}><Text style={styles.email}>{invite.workspaceName}</Text><Text style={styles.meta}>{invite.inviterEmail} 邀請你成為 {label(invite.role)}</Text><Text style={styles.expiry}>有效至 {new Date(invite.expiresAt).toLocaleDateString("zh-HK")}</Text></View>
+            <View style={styles.inviteActions}><Pressable disabled={busy} onPress={() => void run({ action: "decline-invitation", invitationId: invite.id })} style={styles.declineButton}><Text style={styles.declineText}>拒絕</Text></Pressable><Pressable disabled={busy} onPress={() => void run({ action: "accept-invitation", invitationId: invite.id }, "已接受邀請，可以喺首頁切換工作空間。")} style={styles.acceptButton}><Text style={styles.acceptText}>接受</Text></Pressable></View>
+          </View>) : <Text style={styles.emptyInvite}>暫時未有待處理邀請</Text>}
+        </View> : null}
         {!loading ? (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>目前成員</Text>
@@ -382,6 +394,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard,
   },
   promptText: { fontFamily: fonts.bodyBold, color: colors.primary },
+  inviteHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+  inviteHeaderCopy: { flex: 1 },
+  badge: { minWidth: 24, height: 24, borderRadius: 12, backgroundColor: "#fef3c7", alignItems: "center", justifyContent: "center", paddingHorizontal: 7 },
+  badgeText: { fontFamily: fonts.bodyBold, color: "#92400e", fontSize: 12 },
+  incomingCard: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.bodyBorder, paddingTop: 13, gap: 10 },
+  workspaceMark: { width: 42, height: 42, borderRadius: 14, backgroundColor: "#fef3c7", alignItems: "center", justifyContent: "center" },
+  workspaceAvatar: { width: 42, height: 42, borderRadius: 14 },
+  expiry: { fontFamily: fonts.body, color: colors.textMuted, fontSize: 11, marginTop: 4 },
+  inviteActions: { flexDirection: "row", gap: 8 },
+  declineButton: { flex: 1, borderWidth: 1, borderColor: colors.bodyBorder, borderRadius: 10, padding: 10, alignItems: "center" },
+  declineText: { fontFamily: fonts.bodyBold, color: colors.textMuted },
+  acceptButton: { flex: 1, backgroundColor: colors.primary, borderRadius: 10, padding: 10, alignItems: "center" },
+  acceptText: { fontFamily: fonts.bodyBold, color: "#fff" },
+  emptyInvite: { fontFamily: fonts.body, color: colors.textMuted, textAlign: "center", paddingVertical: 14 },
   modalHeader: {
     height: 58,
     flexDirection: "row",

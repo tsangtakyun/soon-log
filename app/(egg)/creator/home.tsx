@@ -87,12 +87,13 @@ export default function EggHomeScreen() {
       {loading ? <EggLoader label="正在載入工作空間…" /> : null}
       {error ? <View style={eggStyles.card}><Text style={eggStyles.cardTitle}>未能載入工作空間</Text><Text style={eggStyles.body}>{error}</Text><Pressable onPress={() => void refresh()}><Text style={eggStyles.link}>重新整理</Text></Pressable></View> : null}
       {data && data.workspaces.length > 1 ? (
-        <View style={eggStyles.card}>
-          <Text style={eggStyles.cardTitle}>切換工作空間</Text>
+        <View style={styles.workspaceSwitcher}>
+          <View style={styles.workspaceHeader}><View><Text style={styles.workspaceEyebrow}>目前工作空間</Text><Text style={styles.workspaceHeading}>{data.activeWorkspace?.display_name || data.activeWorkspace?.username}</Text></View><Feather name="repeat" size={19} color={colors.primary} /></View>
           {data.workspaces.map((workspace) => (
-            <Pressable key={workspace.id} onPress={() => void refresh(workspace.id)} style={eggStyles.row}>
-              <Text style={eggStyles.body}>{workspace.display_name || workspace.username}</Text>
-              <Text style={workspace.id === data.activeWorkspace?.id ? eggStyles.link : eggStyles.body}>{workspace.role}</Text>
+            <Pressable key={workspace.id} disabled={loading || workspace.id === data.activeWorkspace?.id} onPress={() => void refresh(workspace.id)} style={[styles.workspaceOption, workspace.id === data.activeWorkspace?.id && styles.workspaceOptionActive]} accessibilityRole="button" accessibilityLabel={`切換到 ${workspace.display_name || workspace.username}`}>
+              {workspace.avatar_url ? <Image source={{ uri: workspace.avatar_url }} style={styles.workspaceAvatar} /> : <View style={[styles.workspaceAvatar, styles.workspaceAvatarFallback]}><Text style={styles.workspaceInitial}>{(workspace.display_name || workspace.username).slice(0, 1).toUpperCase()}</Text></View>}
+              <View style={styles.workspaceCopy}><Text style={styles.workspaceName}>{workspace.display_name || workspace.username}</Text><Text style={styles.workspaceRole}>{workspace.role === 'owner' ? '擁有者' : workspace.role === 'admin' ? '管理員' : '成員'}</Text></View>
+              {workspace.id === data.activeWorkspace?.id ? <View style={styles.currentBadge}><Feather name="check" size={13} color="#fff" /><Text style={styles.currentBadgeText}>使用中</Text></View> : <Feather name="chevron-right" size={19} color={colors.textMuted} />}
             </Pressable>
           ))}
         </View>
@@ -143,6 +144,20 @@ const styles = StyleSheet.create({
   avatarFallback: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
   hello: { color: colors.text, fontFamily: fonts.bodyBold, fontSize: 25, lineHeight: 31 },
   subheading: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 14 },
+  workspaceSwitcher: { borderRadius: 22, borderWidth: 1, borderColor: colors.bodyBorder, backgroundColor: colors.bgCard, padding: 16, gap: 10 },
+  workspaceHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 2, marginBottom: 2 },
+  workspaceEyebrow: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 11, letterSpacing: 0.8 },
+  workspaceHeading: { color: colors.text, fontFamily: fonts.heading, fontSize: 20, marginTop: 2 },
+  workspaceOption: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.bodyBorder, backgroundColor: colors.bg, paddingHorizontal: 12, paddingVertical: 10 },
+  workspaceOptionActive: { borderColor: '#d9a76c', backgroundColor: '#fff8ea' },
+  workspaceAvatar: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#f3f4f6' },
+  workspaceAvatarFallback: { alignItems: 'center', justifyContent: 'center' },
+  workspaceInitial: { fontFamily: fonts.heading, fontSize: 17, color: colors.primary },
+  workspaceCopy: { flex: 1, minWidth: 0 },
+  workspaceName: { color: colors.text, fontFamily: fonts.bodyBold, fontSize: 15 },
+  workspaceRole: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 12, marginTop: 2 },
+  currentBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, backgroundColor: colors.primary, paddingHorizontal: 9, paddingVertical: 6 },
+  currentBadgeText: { color: '#fff', fontFamily: fonts.bodyBold, fontSize: 11 },
   comingSoon: { borderRadius: 999, backgroundColor: '#fef3c7', paddingHorizontal: 10, paddingVertical: 5 },
   comingSoonText: { color: '#92400e', fontFamily: fonts.bodyBold, fontSize: 11 },
   period: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 12 },

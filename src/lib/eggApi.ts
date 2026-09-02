@@ -227,6 +227,16 @@ export type EggTeamInvitation = {
   created_at?: string;
 };
 
+export type EggIncomingTeamInvitation = {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceAvatar: string | null;
+  inviterEmail: string;
+  role: "admin" | "member";
+  expiresAt: string;
+};
+
 export async function loadEggTeam() {
   const response = await fetch(`${apiBase}/api/mobile/team`, {
     headers: await eggAuthHeaders(),
@@ -236,6 +246,7 @@ export async function loadEggTeam() {
   return result as {
     members: EggTeamMember[];
     invitations: EggTeamInvitation[];
+    incomingInvitations: EggIncomingTeamInvitation[];
     currentRole: "owner" | "admin" | "member";
   };
 }
