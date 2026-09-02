@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -239,7 +240,8 @@ export default function ReplyCentreScreen() {
     const attachment = image;
     const optimistic: EggReplyMessage = {
       role: "user",
-      content: attachment ? `${clean}\n\n[已附上截圖]` : clean,
+      content: clean,
+      attachment_url: attachment ? `data:${attachment.mediaType};base64,${attachment.data}` : null,
       created_at: new Date().toISOString(),
     };
     setMessages((current) => [...current, optimistic]);
@@ -260,7 +262,7 @@ export default function ReplyCentreScreen() {
           : undefined,
       });
       setMessages((current) => [
-        ...current,
+        ...current.map((message) => message === optimistic && result.attachmentUrl ? { ...message, attachment_url: result.attachmentUrl } : message),
         {
           role: "assistant",
           content: result.reply,
@@ -659,6 +661,9 @@ function MessageBubble({ message }: { message: EggReplyMessage }) {
   return (
     <View style={[styles.bubbleRow, user && styles.bubbleRowUser]}>
       <View style={[styles.bubble, user ? styles.userBubble : styles.aiBubble]}>
+        {message.attachment_url ? (
+          <Image source={{ uri: message.attachment_url }} style={styles.messageImage} resizeMode="contain" accessibilityLabel="品牌查詢截圖" />
+        ) : null}
         <Text style={[styles.bubbleText, user && styles.userBubbleText]}>
           {message.content}
         </Text>
@@ -907,6 +912,7 @@ const styles = StyleSheet.create({
     padding: 9,
   },
   attachmentName: { flex: 1, color: "#403a37", fontSize: 13 },
+  messageImage: { width: "100%", height: 280, borderRadius: 14, marginBottom: 12, backgroundColor: "#f2ece8" },
   empty: {
     minHeight: 260,
     alignItems: "center",

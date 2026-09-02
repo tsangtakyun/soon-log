@@ -38,8 +38,9 @@ export default function EggTopicsScreen() {
 
   function manage(idea: EggTopicIdea) {
     const media = idea.media_urls?.length ? idea.media_urls : idea.image_url ? [idea.image_url] : [];
+    const canManageCover = Boolean(idea.manageable || (canDelete && idea.workspace_id));
     Alert.alert("管理題材", idea.title, [
-      ...(idea.manageable ? [{ text: "上載新封面", onPress: async () => {
+      ...(canManageCover ? [{ text: "上載新封面", onPress: async () => {
         const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!permission.granted) return Alert.alert("需要相簿權限", "請允許 EGG 讀取你選擇嘅圖片。");
         const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: false, quality: 0.9 });
@@ -50,7 +51,7 @@ export default function EggTopicsScreen() {
         catch (error) { Alert.alert("更換失敗", error instanceof Error ? error.message : "請稍後再試"); }
         finally { setPendingId(null); }
       } }] : []),
-      ...(idea.manageable && media.length > 1 ? [{ text: "選擇 carousel 封面", onPress: () => Alert.alert("選擇封面", "請選擇想用作封面嘅圖片", media.map((imageUrl, index) => ({ text: `第 ${index + 1} 張`, onPress: async () => { setPendingId(idea.id); try { await changeEggTopicCover(idea.id, imageUrl); setIdeas((current) => current.map((item) => item.id === idea.id ? { ...item, image_url: imageUrl } : item)); } catch (error) { Alert.alert("更換失敗", error instanceof Error ? error.message : "請稍後再試"); } finally { setPendingId(null); } } }))) }] : []),
+      ...(canManageCover && media.length > 1 ? [{ text: "選擇新封面", onPress: () => Alert.alert("選擇新封面", "選取後會取代現有封面", media.map((imageUrl, index) => ({ text: `第 ${index + 1} 張`, onPress: async () => { setPendingId(idea.id); try { await changeEggTopicCover(idea.id, imageUrl); setIdeas((current) => current.map((item) => item.id === idea.id ? { ...item, image_url: imageUrl, media_urls: [imageUrl] } : item)); } catch (error) { Alert.alert("更換失敗", error instanceof Error ? error.message : "請稍後再試"); } finally { setPendingId(null); } } }))) }] : []),
       ...(canDelete ? [{ text: "刪除題材", style: "destructive" as const, onPress: () => Alert.alert("確定刪除？", "刪除後無法復原。", [{ text: "取消", style: "cancel" }, { text: "刪除", style: "destructive", onPress: async () => { setPendingId(idea.id); try { await deleteEggTopic(idea.id); setIdeas((current) => current.filter((item) => item.id !== idea.id)); } catch (error) { Alert.alert("刪除失敗", error instanceof Error ? error.message : "請稍後再試"); } finally { setPendingId(null); } } }]) }] : []),
       { text: "取消", style: "cancel" },
     ]);

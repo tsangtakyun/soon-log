@@ -481,6 +481,7 @@ export type EggReplyMessage = {
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  attachment_url?: string | null;
 };
 
 export async function loadEggReplyWorkspace(projectId?: string) {
@@ -571,7 +572,7 @@ export async function generateEggReply(payload: {
   }
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || "未能生成回覆");
-  return result as { reply: string; brief: EggReplyBrief; projectName?: string; ruleSaved?: boolean; warning?: string };
+  return result as { reply: string; brief: EggReplyBrief; projectName?: string; attachmentUrl?: string; ruleSaved?: boolean; warning?: string };
 }
 
 export type EggAnalyticsSnapshot = {
