@@ -26,6 +26,7 @@ import {
   deleteEggReplyProject,
   generateEggReply,
   loadEggReplyWorkspace,
+  renameEggReplyProject,
   type EggReplyBrief,
   type EggReplyMessage,
   type EggReplyProject,
@@ -61,6 +62,9 @@ export default function ReplyCentreScreen() {
   const [newProjectName, setNewProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [renameVisible, setRenameVisible] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
   const [feedbackMode, setFeedbackMode] = useState<FeedbackMode>("project");
   const activeProject = useMemo(
     () =>
@@ -178,6 +182,32 @@ export default function ReplyCentreScreen() {
       setError(cause instanceof Error ? cause.message : "未能刪除 Project");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  function openRenameProject() {
+    if (!activeProject) return;
+    setRenameValue(activeProject.name);
+    setRenameVisible(true);
+  }
+
+  async function renameProject() {
+    const name = renameValue.trim();
+    if (!activeProject || !name || renaming) return;
+    if (name === activeProject.name) {
+      setRenameVisible(false);
+      return;
+    }
+    setRenaming(true);
+    setError("");
+    try {
+      const updated = await renameEggReplyProject(activeProject.id, name);
+      setProjects((current) => current.map((project) => project.id === updated.id ? { ...project, ...updated } : project));
+      setRenameVisible(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "未能更新 Project 名稱");
+    } finally {
+      setRenaming(false);
     }
   }
 
@@ -347,10 +377,30 @@ export default function ReplyCentreScreen() {
               onRemoveImage={() => setImage(null)}
               onSend={send}
               onShowProjects={() => setPanel("projects")}
+              onRenameProject={openRenameProject}
             />
           ) : null}
         </>
       )}
+      <Modal
+        visible={renameVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !renaming && setRenameVisible(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => !renaming && setRenameVisible(false)}>
+          <Pressable style={styles.modalCard} onPress={() => undefined}>
+            <Text style={styles.modalTitle}>修改 Project 名稱</Text>
+            <TextInput autoFocus value={renameValue} onChangeText={(value) => setRenameValue(value.slice(0, 80))} placeholder="輸入自訂名稱" style={styles.input} selectTextOnFocus />
+            <View style={styles.modalActions}>
+              <TouchableOpacity disabled={renaming} onPress={() => setRenameVisible(false)}><Text style={styles.cancel}>取消</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.primaryButton, (renaming || !renameValue.trim()) && styles.disabled]} disabled={renaming || !renameValue.trim()} onPress={() => void renameProject()}>
+                {renaming ? <ActivityIndicator size="small" color="white" /> : null}<Text style={styles.primaryText}>{renaming ? "儲存中…" : "儲存"}</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <Modal
         visible={newProjectVisible}
         transparent
@@ -499,6 +549,7 @@ function ChatPanel({
   onRemoveImage,
   onSend,
   onShowProjects,
+  onRenameProject,
 }: {
   project: EggReplyProject | null;
   messages: EggReplyMessage[];
@@ -512,12 +563,16 @@ function ChatPanel({
   onRemoveImage: () => void;
   onSend: () => void;
   onShowProjects: () => void;
+  onRenameProject: () => void;
 }) {
   return (
     <View style={styles.flex}>
       <View style={styles.chatHeader}>
         <View style={styles.flex}>
-          <Text style={styles.heading}>{project?.name || "AI 客戶回覆"}</Text>
+          <TouchableOpacity style={styles.renameTitle} onPress={onRenameProject} disabled={!project} accessibilityLabel="修改 Project 名稱">
+            <Text style={styles.heading} numberOfLines={1}>{project?.name || "AI 客戶回覆"}</Text>
+            {project ? <Feather name="edit-2" size={16} color="#6b2218" /> : null}
+          </TouchableOpacity>
           <Text style={styles.muted}>只會草擬回覆，不會自動傳送或接受合作</Text>
         </View>
         <TouchableOpacity onPress={onShowProjects}>
@@ -773,6 +828,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#e8e0da",
   },
+  renameTitle: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "flex-start", maxWidth: "95%" },
   messages: { flexGrow: 1, padding: 16, gap: 12 },
   bubbleRow: { flexDirection: "row", justifyContent: "flex-start" },
   bubbleRowUser: { justifyContent: "flex-end" },

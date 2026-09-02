@@ -524,6 +524,20 @@ export async function deleteEggReplyProject(projectId: string) {
   if (!response.ok) throw new Error(result.error || "未能刪除 Project");
 }
 
+export async function renameEggReplyProject(projectId: string, name: string) {
+  const response = await fetch(`${apiBase}/api/mobile/reply`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(await eggAuthHeaders()),
+    },
+    body: JSON.stringify({ action: "rename_project", projectId, name }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "未能更新 Project 名稱");
+  return result.project as EggReplyProject;
+}
+
 export async function generateEggReply(payload: {
   projectId: string;
   message: string;
