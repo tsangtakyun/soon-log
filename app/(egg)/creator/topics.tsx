@@ -17,9 +17,9 @@ export default function EggTopicsScreen() {
   const [location, setLocation] = useState("全部地區");
   const [loading, setLoading] = useState(true);
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [role, setRole] = useState<"owner" | "admin" | "member">("member");
+  const [canDelete, setCanDelete] = useState(false);
   const refresh = useCallback(async () => {
-    try { const result = await loadEggTopics(); setIdeas(result.ideas); setRole(result.role); } catch (error) { Alert.alert("未能載入", error instanceof Error ? error.message : "請稍後再試"); } finally { setLoading(false); }
+    try { const result = await loadEggTopics(); setIdeas(result.ideas); setCanDelete(result.canDelete); } catch (error) { Alert.alert("未能載入", error instanceof Error ? error.message : "請稍後再試"); } finally { setLoading(false); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
   const categories = useMemo(() => ["全部", ...Array.from(new Set(ideas.map((idea) => idea.category)))], [ideas]);
@@ -39,19 +39,19 @@ export default function EggTopicsScreen() {
   function manage(idea: EggTopicIdea) {
     const media = idea.media_urls?.length ? idea.media_urls : idea.image_url ? [idea.image_url] : [];
     Alert.alert("管理題材", idea.title, [
-      { text: "上載新封面", onPress: async () => {
+      ...(idea.manageable ? [{ text: "上載新封面", onPress: async () => {
         const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!permission.granted) return Alert.alert("需要相簿權限", "請允許 EGG 讀取你選擇嘅圖片。");
         const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: false, quality: 0.9 });
         const asset = result.assets?.[0];
         if (!asset) return;
         setPendingId(idea.id);
-        try { const imageUrl = await uploadEggTopicImage(asset.uri, asset.mimeType || "image/jpeg"); await changeEggTopicCover(idea.id, imageUrl); setIdeas((current) => current.map((item) => item.id === idea.id ? { ...item, image_url: imageUrl, media_urls: [imageUrl, ...(item.media_urls ?? [])] } : item)); }
+        try { const imageUrl = await uploadEggTopicImage(asset.uri, asset.mimeType || "image/jpeg"); await changeEggTopicCover(idea.id, imageUrl); setIdeas((current) => current.map((item) => item.id === idea.id ? { ...item, image_url: imageUrl, media_urls: [imageUrl] } : item)); }
         catch (error) { Alert.alert("更換失敗", error instanceof Error ? error.message : "請稍後再試"); }
         finally { setPendingId(null); }
-      } },
-      ...(media.length > 1 ? [{ text: "選擇 carousel 封面", onPress: () => Alert.alert("選擇封面", "請選擇想用作封面嘅圖片", media.map((imageUrl, index) => ({ text: `第 ${index + 1} 張`, onPress: async () => { setPendingId(idea.id); try { await changeEggTopicCover(idea.id, imageUrl); setIdeas((current) => current.map((item) => item.id === idea.id ? { ...item, image_url: imageUrl } : item)); } catch (error) { Alert.alert("更換失敗", error instanceof Error ? error.message : "請稍後再試"); } finally { setPendingId(null); } } }))) }] : []),
-      { text: "刪除題材", style: "destructive", onPress: () => Alert.alert("確定刪除？", "刪除後無法復原。", [{ text: "取消", style: "cancel" }, { text: "刪除", style: "destructive", onPress: async () => { setPendingId(idea.id); try { await deleteEggTopic(idea.id); setIdeas((current) => current.filter((item) => item.id !== idea.id)); } catch (error) { Alert.alert("刪除失敗", error instanceof Error ? error.message : "請稍後再試"); } finally { setPendingId(null); } } }]) },
+      } }] : []),
+      ...(idea.manageable && media.length > 1 ? [{ text: "選擇 carousel 封面", onPress: () => Alert.alert("選擇封面", "請選擇想用作封面嘅圖片", media.map((imageUrl, index) => ({ text: `第 ${index + 1} 張`, onPress: async () => { setPendingId(idea.id); try { await changeEggTopicCover(idea.id, imageUrl); setIdeas((current) => current.map((item) => item.id === idea.id ? { ...item, image_url: imageUrl } : item)); } catch (error) { Alert.alert("更換失敗", error instanceof Error ? error.message : "請稍後再試"); } finally { setPendingId(null); } } }))) }] : []),
+      ...(canDelete ? [{ text: "刪除題材", style: "destructive" as const, onPress: () => Alert.alert("確定刪除？", "刪除後無法復原。", [{ text: "取消", style: "cancel" }, { text: "刪除", style: "destructive", onPress: async () => { setPendingId(idea.id); try { await deleteEggTopic(idea.id); setIdeas((current) => current.filter((item) => item.id !== idea.id)); } catch (error) { Alert.alert("刪除失敗", error instanceof Error ? error.message : "請稍後再試"); } finally { setPendingId(null); } } }]) }] : []),
       { text: "取消", style: "cancel" },
     ]);
   }
@@ -66,7 +66,7 @@ export default function EggTopicsScreen() {
       {loading && !ideas.length ? <EggLoader label="正在整理題材靈感…" /> : null}
       {filtered.map((idea) => <View key={idea.id} style={styles.card}>
         <TopicMediaCarousel idea={idea} />
-        <View style={styles.cardTop}><Text style={styles.meta}>{idea.platform} · {idea.category}</Text><View style={styles.cardTools}>{role === "owner" && idea.manageable ? <Pressable onPress={() => manage(idea)} hitSlop={10}><Feather name="more-horizontal" size={20} color={colors.textMuted} /></Pressable> : <Feather name="zap" size={17} color="#b45309" />}</View></View>
+        <View style={styles.cardTop}><Text style={styles.meta}>{idea.platform} · {idea.category}</Text><View style={styles.cardTools}>{idea.manageable || (canDelete && idea.workspace_id) ? <Pressable onPress={() => manage(idea)} hitSlop={10}><Feather name="more-horizontal" size={20} color={colors.textMuted} /></Pressable> : <Feather name="zap" size={17} color="#b45309" />}</View></View>
         {idea.recommended ? <View style={styles.recommended}><Text style={styles.recommendedText}>為你推薦</Text></View> : null}
         <Text style={styles.title}>{idea.title}</Text>{idea.summary ? <Text style={styles.summary}>{idea.summary}</Text> : null}
         {idea.why_now ? <View style={styles.whyNow}><Text style={styles.whyNowText}><Text style={styles.whyNowStrong}>點解值得留意：</Text>{idea.why_now}</Text></View> : null}

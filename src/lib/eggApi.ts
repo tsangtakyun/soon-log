@@ -119,7 +119,7 @@ export async function loadEggTopics() {
   const response = await fetch(`${apiBase}/api/mobile/topics`, { headers: await eggAuthHeaders() });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || "未能載入題材靈感");
-  return { ideas: (result.ideas ?? []) as EggTopicIdea[], role: (result.role ?? "member") as EggWorkspace["role"] };
+  return { ideas: (result.ideas ?? []) as EggTopicIdea[], role: (result.role ?? "member") as EggWorkspace["role"], canDelete: result.canDelete === true };
 }
 
 export async function updateEggTopic(ideaId: string, action: "save" | "create" | "dismiss") {
