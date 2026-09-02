@@ -474,9 +474,20 @@ export type EggReplyMessage = {
 
 export async function loadEggReplyWorkspace(projectId?: string) {
   const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
-  const response = await fetch(`${apiBase}/api/mobile/reply${query}`, {
-    headers: await eggAuthHeaders(),
-  });
+  const headers = await eggAuthHeaders();
+  let response: Response | null = null;
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      response = await fetch(`${apiBase}/api/mobile/reply${query}`, { headers });
+      if (response.status < 500 || attempt === 2) break;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 2) break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 450 * (attempt + 1)));
+  }
+  if (!response) throw new Error(lastError instanceof Error && !/network request failed/i.test(lastError.message) ? lastError.message : "網絡連線唔穩定，請稍後再試");
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || "未能載入回覆中心");
   return result as {
@@ -507,14 +518,19 @@ export async function generateEggReply(payload: {
   feedbackMode: "project" | "workspace_rule";
   image?: { data: string; mediaType: string };
 }) {
-  const response = await fetch(`${apiBase}/api/mobile/reply`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(await eggAuthHeaders()),
-    },
-    body: JSON.stringify({ action: "chat", ...payload }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase}/api/mobile/reply`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(await eggAuthHeaders()),
+      },
+      body: JSON.stringify({ action: "chat", ...payload }),
+    });
+  } catch (error) {
+    throw new Error(error instanceof Error && !/network request failed/i.test(error.message) ? error.message : "網絡中斷，訊息未自動重送；草稿已保留，再次送出前請先檢查對話");
+  }
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || "未能生成回覆");
   return result as { reply: string; brief: EggReplyBrief; projectName?: string; ruleSaved?: boolean; warning?: string };

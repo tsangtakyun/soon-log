@@ -42,6 +42,9 @@ export default function ReplyCentreScreen() {
     sharedMime?: string;
   }>();
   const didApplySharedContent = useRef(false);
+  const activeIdRef = useRef<string | null>(null);
+  const loadSequence = useRef(0);
+  const hasLoaded = useRef(false);
   const [projects, setProjects] = useState<EggReplyProject[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<EggReplyMessage[]>([]);
@@ -94,26 +97,33 @@ export default function ReplyCentreScreen() {
   }, [params.sharedImage, params.sharedMime, params.sharedText, params.sharedUrl]);
 
   const load = useCallback(async (projectId?: string, quiet = false) => {
+    const sequence = ++loadSequence.current;
     if (!quiet) setLoading(true);
-    setError("");
     try {
       const result = await loadEggReplyWorkspace(projectId);
+      if (sequence !== loadSequence.current) return;
       setProjects(result.projects);
       setActiveId(result.activeProjectId);
+      activeIdRef.current = result.activeProjectId;
       setMessages(result.messages);
       setFeedbackMode("project");
+      setError("");
+      hasLoaded.current = true;
     } catch (cause) {
+      if (sequence !== loadSequence.current) return;
       setError(cause instanceof Error ? cause.message : "未能載入回覆中心");
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (sequence === loadSequence.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      void load(activeId ?? undefined);
-    }, [activeId, load]),
+      void load(activeIdRef.current ?? undefined, hasLoaded.current);
+    }, [load]),
   );
 
   async function createProject() {
@@ -123,6 +133,7 @@ export default function ReplyCentreScreen() {
       const project = await createEggReplyProject(name);
       setProjects((current) => [project, ...current]);
       setActiveId(project.id);
+      activeIdRef.current = project.id;
       setMessages([]);
       setNewProjectName("");
       setNewProjectVisible(false);
@@ -270,6 +281,7 @@ export default function ReplyCentreScreen() {
               activeId={activeProject?.id}
               onSelect={(id) => {
                 setPanel("chat");
+                activeIdRef.current = id;
                 void load(id);
               }}
               onAdd={() => setNewProjectVisible(true)}
@@ -469,7 +481,14 @@ function ChatPanel({
           <Feather name="folder" size={20} color="#6b2218" />
         </TouchableOpacity>
       </View>
-      <ScrollView style={styles.flex} contentContainerStyle={styles.messages}>
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.messages}
+        bounces={false}
+        overScrollMode="never"
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+      >
         {messages.length ? (
           messages.map((message, index) => (
             <MessageBubble
