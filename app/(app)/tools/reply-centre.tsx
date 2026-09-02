@@ -32,6 +32,7 @@ import {
 
 type Panel = "projects" | "brief" | "chat";
 type Attachment = { data: string; mediaType: string; name: string };
+type FeedbackMode = "project" | "workspace_rule";
 
 export default function ReplyCentreScreen() {
   const params = useLocalSearchParams<{
@@ -53,6 +54,7 @@ export default function ReplyCentreScreen() {
   const [error, setError] = useState("");
   const [newProjectVisible, setNewProjectVisible] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
+  const [feedbackMode, setFeedbackMode] = useState<FeedbackMode>("project");
   const activeProject = useMemo(
     () =>
       projects.find((project) => project.id === activeId) ??
@@ -99,6 +101,7 @@ export default function ReplyCentreScreen() {
       setProjects(result.projects);
       setActiveId(result.activeProjectId);
       setMessages(result.messages);
+      setFeedbackMode("project");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "未能載入回覆中心");
     } finally {
@@ -172,6 +175,7 @@ export default function ReplyCentreScreen() {
         history: messages
           .slice(-6)
           .map(({ role, content }) => ({ role, content })),
+        feedbackMode,
         image: attachment
           ? { data: attachment.data, mediaType: attachment.mediaType }
           : undefined,
@@ -189,12 +193,15 @@ export default function ReplyCentreScreen() {
           project.id === activeProject.id
             ? {
                 ...project,
+                name: result.projectName || project.name,
                 brief: result.brief,
                 updated_at: new Date().toISOString(),
               }
             : project,
         ),
       );
+      if (result.ruleSaved) Alert.alert("商務規則已儲存", "呢個修改之後其他客戶都會套用，舊版本亦已保留。");
+      setFeedbackMode("project");
       if (result.warning) setError(result.warning);
     } catch (cause) {
       setMessages((current) =>
@@ -281,7 +288,9 @@ export default function ReplyCentreScreen() {
               input={input}
               image={image}
               sending={sending}
+              feedbackMode={feedbackMode}
               onInput={setInput}
+              onFeedbackMode={setFeedbackMode}
               onImage={chooseImage}
               onRemoveImage={() => setImage(null)}
               onSend={send}
@@ -409,22 +418,13 @@ function BriefPanel({ project }: { project: EggReplyProject | null }) {
           text="放入品牌查詢截圖或文字後，AI 會自動整理。"
         />
       ) : (
-        <View style={styles.briefCard}>
-          <BriefField label="查詢摘要" value={brief.summary} />
-          <BriefField label="品牌／Agency" value={brief.brand} />
-          <BriefField label="聯絡人" value={brief.contact} />
-          <BriefField label="合作類型" value={brief.collaborationType} />
-          <BriefField label="預算" value={brief.budget} />
-          <BriefField label="Timeline" value={brief.timeline} />
-          <BriefField
-            label="Deliverables"
-            value={brief.deliverables?.join("、")}
-          />
-          <BriefField label="廣告授權／使用權" value={brief.usageRights} />
-          <BriefField label="排他條款" value={brief.exclusivity} />
-          <BriefList label="缺失資料" items={brief.missing} />
-          <BriefList label="商業風險" items={brief.risks} warning />
-          <BriefList label="建議下一步" items={brief.nextSteps} />
+        <View style={styles.briefSections}>
+          <View style={styles.summaryCard}><Text style={styles.summaryLabel}>查詢摘要</Text><Text style={styles.summaryText}>{brief.summary || "未提供"}</Text></View>
+          <View style={styles.briefCard}><Text style={styles.groupTitle}>已知資料</Text><BriefField label="品牌／Agency" value={brief.brand} /><BriefField label="聯絡人" value={brief.contact} /><BriefField label="合作類型" value={brief.collaborationType} /><BriefField label="預算" value={brief.budget} /><BriefField label="Timeline" value={brief.timeline} /><BriefField label="Deliverables" value={brief.deliverables?.join("、")} /></View>
+          <View style={styles.briefCard}><Text style={styles.groupTitle}>商務條款</Text><BriefField label="廣告授權／使用權" value={brief.usageRights} /><BriefField label="排他條款" value={brief.exclusivity} /></View>
+          <BriefList label="待客戶補充" items={brief.missing} tone="missing" />
+          <BriefList label="商業風險" items={brief.risks} tone="risk" />
+          <BriefList label="建議下一步" items={brief.nextSteps} tone="next" />
         </View>
       )}
     </ScrollView>
@@ -437,7 +437,9 @@ function ChatPanel({
   input,
   image,
   sending,
+  feedbackMode,
   onInput,
+  onFeedbackMode,
   onImage,
   onRemoveImage,
   onSend,
@@ -448,7 +450,9 @@ function ChatPanel({
   input: string;
   image: Attachment | null;
   sending: boolean;
+  feedbackMode: FeedbackMode;
   onInput: (value: string) => void;
+  onFeedbackMode: (value: FeedbackMode) => void;
   onImage: () => void;
   onRemoveImage: () => void;
   onSend: () => void;
@@ -487,6 +491,13 @@ function ChatPanel({
         ) : null}
       </ScrollView>
       <View style={styles.composer}>
+        {messages.some((message) => message.role === "assistant") ? (
+          <View style={styles.feedbackModes}>
+            <TouchableOpacity style={[styles.feedbackMode, feedbackMode === "project" && styles.feedbackModeActive]} onPress={() => onFeedbackMode("project")}><Text style={[styles.feedbackModeText, feedbackMode === "project" && styles.feedbackModeTextActive]}>只修改今次草稿</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.feedbackMode, feedbackMode === "workspace_rule" && styles.ruleModeActive]} onPress={() => onFeedbackMode("workspace_rule")}><Text style={[styles.feedbackModeText, feedbackMode === "workspace_rule" && styles.feedbackModeTextActive]}>儲存為商務規則</Text></TouchableOpacity>
+          </View>
+        ) : null}
+        {feedbackMode === "workspace_rule" ? <Text style={styles.ruleHint}>呢段修改會套用到 Workspace 之後所有客戶，並保留版本。</Text> : null}
         {image ? (
           <View style={styles.attachment}>
             <Feather name="image" size={18} color="#6b2218" />
@@ -551,25 +562,26 @@ function MessageBubble({ message }: { message: EggReplyMessage }) {
   );
 }
 function BriefField({ label, value }: { label: string; value?: string }) {
+  const missing = !value || value === "未提供";
   return (
     <View style={styles.briefField}>
       <Text style={styles.label}>{label}</Text>
-      <Text style={styles.body}>{value || "未提供"}</Text>
+      {missing ? <Text style={styles.missingBadge}>未提供</Text> : <Text style={styles.body}>{value}</Text>}
     </View>
   );
 }
 function BriefList({
   label,
   items,
-  warning,
+  tone,
 }: {
   label: string;
   items?: string[];
-  warning?: boolean;
+  tone: "missing" | "risk" | "next";
 }) {
   return (
-    <View style={[styles.listBox, warning && styles.warningBox]}>
-      <Text style={styles.label}>{label}</Text>
+    <View style={[styles.listBox, tone === "missing" && styles.missingBox, tone === "risk" && styles.riskBox, tone === "next" && styles.nextBox]}>
+      <View style={styles.listHeader}><Text style={styles.listTitle}>{label}</Text><Text style={styles.countBadge}>{items?.length ?? 0}</Text></View>
       <Text style={styles.body}>
         {items?.length
           ? items.map((item) => `• ${item}`).join("\n")
@@ -661,23 +673,33 @@ const styles = StyleSheet.create({
   },
   projectName: { fontWeight: "700", color: "#181311", marginBottom: 3 },
   briefCard: {
-    marginTop: 16,
     borderRadius: 18,
     padding: 18,
     backgroundColor: "white",
     borderWidth: 1,
     borderColor: "#e8e0da",
   },
+  briefSections: { marginTop: 16, gap: 12 },
+  summaryCard: { borderRadius: 18, padding: 18, backgroundColor: "#181311" },
+  summaryLabel: { color: "#aaa3a0", fontSize: 11, fontWeight: "800", marginBottom: 8 },
+  summaryText: { color: "white", fontSize: 15, lineHeight: 23 },
+  groupTitle: { color: "#181311", fontSize: 14, fontWeight: "800", marginBottom: 14 },
   briefField: { marginBottom: 16 },
   label: { color: "#6b7280", fontSize: 12, fontWeight: "700", marginBottom: 5 },
   body: { color: "#24201e", lineHeight: 21 },
+  missingBadge: { alignSelf: "flex-start", color: "#9a5b00", backgroundColor: "#fff6df", paddingHorizontal: 9, paddingVertical: 4, borderRadius: 12, fontSize: 12, fontWeight: "700" },
   listBox: {
     padding: 13,
     borderRadius: 12,
     backgroundColor: "#f7f5f3",
     marginBottom: 12,
   },
-  warningBox: { backgroundColor: "#fff6df" },
+  missingBox: { backgroundColor: "#fff6df", borderWidth: 1, borderColor: "#f1d695" },
+  riskBox: { backgroundColor: "#fff0ef", borderWidth: 1, borderColor: "#efc0ba" },
+  nextBox: { backgroundColor: "#edf9f1", borderWidth: 1, borderColor: "#b8e2c6" },
+  listHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 7 },
+  listTitle: { color: "#24201e", fontSize: 12, fontWeight: "800" },
+  countBadge: { backgroundColor: "rgba(255,255,255,0.75)", borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2, fontSize: 11, fontWeight: "700", color: "#6b7280" },
   chatHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -720,6 +742,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: "#e8e0da",
   },
+  feedbackModes: { flexDirection: "row", backgroundColor: "#eee8e3", padding: 4, borderRadius: 12, marginBottom: 8 },
+  feedbackMode: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 9 },
+  feedbackModeActive: { backgroundColor: "white" },
+  ruleModeActive: { backgroundColor: "#6d28d9" },
+  feedbackModeText: { color: "#6b7280", fontSize: 11, fontWeight: "700" },
+  feedbackModeTextActive: { color: "#181311" },
+  ruleHint: { color: "#5b21b6", backgroundColor: "#f3e8ff", padding: 9, borderRadius: 9, marginBottom: 8, fontSize: 11, lineHeight: 16 },
   composerRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   iconButton: {
     width: 44,

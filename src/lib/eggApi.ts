@@ -504,6 +504,7 @@ export async function generateEggReply(payload: {
   projectId: string;
   message: string;
   history: Array<{ role: "user" | "assistant"; content: string }>;
+  feedbackMode: "project" | "workspace_rule";
   image?: { data: string; mediaType: string };
 }) {
   const response = await fetch(`${apiBase}/api/mobile/reply`, {
@@ -516,7 +517,7 @@ export async function generateEggReply(payload: {
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || "未能生成回覆");
-  return result as { reply: string; brief: EggReplyBrief; warning?: string };
+  return result as { reply: string; brief: EggReplyBrief; projectName?: string; ruleSaved?: boolean; warning?: string };
 }
 
 export type EggAnalyticsSnapshot = {
