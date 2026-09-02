@@ -23,6 +23,7 @@ import {
 import { BackHeader } from "@/components/BackHeader";
 import {
   createEggReplyProject,
+  deleteEggReplyProject,
   generateEggReply,
   loadEggReplyWorkspace,
   type EggReplyBrief,
@@ -42,6 +43,7 @@ export default function ReplyCentreScreen() {
     sharedMime?: string;
   }>();
   const didApplySharedContent = useRef(false);
+  const creatingProjectRef = useRef(false);
   const activeIdRef = useRef<string | null>(null);
   const loadSequence = useRef(0);
   const hasLoaded = useRef(false);
@@ -57,6 +59,8 @@ export default function ReplyCentreScreen() {
   const [error, setError] = useState("");
   const [newProjectVisible, setNewProjectVisible] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [feedbackMode, setFeedbackMode] = useState<FeedbackMode>("project");
   const activeProject = useMemo(
     () =>
@@ -128,10 +132,12 @@ export default function ReplyCentreScreen() {
 
   async function createProject() {
     const name = newProjectName.trim();
-    if (!name) return;
+    if (!name || creatingProjectRef.current) return;
+    creatingProjectRef.current = true;
+    setCreatingProject(true);
     try {
       const project = await createEggReplyProject(name);
-      setProjects((current) => [project, ...current]);
+      setProjects((current) => [project, ...current.filter((item) => item.id !== project.id)]);
       setActiveId(project.id);
       activeIdRef.current = project.id;
       setMessages([]);
@@ -140,6 +146,38 @@ export default function ReplyCentreScreen() {
       setPanel("chat");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "建立 Project 失敗");
+    } finally {
+      creatingProjectRef.current = false;
+      setCreatingProject(false);
+    }
+  }
+
+  function confirmDeleteProject(project: EggReplyProject) {
+    Alert.alert("刪除 Project？", `「${project.name}」嘅 Brief 同所有對話都會刪除，無法復原。`, [
+      { text: "取消", style: "cancel" },
+      { text: "刪除", style: "destructive", onPress: () => void removeProject(project) },
+    ]);
+  }
+
+  async function removeProject(project: EggReplyProject) {
+    if (deletingId) return;
+    setDeletingId(project.id);
+    setError("");
+    try {
+      await deleteEggReplyProject(project.id);
+      const remaining = projects.filter((item) => item.id !== project.id);
+      setProjects(remaining);
+      if (activeIdRef.current === project.id) {
+        const nextId = remaining[0]?.id ?? null;
+        activeIdRef.current = nextId;
+        setActiveId(nextId);
+        setMessages([]);
+        if (nextId) await load(nextId, true);
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "未能刪除 Project");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -285,6 +323,8 @@ export default function ReplyCentreScreen() {
                 void load(id);
               }}
               onAdd={() => setNewProjectVisible(true)}
+              onDelete={confirmDeleteProject}
+              deletingId={deletingId}
               refreshing={refreshing}
               onRefresh={() => {
                 setRefreshing(true);
@@ -335,10 +375,12 @@ export default function ReplyCentreScreen() {
                 <Text style={styles.cancel}>取消</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.primaryButton}
+                style={[styles.primaryButton, creatingProject && styles.disabled]}
+                disabled={creatingProject || !newProjectName.trim()}
                 onPress={() => void createProject()}
               >
-                <Text style={styles.primaryText}>建立</Text>
+                {creatingProject ? <ActivityIndicator size="small" color="white" /> : null}
+                <Text style={styles.primaryText}>{creatingProject ? "建立中…" : "建立"}</Text>
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -353,6 +395,8 @@ function ProjectsPanel({
   activeId,
   onSelect,
   onAdd,
+  onDelete,
+  deletingId,
   refreshing,
   onRefresh,
 }: {
@@ -360,6 +404,8 @@ function ProjectsPanel({
   activeId?: string;
   onSelect: (id: string) => void;
   onAdd: () => void;
+  onDelete: (project: EggReplyProject) => void;
+  deletingId: string | null;
   refreshing: boolean;
   onRefresh: () => void;
 }) {
@@ -383,25 +429,22 @@ function ProjectsPanel({
       </View>
       {projects.length ? (
         projects.map((project) => (
-          <TouchableOpacity
+          <View
             key={project.id}
             style={[
               styles.projectCard,
               project.id === activeId && styles.projectActive,
             ]}
-            onPress={() => onSelect(project.id)}
           >
-            <View style={styles.projectIcon}>
-              <Feather name="folder" size={18} color="#6b2218" />
-            </View>
-            <View style={styles.flex}>
-              <Text style={styles.projectName}>{project.name}</Text>
-              <Text style={styles.muted} numberOfLines={1}>
-                {project.brief?.summary || "尚未建立 Brief"}
-              </Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#9ca3af" />
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.projectMain} onPress={() => onSelect(project.id)} disabled={deletingId === project.id}>
+              <View style={styles.projectIcon}><Feather name="folder" size={18} color="#6b2218" /></View>
+              <View style={styles.flex}><Text style={styles.projectName}>{project.name}</Text><Text style={styles.muted} numberOfLines={1}>{project.brief?.summary || "尚未建立 Brief"}</Text></View>
+              <Feather name="chevron-right" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+            <TouchableOpacity accessibilityLabel={`刪除 ${project.name}`} style={styles.deleteProject} onPress={() => onDelete(project)} disabled={Boolean(deletingId)}>
+              {deletingId === project.id ? <ActivityIndicator size="small" color="#a51d16" /> : <Feather name="trash-2" size={18} color="#a51d16" />}
+            </TouchableOpacity>
+          </View>
         ))
       ) : (
         <Empty
@@ -674,13 +717,14 @@ const styles = StyleSheet.create({
   projectCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
     backgroundColor: "white",
     borderWidth: 1,
     borderColor: "#e8e0da",
     borderRadius: 16,
-    padding: 14,
+    overflow: "hidden",
   },
+  projectMain: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
+  deleteProject: { alignSelf: "stretch", width: 52, alignItems: "center", justifyContent: "center", borderLeftWidth: 1, borderLeftColor: "#f0ded9", backgroundColor: "#fff8f6" },
   projectActive: { borderColor: "#8b3b2f", backgroundColor: "#fff9f5" },
   projectIcon: {
     width: 40,

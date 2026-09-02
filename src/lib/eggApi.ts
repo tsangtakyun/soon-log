@@ -511,6 +511,19 @@ export async function createEggReplyProject(name: string) {
   return result.project as EggReplyProject;
 }
 
+export async function deleteEggReplyProject(projectId: string) {
+  const response = await fetch(`${apiBase}/api/mobile/reply`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(await eggAuthHeaders()),
+    },
+    body: JSON.stringify({ action: "delete_project", projectId }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "未能刪除 Project");
+}
+
 export async function generateEggReply(payload: {
   projectId: string;
   message: string;
