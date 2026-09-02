@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Image, Modal, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { EggScreen, eggStyles } from '@/components/egg/EggScreen';
 import { EggLoader } from '@/components/egg/EggLoader';
@@ -39,6 +39,7 @@ export default function EggHomeScreen() {
   const { data, loading, error, refresh } = useEggBootstrap();
   const [topics, setTopics] = useState<EggTopicIdea[]>([]);
   const [topicPage, setTopicPage] = useState(0);
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const topicRailRef = useRef<ScrollView>(null);
   const creator = data?.creator;
   const latest = data?.metrics?.latest;
@@ -71,6 +72,14 @@ export default function EggHomeScreen() {
   const handleTopicScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     setTopicPage(Math.min(visibleTopics.length - 1, Math.max(0, Math.round(event.nativeEvent.contentOffset.x / (topicCardWidth + 10)))));
   }, [topicCardWidth, visibleTopics.length]);
+  const switchWorkspace = useCallback(async (workspaceId: string) => {
+    if (workspaceId === data?.activeWorkspace?.id) {
+      setWorkspaceMenuOpen(false);
+      return;
+    }
+    await refresh(workspaceId);
+    setWorkspaceMenuOpen(false);
+  }, [data?.activeWorkspace?.id, refresh]);
   return (
     <EggScreen>
       <View style={styles.greeting}>
@@ -83,21 +92,15 @@ export default function EggHomeScreen() {
           <Text style={styles.hello}>你好，{name}</Text>
           <Text style={styles.subheading}>今日有咩想創作？</Text>
         </View>
+        {data && data.workspaces.length > 1 ? (
+          <Pressable onPress={() => setWorkspaceMenuOpen(true)} style={({ pressed }) => [styles.workspaceButton, pressed && styles.workspaceButtonPressed]} accessibilityRole="button" accessibilityLabel="切換工作空間">
+            <Feather name="repeat" size={21} color={colors.primary} />
+            <View style={styles.workspaceButtonDot} />
+          </Pressable>
+        ) : null}
       </View>
       {loading ? <EggLoader label="正在載入工作空間…" /> : null}
       {error ? <View style={eggStyles.card}><Text style={eggStyles.cardTitle}>未能載入工作空間</Text><Text style={eggStyles.body}>{error}</Text><Pressable onPress={() => void refresh()}><Text style={eggStyles.link}>重新整理</Text></Pressable></View> : null}
-      {data && data.workspaces.length > 1 ? (
-        <View style={styles.workspaceSwitcher}>
-          <View style={styles.workspaceHeader}><View><Text style={styles.workspaceEyebrow}>目前工作空間</Text><Text style={styles.workspaceHeading}>{data.activeWorkspace?.display_name || data.activeWorkspace?.username}</Text></View><Feather name="repeat" size={19} color={colors.primary} /></View>
-          {data.workspaces.map((workspace) => (
-            <Pressable key={workspace.id} disabled={loading || workspace.id === data.activeWorkspace?.id} onPress={() => void refresh(workspace.id)} style={[styles.workspaceOption, workspace.id === data.activeWorkspace?.id && styles.workspaceOptionActive]} accessibilityRole="button" accessibilityLabel={`切換到 ${workspace.display_name || workspace.username}`}>
-              {workspace.avatar_url ? <Image source={{ uri: workspace.avatar_url }} style={styles.workspaceAvatar} /> : <View style={[styles.workspaceAvatar, styles.workspaceAvatarFallback]}><Text style={styles.workspaceInitial}>{(workspace.display_name || workspace.username).slice(0, 1).toUpperCase()}</Text></View>}
-              <View style={styles.workspaceCopy}><Text style={styles.workspaceName}>{workspace.display_name || workspace.username}</Text><Text style={styles.workspaceRole}>{workspace.role === 'owner' ? '擁有者' : workspace.role === 'admin' ? '管理員' : '成員'}</Text></View>
-              {workspace.id === data.activeWorkspace?.id ? <View style={styles.currentBadge}><Feather name="check" size={13} color="#fff" /><Text style={styles.currentBadgeText}>使用中</Text></View> : <Feather name="chevron-right" size={19} color={colors.textMuted} />}
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
       <View style={styles.topicSection}>
         <View style={eggStyles.sectionHeader}>
           <Text style={eggStyles.cardTitle}>題材靈感</Text>
@@ -133,6 +136,27 @@ export default function EggHomeScreen() {
           <Metric label="互動率" value={latest?.engagement_rate != null ? `${latest.engagement_rate.toFixed(1)}%` : '—'} current={latest?.engagement_rate} previous={previous?.engagement_rate} />
         </View>
       </Pressable>
+      <Modal visible={workspaceMenuOpen} transparent animationType="slide" onRequestClose={() => setWorkspaceMenuOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setWorkspaceMenuOpen(false)}>
+          <Pressable style={styles.workspaceSheet} onPress={(event) => event.stopPropagation()}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <View><Text style={styles.workspaceEyebrow}>工作空間</Text><Text style={styles.sheetTitle}>切換創作者身份</Text></View>
+              <Pressable onPress={() => setWorkspaceMenuOpen(false)} style={styles.closeButton} hitSlop={10} accessibilityLabel="關閉"><Feather name="x" size={20} color={colors.textMuted} /></Pressable>
+            </View>
+            <Text style={styles.sheetHint}>目前使用：{data?.activeWorkspace?.display_name || data?.activeWorkspace?.username}</Text>
+            <View style={styles.workspaceList}>
+              {data?.workspaces.map((workspace) => (
+                <Pressable key={workspace.id} disabled={loading} onPress={() => void switchWorkspace(workspace.id)} style={({ pressed }) => [styles.workspaceOption, workspace.id === data.activeWorkspace?.id && styles.workspaceOptionActive, pressed && styles.workspaceOptionPressed]} accessibilityRole="button" accessibilityLabel={`切換到 ${workspace.display_name || workspace.username}`}>
+                  {workspace.avatar_url ? <Image source={{ uri: workspace.avatar_url }} style={styles.workspaceAvatar} /> : <View style={[styles.workspaceAvatar, styles.workspaceAvatarFallback]}><Text style={styles.workspaceInitial}>{(workspace.display_name || workspace.username).slice(0, 1).toUpperCase()}</Text></View>}
+                  <View style={styles.workspaceCopy}><Text style={styles.workspaceName}>{workspace.display_name || workspace.username}</Text><Text style={styles.workspaceRole}>{workspace.role === 'owner' ? '擁有者' : workspace.role === 'admin' ? '管理員' : '成員'}</Text></View>
+                  {workspace.id === data?.activeWorkspace?.id ? <View style={styles.currentBadge}><Feather name="check" size={13} color="#fff" /><Text style={styles.currentBadgeText}>使用中</Text></View> : <Feather name="chevron-right" size={19} color={colors.textMuted} />}
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </EggScreen>
   );
 }
@@ -144,12 +168,21 @@ const styles = StyleSheet.create({
   avatarFallback: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
   hello: { color: colors.text, fontFamily: fonts.bodyBold, fontSize: 25, lineHeight: 31 },
   subheading: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 14 },
-  workspaceSwitcher: { borderRadius: 22, borderWidth: 1, borderColor: colors.bodyBorder, backgroundColor: colors.bgCard, padding: 16, gap: 10 },
-  workspaceHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 2, marginBottom: 2 },
+  workspaceButton: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: colors.bodyBorder, backgroundColor: colors.bgCard, alignItems: 'center', justifyContent: 'center' },
+  workspaceButtonPressed: { opacity: 0.65, transform: [{ scale: 0.97 }] },
+  workspaceButtonDot: { position: 'absolute', right: 8, top: 8, width: 7, height: 7, borderRadius: 4, borderWidth: 1.5, borderColor: colors.bgCard, backgroundColor: '#d9a76c' },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(31, 24, 21, 0.36)' },
+  workspaceSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: colors.bg, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 34, gap: 14 },
+  sheetHandle: { alignSelf: 'center', width: 42, height: 5, borderRadius: 3, backgroundColor: '#d7d0ca', marginBottom: 4 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sheetTitle: { color: colors.text, fontFamily: fonts.heading, fontSize: 24, marginTop: 2 },
+  sheetHint: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 13 },
+  closeButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.bgCard, alignItems: 'center', justifyContent: 'center' },
+  workspaceList: { gap: 10 },
   workspaceEyebrow: { color: colors.textMuted, fontFamily: fonts.bodyBold, fontSize: 11, letterSpacing: 0.8 },
-  workspaceHeading: { color: colors.text, fontFamily: fonts.heading, fontSize: 20, marginTop: 2 },
   workspaceOption: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.bodyBorder, backgroundColor: colors.bg, paddingHorizontal: 12, paddingVertical: 10 },
   workspaceOptionActive: { borderColor: '#d9a76c', backgroundColor: '#fff8ea' },
+  workspaceOptionPressed: { opacity: 0.7 },
   workspaceAvatar: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#f3f4f6' },
   workspaceAvatarFallback: { alignItems: 'center', justifyContent: 'center' },
   workspaceInitial: { fontFamily: fonts.heading, fontSize: 17, color: colors.primary },
